@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320" role="img" aria-labelledby="title desc">
+  <title id="title">DuckOnWire</title>
+  <desc id="desc">A cheerful yellow duck balancing on a curved blue network cable.</desc>
+  <defs>
+    <path id="cable" d="M32 250C66 250 79 269 117 260S195 238 236 238s39 11 53 1"/>
+    <path id="duck" d="M63 129c31 5 33-22 62-20 18 1 32 14 51 14v-23c-6-11-5-20-1-30 8-23 33-35 55-24 23 11 33 32 27 54l-6 18c2 15 10 25 10 40-2 34-28 58-68 60h-58c-33-1-57-19-68-44l-17-30c-4-9 2-17 13-15Z"/>
+    <path id="feet" d="m141 214 4 35m-13 4 26-3m44-37 3 29m-12 3 25-3"/>
+    <path id="beak" d="m256 84 24 7c7 2 9 8 2 12l-30 8Z"/>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#cable" stroke="#FFFFFF" stroke-width="25"/>
+    <use href="#cable" stroke="#142033" stroke-width="18"/>
+    <use href="#cable" stroke="#32B8F0" stroke-width="11"/>
+    <use href="#feet" stroke="#FFFFFF" stroke-width="15"/>
+    <use href="#feet" stroke="#142033" stroke-width="10"/>
+    <use href="#feet" stroke="#FFA92B" stroke-width="5"/>
+  </g>
+  <g stroke-linejoin="round">
+    <use href="#duck" fill="#FFE100" stroke="#FFFFFF" stroke-width="15"/>
+    <use href="#duck" fill="#FFE100" stroke="#142033" stroke-width="8"/>
+    <use href="#beak" fill="#FFA92B" stroke="#FFFFFF" stroke-width="12"/>
+    <use href="#beak" fill="#FFA92B" stroke="#142033" stroke-width="6"/>
+  </g>
+  <path d="M110 151c20-12 45-10 64 4-7 25-40 37-62 15" fill="#F6C400" stroke="#142033" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="235" cy="78" r="6" fill="#142033"/>
+  <circle cx="237" cy="76" r="1.8" fill="#FFFFFF"/>
+  <path d="M190 68c5-7 13-11 20-12" fill="none" stroke="#FFF36D" stroke-width="7" stroke-linecap="round"/>
+  <g stroke="#FFFFFF" stroke-width="10" stroke-linejoin="round">
+    <rect x="9" y="238" width="24" height="24" rx="5" fill="#FFFFFF"/>
+    <rect x="287" y="226" width="24" height="24" rx="5" fill="#FFFFFF"/>
+  </g>
+  <g fill="#BFEAFE" stroke="#142033" stroke-width="5">
+    <rect x="9" y="238" width="24" height="24" rx="5"/>
+    <rect x="287" y="226" width="24" height="24" rx="5"/>
+  </g>
+  <path d="M17 244v12m7-12v12m271-24v12m7-12v12" fill="none" stroke="#1987B8" stroke-width="3" stroke-linecap="round"/>
+</svg>
