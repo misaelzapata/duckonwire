@@ -2,7 +2,31 @@ name: Native C++ and CMake
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'include/**'
+      - 'tests/*.cpp'
+      - 'tests/support/**'
+      - 'examples/*.cpp'
+      - 'examples/*.c'
+      - 'examples/demo/**'
+      - 'cmake/**'
+      - '!cmake/DocumentationTests.cmake'
+      - 'patches/**'
+      - 'CMakeLists.txt'
   pull_request:
+    paths:
+      - 'src/**'
+      - 'include/**'
+      - 'tests/*.cpp'
+      - 'tests/support/**'
+      - 'examples/*.cpp'
+      - 'examples/*.c'
+      - 'examples/demo/**'
+      - 'cmake/**'
+      - '!cmake/DocumentationTests.cmake'
+      - 'patches/**'
+      - 'CMakeLists.txt'
   workflow_dispatch:
 permissions:
   contents: read

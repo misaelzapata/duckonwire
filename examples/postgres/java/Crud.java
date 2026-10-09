@@ -28,7 +28,7 @@ public final class Crud {
                 statement.setString(1, owner); statement.executeUpdate();
             }
             try (PreparedStatement insert = connection.prepareStatement("INSERT INTO pg_demo_products VALUES(?,?,?,?,?)")) {
-                for (Object[] row : new Object[][] {{1, "Cafe", "19.99", 3}, {2, "Arroz", "8.50", 10}}) {
+                for (Object[] row : new Object[][] {{1, "Coffee", "19.99", 3}, {2, "Rice", "8.50", 10}}) {
                     insert.setString(1, owner); insert.setInt(2, (Integer) row[0]);
                     insert.setString(3, (String) row[1]); insert.setBigDecimal(4, new BigDecimal((String) row[2]));
                     insert.setInt(5, (Integer) row[3]); insert.addBatch();
@@ -45,7 +45,7 @@ public final class Crud {
             try (PreparedStatement select = connection.prepareStatement("SELECT id,name,price,stock FROM pg_demo_products WHERE client=? ORDER BY id")) {
                 select.setString(1, owner);
                 try (ResultSet rows = select.executeQuery()) {
-                    if (!rows.next() || rows.getInt(1) != 1 || !rows.getString(2).equals("Cafe") || rows.getBigDecimal(3).compareTo(new BigDecimal("19.99")) != 0 || rows.getInt(4) != 4) throw new SQLException("Unexpected committed row");
+                    if (!rows.next() || rows.getInt(1) != 1 || !rows.getString(2).equals("Coffee") || rows.getBigDecimal(3).compareTo(new BigDecimal("19.99")) != 0 || rows.getInt(4) != 4) throw new SQLException("Unexpected committed row");
                     String price = rows.getBigDecimal(3).toPlainString();
                     String row = "[" + rows.getInt(1) + ",\"" + rows.getString(2) + "\",\"" + price + "\"," + rows.getInt(4) + "]";
                     if (rows.next()) throw new SQLException("Unexpected second row");

@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let transaction=client.transaction().await?;
     transaction.execute("DELETE FROM pg_demo_products WHERE client=$1",&[&owner]).await?;
     let insert=transaction.prepare("INSERT INTO pg_demo_products VALUES($1,$2,$3,CAST($4 AS VARCHAR)::DECIMAL(18,2),$5)").await?;
-    for (id,name,price,stock) in [(1i32,"Cafe","19.99",3i32),(2,"Arroz","8.50",10)] {
+    for (id,name,price,stock) in [(1i32,"Coffee","19.99",3i32),(2,"Rice","8.50",10)] {
         transaction.execute(&insert,&[&owner,&id,&name,&price,&stock]).await?;
     }
     transaction.execute("UPDATE pg_demo_products SET stock=stock+1 WHERE client=$1 AND id=$2",&[&owner,&1i32]).await?;
@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     transaction.commit().await?;
     let rows=client.query("SELECT id,name,CAST(price AS VARCHAR),stock FROM pg_demo_products WHERE client=$1 ORDER BY id",&[&owner]).await?;
     let selected:Vec<_>=rows.iter().map(|r|serde_json::json!([r.get::<_,i32>(0),r.get::<_,String>(1),r.get::<_,String>(2),r.get::<_,i32>(3)])).collect();
-    if selected != vec![serde_json::json!([1,"Cafe","19.99",4])] { return Err("Unexpected committed row".into()); }
+    if selected != vec![serde_json::json!([1,"Coffee","19.99",4])] { return Err("Unexpected committed row".into()); }
     println!("{}",serde_json::json!({"passed":true,"client":owner,"driver":"tokio-postgres","rows":selected}));
     drop(client);connection_task.await??;Ok(())
 }

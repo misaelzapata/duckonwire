@@ -47,7 +47,7 @@ func main() {
 	if _, err = transaction.Exec(ctx, "DELETE FROM pg_demo_products WHERE client=$1", owner); err != nil {
 		panic(err)
 	}
-	for _, row := range [][]any{{1, "Cafe", "19.99", 3}, {2, "Arroz", "8.50", 10}} {
+	for _, row := range [][]any{{1, "Coffee", "19.99", 3}, {2, "Rice", "8.50", 10}} {
 		if _, err = transaction.Exec(ctx, "INSERT INTO pg_demo_products VALUES($1,$2,$3,CAST($4 AS VARCHAR)::DECIMAL(18,2),$5)", append([]any{owner}, row...)...); err != nil {
 			panic(err)
 		}
@@ -78,7 +78,7 @@ func main() {
 	if err = rows.Err(); err != nil {
 		panic(err)
 	}
-	if len(selected) != 1 || selected[0][0] != 1 || selected[0][1] != "Cafe" || selected[0][2] != "19.99" || selected[0][3] != 4 {
+	if len(selected) != 1 || selected[0][0] != 1 || selected[0][1] != "Coffee" || selected[0][2] != "19.99" || selected[0][3] != 4 {
 		panic("Unexpected committed row")
 	}
 	output, _ := json.Marshal(map[string]any{"passed": true, "client": owner, "driver": "pgx/v5", "rows": selected})

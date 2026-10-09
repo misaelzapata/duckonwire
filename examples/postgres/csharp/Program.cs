@@ -23,7 +23,7 @@ await using (var transaction=await connection.BeginTransactionAsync()) {
     await using (var insert=new NpgsqlCommand("INSERT INTO pg_demo_products VALUES($1,$2,$3,$4,$5)",connection,transaction)) {
         insert.Parameters.AddWithValue(owner);insert.Parameters.AddWithValue(0);insert.Parameters.AddWithValue("");insert.Parameters.AddWithValue(0m);insert.Parameters.AddWithValue(0);
         await insert.PrepareAsync();
-        foreach(var row in new[]{(Id:1,Name:"Cafe",Price:19.99m,Stock:3),(Id:2,Name:"Arroz",Price:8.50m,Stock:10)}) {
+        foreach(var row in new[]{(Id:1,Name:"Coffee",Price:19.99m,Stock:3),(Id:2,Name:"Rice",Price:8.50m,Stock:10)}) {
             insert.Parameters[1].Value=row.Id;insert.Parameters[2].Value=row.Name;insert.Parameters[3].Value=row.Price;insert.Parameters[4].Value=row.Stock;await insert.ExecuteNonQueryAsync();
         }
     }
@@ -37,5 +37,5 @@ await using(var select=new NpgsqlCommand("SELECT id,name,price,stock FROM pg_dem
     select.Parameters.AddWithValue(owner);await using var rows=await select.ExecuteReaderAsync();
     while(await rows.ReadAsync()) selected.Add(new object[]{rows.GetInt32(0),rows.GetString(1),rows.GetDecimal(2).ToString("0.00",CultureInfo.InvariantCulture),rows.GetInt32(3)});
 }
-if(selected.Count!=1||!selected[0].SequenceEqual(new object[]{1,"Cafe","19.99",4})) throw new Exception("Unexpected committed row");
+if(selected.Count!=1||!selected[0].SequenceEqual(new object[]{1,"Coffee","19.99",4})) throw new Exception("Unexpected committed row");
 Console.WriteLine(JsonSerializer.Serialize(new{passed=true,client=owner,driver="Npgsql",rows=selected}));

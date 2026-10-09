@@ -35,8 +35,8 @@ do {
     try command("CREATE TABLE IF NOT EXISTS pg_demo_products(client VARCHAR,id INTEGER,name VARCHAR,price DECIMAL(18,2),stock INTEGER,PRIMARY KEY(client,id))")
     try command("BEGIN")
     try command("DELETE FROM pg_demo_products WHERE client=$1", [owner])
-    try command("INSERT INTO pg_demo_products VALUES($1,$2,$3,$4,$5)", [owner,"1","Cafe","19.99","3"])
-    try command("INSERT INTO pg_demo_products VALUES($1,$2,$3,$4,$5)", [owner,"2","Arroz","8.50","10"])
+    try command("INSERT INTO pg_demo_products VALUES($1,$2,$3,$4,$5)", [owner,"1","Coffee","19.99","3"])
+    try command("INSERT INTO pg_demo_products VALUES($1,$2,$3,$4,$5)", [owner,"2","Rice","8.50","10"])
     try command("UPDATE pg_demo_products SET stock=stock+1 WHERE client=$1 AND id=$2", [owner,"1"])
     try command("DELETE FROM pg_demo_products WHERE client=$1 AND id=$2", [owner,"2"])
     try command("COMMIT")
@@ -44,7 +44,7 @@ do {
     defer { PQclear(result) }
     guard PQntuples(result) == 1 else { throw Failure.database("Unexpected row count") }
     let row: [Any] = [Int(String(cString:PQgetvalue(result,0,0)))!, String(cString:PQgetvalue(result,0,1)), String(cString:PQgetvalue(result,0,2)), Int(String(cString:PQgetvalue(result,0,3)))!]
-    guard row[0] as! Int == 1, row[1] as! String == "Cafe", row[2] as! String == "19.99", row[3] as! Int == 4 else { throw Failure.database("Unexpected committed row") }
+    guard row[0] as! Int == 1, row[1] as! String == "Coffee", row[2] as! String == "19.99", row[3] as! Int == 4 else { throw Failure.database("Unexpected committed row") }
     let output: [String: Any] = ["passed": true, "client": owner, "driver": "libpq", "rows": [row]]
     print(String(data:try JSONSerialization.data(withJSONObject: output, options: [.sortedKeys]), encoding:.utf8)!)
 } catch { fputs("\(error)\n", stderr); exit(1) }

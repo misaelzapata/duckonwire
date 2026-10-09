@@ -12,33 +12,70 @@ Share one persistent DuckDB database through a C++ server. Connect with a normal
 - **Read while writers work:** independent sessions and snapshot isolation.
 - **Keep your data:** commits persist; disconnecting rolls back pending writes.
 
-[Build current source](#connect) · [Quack-only rc.4 bundles](https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.4) · [MIT](LICENSE)
+[Tutorial](#tutorial) · [Examples](#examples-and-tests) · [Quack-only rc.4 bundles](https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.4) · [MIT](LICENSE)
+
+## Tutorial
+
+Choose the connection that fits your application:
+
+| I want to… | Choose | What I configure |
+| --- | --- | --- |
+| Try it on my computer | [Local PostgreSQL connection](#connect) | A shared password; your normal PostgreSQL driver |
+| Give people access over a network | [Protected PostgreSQL connection](#public-access) | A username, password and a trusted server certificate |
+| Use DuckDB's native connection API | [Quack connection](#native-connections-clear-transactions) | The paired DuckDB engine, endpoint and local token |
+| Insert data while other clients query | [Concurrent workload](#try-concurrent-inserts) | One connection per worker |
+| Read objects from S3 or R2 | [Object storage](#s3-and-cloudflare-r2) | Trusted local access and, for private objects, your own cloud credentials |
+
+Start with the local example. The protected option uses the same ordinary **username-and-password login**; TLS and SCRAM are handled by the driver. You do not build a separate login screen or call a project-specific client API.
 
 ## Connect
 
-The PostgreSQL endpoint is new in source; the existing rc.4 downloads contain the previous Quack server. Build with CMake 3.24+, Ninja, C++17, Git and OpenSSL/libcurl development files:
+**1. Start the server.** The PostgreSQL server is available from current source; rc.4 downloads provide Quack. [Build instructions](#build-from-source) are below. From the installed server folder, create a password and start the demo:
 
 ```sh
-git clone https://github.com/misaelzapata/duckonwire.git
-cd duckonwire
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel 3
 openssl rand -hex 32
 export DUCKONWIRE_TOKEN='paste-the-generated-value'
-build/bin/duckonwire-server --root . --init-demo
+./bin/duckonwire-server --init-demo
 ```
 
-In another terminal:
+`--init-demo` imports the public product sample into an empty database; use it only on the first start. It rejects databases with existing tables. To start with an empty database, omit it. The server creates its database file automatically.
+
+**2. Connect with your usual driver.** In another terminal, open the same installed folder:
 
 ```sh
 export PGPASSWORD='paste-the-same-generated-value'
+export PGHOST=127.0.0.1 PGPORT=9496 PGUSER=duckonwire PGDATABASE=duckonwire
 npm install --prefix examples/postgres/node
 node examples/postgres/node/crud.mjs
 ```
 
-The example inserts Cafe and Arroz, updates stock, selects rows, deletes Arroz and commits. Final row: `[[1,"Cafe","19.99",4]]`. Each language uses its usual driver directly, binds values and keeps other clients' rows.
+**3. Check the result.** The example inserts Coffee and Rice, updates stock, selects rows, deletes Rice and commits. It prints `"passed":true` and the final row `[[1,"Coffee","19.99",4]]`. Open the [Node example](examples/postgres/node/crud.mjs) to see the complete connection, parameterized queries and transaction. Each language uses its usual driver directly, binds values and keeps other clients' rows.
+
+An application follows the same flow: connect → send a query with bound values → read the result → close. For several changes that must succeed together, send `BEGIN`, run the changes, then `COMMIT`. On failure, send `ROLLBACK`. Closing a connection discards an unfinished transaction.
 
 Defaults: PostgreSQL `127.0.0.1:9496`, Quack `127.0.0.1:9495`, database `data/demo.duckdb`. PostgreSQL examples accept standard `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE`, `PGPASSWORD`; `DUCKONWIRE_TOKEN` is also accepted. Restart without `--init-demo`. Endpoints bind to loopback; use an SSH tunnel for a remote connection. Protected public access is described below; complete PostgreSQL roles/catalog emulation is not implemented.
+
+<details>
+<summary>Use your own database or connect through an SSH tunnel</summary>
+
+Place your database inside a directory owned by this server, and stop other processes that have it open for writing. From the installed folder:
+
+```sh
+mkdir -p workspace
+./bin/duckonwire-server --root workspace --database data/app.duckdb
+```
+
+This creates or opens `workspace/data/app.duckdb`. All clients connect to the server, which owns the file. Stop the earlier demo server before starting another server on the same ports. Use different `--port` and `--pg-port` values to serve another database with another owner process.
+
+To reach a loopback PostgreSQL listener through an existing SSH account:
+
+```sh
+ssh -N -L 19496:127.0.0.1:9496 your-user@your-server
+```
+
+Connect your driver to `PGHOST=127.0.0.1 PGPORT=19496` with the server's password. SSH encrypts the tunnel. For direct network connections and separate user permissions, use the protected listener below.
+
+</details>
 
 <details>
 <summary>Username, password and remote access</summary>
@@ -51,27 +88,41 @@ Without `DUCKONWIRE_TOKEN`, the server generates 32 random bytes from the operat
 
 ## Public access
 
+**TLS** encrypts the connection, like HTTPS, and lets the client verify the server's identity. **SCRAM** verifies the password without sending it over the connection. Both are standard PostgreSQL driver features. You configure a username, password and certificate verification in your usual driver; it handles the secure connection and password exchange. [TLS documentation](https://www.postgresql.org/docs/current/libpq-ssl.html) · [Password authentication](https://www.postgresql.org/docs/current/auth-password.html).
+
 The protected listener uses **TLS + SCRAM-SHA-256** and a small rules file for one published database. `read` allows queries and transactions; `write` also allows table/schema changes and CRUD. Rules apply to the whole database, not individual tables. Use one owner process per database. [Permission and query-limit results](tests/results/public-access.json).
+
+**Normal login:** the server administrator gives you a host, port, database name, username, password and trusted CA certificate. Enter those in your PostgreSQL driver's usual connection settings. An `app` account can write; a `reader` account can query. Unlike local shared-password mode, these are distinct accounts with distinct permissions.
 
 <details>
 <summary>Configure a protected listener</summary>
 
-Supply a certificate for your hostname and its private key inside the server root. The key and rules file must have mode `0600` or `0400`. Generate a password and its SCRAM verifier:
+**1. Prepare the certificate.** Supply a certificate for your hostname and its private key inside the server root. The client needs the issuing CA certificate (`ca.pem` in this example). The key and rules file must have mode `0600` or `0400`.
+
+**2. Create accounts.** Generate separate passwords for the application and readers. The password tool creates a *verifier*: a value the server uses to check a password, so the rules file does not contain the original password.
 
 ```sh
 export PGPASSWORD="$(openssl rand -hex 32)"
-verifier="$(printf '%s\n' "$PGPASSWORD" | build/bin/duckonwire-password)"
-(umask 077; printf 'database\tduckonwire\nuser\tapp\twrite\t%s\n' "$verifier" > access.tsv)
-build/bin/duckonwire-server --root . --access-file access.tsv \
+verifier="$(printf '%s\n' "$PGPASSWORD" | ./bin/duckonwire-password)"
+export PGREADER_USER=reader PGREADER_PASSWORD="$(openssl rand -hex 32)"
+reader_verifier="$(printf '%s\n' "$PGREADER_PASSWORD" | ./bin/duckonwire-password)"
+(umask 077; printf 'database\tduckonwire\nuser\tapp\twrite\t%s\nuser\treader\tread\t%s\n' "$verifier" "$reader_verifier" > access.tsv)
+```
+
+**3. Start the protected server.** Stop the local demo server first. Import any external data before starting this mode:
+
+```sh
+./bin/duckonwire-server --access-file access.tsv \
   --tls-cert server.crt --tls-key server.key --pg-host 0.0.0.0
 ```
 
 The file uses real tab separators. First record: `database`, database name. Remaining records: `user`, username, `read` or `write`, SCRAM verifier. Add a reader with its own verifier; unknown users and database names are rejected. Passwords generated by the tool require 32–1024 printable ASCII characters. Restart to apply rule changes.
 
-Clients use their normal driver settings and verify the certificate:
+**4. Log in normally.** On the client, set the account password in `PGPASSWORD`. Use the hostname on the certificate and its trusted CA:
 
 ```sh
 export PGHOST=db.example.com PGUSER=app PGDATABASE=duckonwire
+export PGPORT=9496
 export PGSSLMODE=verify-full PGSSLROOTCERT=ca.pem
 node examples/postgres/node/crud.mjs
 ```
@@ -79,6 +130,8 @@ node examples/postgres/node/crud.mjs
 PostgreSQL executes at most **8 queries at once** by default and requests native cancellation after **30 seconds**. Cancellation is cooperative; this is not a hard operating-system deadline for blocked I/O. Excess work receives `53300`; native cancellation returns `57014`. Roll back an explicit failed transaction before retrying, with a delay. Configure these limits with `--max-queries` and `--query-timeout-ms`. Protected mode also limits DuckDB buffers and spill storage to 1 GiB each; this is not a hard limit on total process memory. Authenticated protected connections close after a 300-second idle/frame deadline. These query controls apply to the PostgreSQL endpoint; trusted loopback Quack retains native engine behavior.
 
 Use the generated `PGPASSWORD` in the client environment. No passwords in connection URLs or command arguments. Protected mode blocks external-file/network SQL, extension installation and configuration changes. Initialize or import data locally before enabling it; HTTPFS S3/R2 reads remain available in trusted local mode. Quack stays on loopback with a separate local token. This is basic database access control, not PostgreSQL roles, row-level security or a hardened multi-tenant service. SCRAM-SHA-256-PLUS is not implemented; clients must verify TLS certificates.
+
+To connect as the reader, use `PGUSER=reader` and that account's password. `SELECT` succeeds; `INSERT`, `UPDATE`, `DELETE` and schema changes are rejected. The concurrent example below can use both accounts at once.
 
 </details>
 
@@ -147,7 +200,15 @@ Readers can query while writers insert or update. A transaction keeps its snapsh
 
 ## Native connections, clear transactions
 
-A client creates an actual DuckDB connection:
+Choose Quack when you need DuckDB's native API and can use the paired engine. Quack provides trusted local access; named accounts and the configurable query limits belong to the PostgreSQL endpoint. With the local server running and `DUCKONWIRE_TOKEN` set to its password, run the installed native example:
+
+```sh
+export DUCKONWIRE_ENDPOINT=quack:127.0.0.1:9495
+./bin/cpp-crud-client
+./bin/transaction-flow
+```
+
+The first example performs CRUD; the second checks snapshots, rollback and conflicting writes. HTTPFS and Quack are already built into the paired engine; no `LOAD` commands or extension paths are needed. The native API creates an actual DuckDB connection:
 
 ```cpp
 duckdb::DuckDB database(nullptr);
@@ -183,14 +244,21 @@ Use a separate connection per concurrent worker. DuckDB uses transaction snapsho
 
 ## Measured with readers and writers
 
-Current-source PostgreSQL tests inserted **2,000,000 rows per driver** with **TLS + SCRAM**, four writers and four readers using a separate read-only account. Every reader completed queries during writes; grouped joins and latest-price CTE/window results matched exact expectations.
+Node sent **2,000,000 rows from the client** over a PostgreSQL connection with TLS and SCRAM: **313,781 rows/s**, with reads averaging **5.24 ms**. Four writers committed batches while four readers queried using a read-only account.
 
-| Ordinary PostgreSQL driver, macOS ARM64 loopback | Insert rows/s | Mean mixed read latency |
+Each row contained three integer values, bound in batches of 1,000. The run took 6.37 seconds with 2,000 confirmed commits. Timing includes client-side row creation, transport and commits; setup and final checks are excluded. Counts, checksums, grouped joins and latest-price window results passed. This is a local Apple M1 Pro measurement with a small numeric fixture. [Client ingestion example](examples/postgres/node/ingest.mjs) · [Full results](tests/results/postgres-compatibility.json).
+
+<details>
+<summary>Database-generated rows and native Quack measurements</summary>
+
+Current-source PostgreSQL tests **generated and inserted 2,000,000 rows per driver inside DuckDB** with **TLS + SCRAM**, four writers and four readers using a separate read-only account. Every reader completed queries during writes; grouped joins and latest-price CTE/window results matched exact expectations.
+
+| PostgreSQL driver, generated rows inside DuckDB, macOS loopback | Generated rows/s | Mean mixed read latency |
 | --- | ---: | ---: |
 | Node.js `pg` 8.16.3 | 4,134,046 | 4.78 ms |
 | Python `psycopg` 3.3.6 | 4,150,084 | 6.05 ms |
 
-These fixtures generate rows with **80 prepared batches of 25,000**, with 80 confirmed commits; they do not send two million individual inserts. Timing excludes setup, authentication and final checks. Counts and checksums passed in both runs; the Python run additionally verified persistence after stopping and reopening the server. Measurements use two engine threads on an Apple M1 Pro and show this workload on loopback, not production or WAN performance. [Full results and scopes](tests/results/postgres-compatibility.json).
+These fixtures generate rows with **80 prepared batches of 25,000**, with 80 confirmed commits; the rows are generated by DuckDB, rather than sent as individual client values. This measures database-side generation and writes, not application-to-server ingestion throughput. Timing excludes setup, authentication and final checks. Counts and checksums passed in both runs; the Python run additionally verified persistence after stopping and reopening the server. Measurements use two engine threads on an Apple M1 Pro and show this workload on loopback, not production or WAN performance. [Full results and scopes](tests/results/postgres-compatibility.json).
 
 Fresh **rc.4 binaries** inserted **2,000,000 rows per mode**, with **4 writers + 4 readers**, and verified counts/checksums after reopening. Every reader completed queries during writes.
 
@@ -203,15 +271,24 @@ Writes use 80 typed prepared `INSERT SELECT range` batches of 25,000 rows. One n
 
 See the immutable [release manifest](https://github.com/misaelzapata/duckonwire/releases/download/v0.2.0-rc.4/release.json), [macOS results](https://github.com/misaelzapata/duckonwire/releases/download/v0.2.0-rc.4/benchmark-macos.json) and [Linux results](https://github.com/misaelzapata/duckonwire/releases/download/v0.2.0-rc.4/benchmark-linux.json). Both platforms passed **21 native checks, 14 transaction-flow checks and 17 bootstrap checks**. Older rc.3 results remain historical evidence.
 
+</details>
+
 ## Examples and tests
 
 PostgreSQL: [Node.js](examples/postgres/node/crud.mjs) · [Python](examples/postgres/python/crud.py) · [Java](examples/postgres/java/Crud.java) · [C](examples/postgres/c/crud.c) · [C++](examples/postgres/cpp/crud.cpp) · [Swift](examples/postgres/swift/Crud.swift) · [Lua](examples/postgres/lua/crud.lua) · [Go](examples/postgres/go/main.go) · [Rust](examples/postgres/rust/src/main.rs) · [C#](examples/postgres/csharp/Program.cs).
 
-The [stock Node workload](examples/postgres/node/bulk.mjs) inserts **2,000,000 rows** in 80 prepared batches, with four writers and four readers running CTE, join, grouping and latest-price window queries. It checks exact counts and checksums and removes only its own fixture tables:
+### Try concurrent inserts
+
+Use a test database with the local or protected connection settings above. The [client ingestion workload](examples/postgres/node/ingest.mjs) sends values in prepared batches. It opens **four writer and four reader connections**, while readers run joins, grouped sums and latest-price window queries. It verifies exact results and removes its own fixture tables. Start with 100,000 rows, then try two million:
 
 ```sh
-node examples/postgres/node/bulk.mjs
+PG_INGEST_ROWS=100000 node examples/postgres/node/ingest.mjs
+node examples/postgres/node/ingest.mjs
 ```
+
+The JSON reports `rowsPerSecond`, `readLatency.meanMs`, confirmed commits and each reader's progress during writes. In protected mode, also set `PGREADER_USER=reader` and `PGREADER_PASSWORD` to the reader account's password. Otherwise the readers use the writer's account. Run one copy of this example per database at a time because its fixture table names are fixed.
+
+For a different workload, `node examples/postgres/node/bulk.mjs` generates two million rows *inside DuckDB* using `INSERT SELECT range`. That measures database-side writes; `ingest.mjs` measures values sent from the client. Their throughput numbers describe different work.
 
 <details>
 <summary>Run the other PostgreSQL examples</summary>
@@ -232,23 +309,6 @@ Java uses PostgreSQL JDBC 42.7.7: compile `examples/postgres/java/Crud.java` and
 
 Native Quack: [C](examples/crud_c.c) · [C++](examples/crud_cpp.cpp) · [Python](examples/python/crud.py) · [Node.js](examples/node/crud.mjs) · [Go](examples/go/crud/main.go) · [Rust](examples/rust/src/crud.rs) · [Java](examples/java/NormalCrud.java) · [Swift](examples/swift/Crud.swift) · [C#](examples/csharp/crud/Program.cs) · [Lua](examples/lua/client.lua).
 
-```sh
-ctest --test-dir build --output-on-failure
-```
-
-Windows is not qualified. Native bundles target macOS 26 ARM64 or Ubuntu 24.04 x86-64-v3, glibc 2.39, libcurl 4 and OpenSSL 3. This is an experimental development build.
-
-<details>
-<summary>Source pins, upstream updates and packaging</summary>
-
-Our server, tests and examples live here. [DuckDB](https://github.com/misaelzapata/duckdb/tree/duckonwire/native) and [Quack](https://github.com/misaelzapata/duckdb-quack/tree/duckonwire/native) changes live in separate forks. [Pins.cmake](cmake/Pins.cmake) fixes DuckDB `848126236a4a8879f232bed7ab5f702683a55300`, Quack `a6e7cb9243ee3d7ec0e5371b720be3292a32061f` and official HTTPFS `96a2f2e88e5dd075facbc5a65dc3afd67aa2bb44`.
-
-CMake keeps clean checkouts in `upstream/` and build copies in `build/sources/`; it does not replay core/Quack patches. Canonical diffs remain in `patches/`. To update upstream, fetch it, choose a fixed commit, merge or rebase on a new integration branch, then rebuild and retest before changing pins. Never follow a moving HEAD.
-
-[Package.cmake](cmake/Package.cmake) packages a clean committed checkout and completed native build, verifies installed binaries, and emits an archive, manifest and checksums. GitHub supplies source archives at the release tag. [Historical results index](tests/results/index.json) preserves prior build provenance.
-
-</details>
-
 ## S3 and Cloudflare R2
 
 HTTPFS is built into the server. S3 and R2 reads were checked locally, through Quack and through a stock PostgreSQL driver, matching byte counts and SHA-256 against real object-storage reads. No cloud objects were modified. [Recorded cloud results](tests/results/object-storage.json). Protected public listeners disable these external reads by default.
@@ -257,15 +317,81 @@ HTTPFS is built into the server. S3 and R2 reads were checked locally, through Q
 SELECT size FROM read_blob('s3://noaa-ghcn-pds/ghcnd-countries.txt');
 ```
 
-R2 uses a `TYPE r2` secret and an `r2://bucket/object` URI; use your own account and credentials. [R2 setup](https://duckdb.org/docs/current/guides/network_cloud_storage/cloudflare_r2_import) · [S3 setup](https://duckdb.org/docs/current/core_extensions/httpfs/s3api). Explicit credentials are supported by built-in HTTPFS; AWS IAM `credential_chain` additionally needs the AWS extension.
+That query reads a public S3 object's size in bytes. For your own Parquet data, use `SELECT * FROM read_parquet('s3://your-bucket/your-file.parquet') LIMIT 10`. Private buckets need a connection-local secret; follow the provider setup links with your own credentials. R2 uses a `TYPE r2` secret and an `r2://bucket/object` URI. [R2 setup](https://duckdb.org/docs/current/guides/network_cloud_storage/cloudflare_r2_import) · [S3 setup](https://duckdb.org/docs/current/core_extensions/httpfs/s3api). Explicit credentials are supported by built-in HTTPFS; AWS IAM `credential_chain` additionally needs the AWS extension.
+
+These are trusted-local operations. A protected public account cannot create cloud secrets or read external objects. Import the data locally first if those accounts need to query it.
 
 ## Public demo
 
 **46,462 real manufacturer-brand products** from Argentina and Spain, with reproducible **synthetic prices**. No stores, retailer/private-label brands or private identifiers. Included [CSV](examples/demo/products.csv) and [schema](examples/demo/schema.sql) support `--init-demo`; the benchmark uses a separate generated fixture. Own code is MIT; see [third-party notices](THIRD_PARTY_NOTICES.txt).
 
+## Server options
+
+The defaults are enough for local use. Open this reference when you need a different database, network address or query limit.
+
+<details>
+<summary>Every server option, with its purpose and default</summary>
+
+| Option | What it does | Default or example |
+| --- | --- | --- |
+| `--root DIRECTORY` | Keeps the database, runtime state and configuration inside one server workspace. The directory must already exist. | Current directory; `--root workspace` |
+| `--database PATH` | Opens an existing DuckDB database or creates a new one inside the root. | `data/demo.duckdb` |
+| `--state PATH` | Writes the private connection descriptor; it includes the local token. Use a different path from the database. | `.runtime/native.json` |
+| `--init-demo` | Imports the public sample when initializing the demo; omit it for an empty or existing application database. | Off |
+| `--port NUMBER` | Chooses the loopback Quack port. | `9495`; range 1–65535 |
+| `--pg-port NUMBER` | Chooses the PostgreSQL port. `0` asks the OS for a free port, recorded in the descriptor. | `9496`; range 0–65535 |
+| `--pg-host ADDRESS` | Chooses where PostgreSQL listens. A network listener requires protected access. | `127.0.0.1`; protected example `0.0.0.0` |
+| `--access-file PATH` | Enables named accounts and whole-database `read`/`write` permissions from a tab-separated rules file. Requires TLS. | Off; `access.tsv` |
+| `--tls-cert PATH` | Supplies the server certificate for protected access. Its hostname must match what clients connect to. | Required with access rules; `server.crt` |
+| `--tls-key PATH` | Supplies the certificate's private key. Keep it inside the root with mode `0600` or `0400`. | Required with access rules; `server.key` |
+| `--max-queries NUMBER` | Caps simultaneously executing PostgreSQL queries. Extra work gets `53300`, so clients can retry after a delay. | `8`; range 1–256 |
+| `--query-timeout-ms NUMBER` | Requests cancellation of a PostgreSQL query after this many milliseconds; see the cooperative-cancellation limits above. | `30000`; range 1–3600000 |
+| `--help` | Prints the command reference and exits. | `./bin/duckonwire-server --help` |
+
+Relative paths resolve inside `--root`, even when the executable lives elsewhere. Stop the server with Ctrl+C or SIGTERM to close sessions and remove its runtime descriptor. Do not delete a descriptor or database file while its owner is running.
+
+</details>
+
+## For agents and contributors
+
+[AGENTS.md](AGENTS.md) explains the architecture, connection choices and verification commands. The [documentation workflow](.github/workflows/documentation.yml) checks links and server options, then runs native transactions, ordinary PostgreSQL login/CRUD, TLS/SCRAM and concurrent inserts with complex reads. Its results state the platform and workload; cloud checks remain separately recorded in the [result index](tests/results/index.json).
+
+## Build from source
+
+<details>
+<summary>Build, test and package (for contributors)</summary>
+
+Build dependencies: CMake 3.24+, Ninja, C++17, Git and OpenSSL/libcurl development files.
+
+Windows is not qualified. Native bundles target macOS 26 ARM64 or Ubuntu 24.04 x86-64-v3, glibc 2.39, libcurl 4 and OpenSSL 3. This is an experimental development build.
+
+```sh
+git clone https://github.com/misaelzapata/duckonwire.git
+cd duckonwire
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel 3
+ctest --test-dir build --output-on-failure
+cmake --install build --prefix dist
+cd dist
+```
+
+The installed folder contains `bin/`, the paired engine and the examples. Use the quick-start commands from this folder.
+
+The native server, examples and tests live here; engine changes live in the [DuckDB](https://github.com/misaelzapata/duckdb/tree/duckonwire/native) and [Quack](https://github.com/misaelzapata/duckdb-quack/tree/duckonwire/native) forks. [Build pins](cmake/Pins.cmake) and the [result index](tests/results/index.json) record exact versions, patches and reproducible commands. [Packaging instructions](cmake/Package.cmake) live with the build tooling.
+
+</details>
+
 ## Español
 
-DuckOnWire comparte una base DuckDB mediante un servidor C++. El endpoint PostgreSQL permite usar drivers normales sin cambiar DuckDB en los clientes; Quack conserva la API nativa con un motor compatible con protocolo 7. Ambos usan sesiones independientes: `COMMIT` confirma, `ROLLBACK` descarta y cerrar una conexión revierte cambios pendientes. Cada cliente obtiene una conexión DuckDB nativa dentro del mismo proceso dueño del archivo; así hay lectores y escritores simultáneos sin abrir el archivo desde varios procesos. La tabla distingue versiones probadas y evidencia histórica. El endpoint PostgreSQL se compila desde el código actual; los paquetes rc.4 anteriores contienen sólo Quack. El acceso público básico usa TLS y SCRAM, con usuarios de lectura o escritura por base y límites de consultas; SQL y almacenamiento siguen siendo DuckDB. Proyecto experimental, MIT; demo público de Argentina y España con precios ficticios.
+DuckOnWire permite compartir una base DuckDB mediante un servidor C++. Puedes usar tu driver PostgreSQL habitual sin cambiar DuckDB en los clientes, o Quack con el motor nativo compatible. El [tutorial](#tutorial) recorre estas opciones:
+
+1. **Probar en tu máquina:** inicia el servidor y ejecuta un ejemplo con la misma contraseña. En este modo la contraseña es compartida; el nombre de usuario no crea permisos separados.
+2. **Dar acceso por red:** configura cuentas reales de lectura o escritura y un certificado. El login sigue siendo **usuario y contraseña**. TLS cifra la conexión y verifica el servidor; SCRAM comprueba la contraseña sin enviarla. El driver se encarga de ambos.
+3. **Usar Quack nativo:** ejecuta los clientes incluidos con el endpoint y token local. No necesitas cargar extensiones manualmente, pero sí un motor compatible.
+4. **Leer y escribir a la vez:** cada trabajador abre su conexión. `COMMIT` confirma, `ROLLBACK` descarta y cerrar una conexión revierte cambios pendientes. Un lector conserva su vista de los datos hasta terminar su transacción; dos escritores que cambian la misma fila pueden entrar en conflicto.
+5. **Probar carga real:** `ingest.mjs` envía valores desde Node; `bulk.mjs` genera filas dentro de DuckDB. Los resultados muestran velocidad, latencia y comprobaciones de integridad. S3/R2 se usan desde conexiones locales de confianza; el acceso público protegido bloquea esas lecturas externas.
+
+Todas las opciones del servidor están en la [referencia desplegable](#server-options); las instrucciones de compilación quedan al final para quien las necesite. Hay una [guía para agentes](AGENTS.md) y un workflow que ejecuta los ejemplos. El servidor PostgreSQL está en el código actual; los paquetes rc.4 anteriores contienen sólo Quack. Proyecto experimental, MIT; demo público de Argentina y España con precios ficticios.
 
 ## 中文
 

@@ -1,11 +1,12 @@
 name: PostgreSQL driver compatibility
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_call:
   workflow_dispatch:
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 jobs:
   postgres:
     runs-on: ubuntu-24.04
@@ -17,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Dependencies
-        run: sudo apt-get update && sudo apt-get install -y g++ libpq-dev libcurl4t64 libssl-dev
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ libpq-dev libcurl4t64 libssl-dev python3-venv
       - name: Reuse the qualified pinned engine
         # The engine pins have not changed. Compile this server and its tests
         # afresh against the immutable rc.4 library, verifying the whole archive.
@@ -53,6 +54,8 @@ jobs:
           g++ "${flags[@]}" tests/native_tests.cpp "${libraries[@]}" -o build/bin/native-tests
           g++ "${flags[@]}" examples/transaction_flow.cpp "${libraries[@]}" -o build/bin/transaction-flow
           cc -I"$(pg_config --includedir)" examples/postgres/c/crud.c -L"$(pg_config --libdir)" -lpq -o build/bin/pg-crud
+      - name: Verify the guide against the fresh server help
+        run: cmake -DSOURCE_DIR="$PWD" -DSERVER_BINARY="$PWD/build/bin/duckonwire-server" -DREPORT_FILE="$PWD/build/test-results/documentation.json" -P cmake/DocumentationTests.cmake
       - name: Native acceptance against the fresh server
         run: |
           build/bin/access-tests --fixture-parent build/test-results | tee build/test-results/access-rules.json
@@ -117,6 +120,36 @@ jobs:
           build/bin/pg-crud | tee build/test-results/tls-libpq-crud.json
           build/pg-python/bin/python examples/postgres/python/crud.py | tee build/test-results/tls-psycopg-crud.json
           node examples/postgres/node/crud.mjs | tee build/test-results/tls-node-crud.json
+          # Normal username/password login through the standard pg driver.
+          # The actual reader account must query and must not insert a row.
+          (
+            cd examples/postgres/node
+            node --input-type=module <<'NODE'
+          import { Client } from 'pg';
+          import { readFileSync } from 'node:fs';
+          const config = { host: process.env.PGHOST ?? '127.0.0.1', port: Number(process.env.PGPORT),
+            user: process.env.PGUSER ?? 'duckonwire', database: process.env.PGDATABASE ?? 'duckonwire',
+            password: process.env.PGPASSWORD, ssl: { ca: readFileSync(process.env.PGSSLROOTCERT), rejectUnauthorized: true } };
+          const writer = new Client(config);
+          const reader = new Client({ ...config, user: process.env.PGREADER_USER, password: process.env.PGREADER_PASSWORD });
+          const label = 'PostgreSQL CI reader denial';
+          try {
+            await writer.connect(); await reader.connect();
+            const existing = await reader.query('SELECT count(*) AS n FROM pg_demo_products');
+            if (BigInt(existing.rows[0].n) < 1n) throw new Error('Reader could not query writer-created rows');
+            let rejected = false;
+            try { await reader.query('INSERT INTO pg_demo_products VALUES($1,$2,$3,$4,$5)', [label, 1, 'Denied row', '1.00', 1]); }
+            catch (error) { if (error.code !== '42501') throw error; rejected = true; }
+            if (!rejected) throw new Error('Reader inserted a row');
+            const state = await writer.query('SELECT count(*) AS n FROM pg_demo_products WHERE client=$1', [label]);
+            if (BigInt(state.rows[0].n) !== 0n) throw new Error('Denied insert changed shared state');
+            console.log(JSON.stringify({ passed: true, driver: 'pg', sslmode: 'verify-full',
+              readerSelectAllowed: true, readerInsertSqlstate: '42501', sharedStateUnchanged: true }));
+          } finally { await Promise.allSettled([reader.end(), writer.end()]); }
+          NODE
+          ) | tee build/test-results/tls-reader-permissions.json
+          # Every price value is constructed by the client and bound over TLS.
+          PG_INGEST_ROWS=100000 node examples/postgres/node/ingest.mjs | tee build/test-results/tls-values-ingestion.json
           node examples/postgres/node/bulk.mjs | tee build/test-results/tls-node-bulk.json
           kill -TERM "$owner_pid"
           wait "$owner_pid"

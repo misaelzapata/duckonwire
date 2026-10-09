@@ -1,5 +1,6 @@
 /upstream/
 /build*/
+/dist/
 /.cache/
 /data/
 /.runtime/

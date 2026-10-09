@@ -1,0 +1,28 @@
+name: Documentation and executable tutorial
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  guide:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check guide links, anchors and code fences
+        run: cmake -DSOURCE_DIR="$PWD" -DREPORT_FILE="$PWD/build/documentation.json" -P cmake/DocumentationTests.cmake
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: documentation-structure
+          path: build/documentation.json
+          if-no-files-found: error
+  executable-tutorial:
+    needs: guide
+    uses: ./.github/workflows/postgres.yml
+    # Reuses the verified pinned engine, compiles the current C++ server, checks
+    # --help, and runs native/protocol tests and C/Python/Node TLS/SCRAM examples.
+    # The VALUES smoke sends 100,000 rows with 4 writers and 4 read-only clients.
+    # Private S3/R2 accounts and credentials are intentionally absent from CI.

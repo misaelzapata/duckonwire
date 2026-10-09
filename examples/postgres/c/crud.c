@@ -42,7 +42,7 @@ int main(void) {
     bound(connection, "DELETE FROM pg_demo_products WHERE client=$1", 1, owner);
     PGresult *prepared = PQprepare(connection, "insert_product", "INSERT INTO pg_demo_products VALUES($1,$2,$3,$4,$5)", 5, NULL);
     checked(connection, prepared); PQclear(prepared);
-    const char *products[2][5] = {{CLIENT_LABEL, "1", "Cafe", "19.99", "3"}, {CLIENT_LABEL, "2", "Arroz", "8.50", "10"}};
+    const char *products[2][5] = {{CLIENT_LABEL, "1", "Coffee", "19.99", "3"}, {CLIENT_LABEL, "2", "Rice", "8.50", "10"}};
     for (int i = 0; i < 2; i++) {
         PGresult *inserted = PQexecPrepared(connection, "insert_product", 5, products[i], NULL, NULL, 0);
         checked(connection, inserted); PQclear(inserted);
@@ -53,7 +53,7 @@ int main(void) {
     command(connection, "COMMIT");
     PGresult *selected = PQexecParams(connection, "SELECT id,name,price,stock,json_array(id,name,CAST(price AS VARCHAR),stock) FROM pg_demo_products WHERE client=$1 ORDER BY id", 1, NULL, owner, NULL, NULL, 0);
     checked(connection, selected);
-    if (PQntuples(selected) != 1 || strcmp(PQgetvalue(selected,0,0), "1") || strcmp(PQgetvalue(selected,0,1), "Cafe") || strcmp(PQgetvalue(selected,0,2), "19.99") || strcmp(PQgetvalue(selected,0,3), "4")) {
+    if (PQntuples(selected) != 1 || strcmp(PQgetvalue(selected,0,0), "1") || strcmp(PQgetvalue(selected,0,1), "Coffee") || strcmp(PQgetvalue(selected,0,2), "19.99") || strcmp(PQgetvalue(selected,0,3), "4")) {
         fprintf(stderr, "Unexpected committed row\n"); PQclear(selected); PQfinish(connection); return 1;
     }
     printf("{\"passed\":true,\"client\":\"%s\",\"driver\":\"libpq\",\"rows\":[%s]}\n", CLIENT_LABEL, PQgetvalue(selected,0,4));
