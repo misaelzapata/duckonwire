@@ -1,0 +1,78 @@
+{
+  "kind": "real_public_product_catalog_with_synthetic_prices",
+  "seed": 20261008,
+  "maximum_combined_products": 100000,
+  "selection_limit": 100000,
+  "country_meaning": "national catalog market; not manufacturing origin",
+  "sources": [
+    {
+      "country_code": "AR",
+      "country_meaning": "national catalog market; not manufacturing origin",
+      "source_sha256_before": "ae376b97206aae7d0792d11f5b163270d756b57e9274de876a3906834c7d5527",
+      "source_sha256_after": "ae376b97206aae7d0792d11f5b163270d756b57e9274de876a3906834c7d5527",
+      "source_rows": 294521,
+      "eligible_unique_rows": 29274,
+      "excluded_rows": {
+        "duplicate_public_fields": 6880,
+        "manufacturer_not_verified_for_market": 198803,
+        "missing_brand": 7049,
+        "private_label_or_retailer_brand": 52275,
+        "retailer_or_private_label_mention": 240
+      },
+      "read_only": true,
+      "public_fields_only": true,
+      "stock_status_categories_replaced_with_empty_category": 0,
+      "market_evidence": {
+        "country_code": "AR",
+        "nonempty_branch_geography_rows": 2418,
+        "branch_geography_matching_market": 2418,
+        "nonempty_source_url_rows": 197359,
+        "argentine_domain_rows": 197359,
+        "country_arguments_checked_against_snapshot_contents": true,
+        "raw_branch_names_or_source_urls_exported": false
+      },
+      "selected_rows": 29274,
+      "eligible_rows_outside_cap": 0
+    },
+    {
+      "country_code": "ES",
+      "country_meaning": "national catalog market; not manufacturing origin",
+      "source_sha256_before": "2dc49e15c1e504530c3247364dbe8d0d0bbf9747a158a7962363eb2c2f8f7f9b",
+      "source_sha256_after": "2dc49e15c1e504530c3247364dbe8d0d0bbf9747a158a7962363eb2c2f8f7f9b",
+      "source_rows": 249534,
+      "eligible_unique_rows": 17188,
+      "excluded_rows": {
+        "duplicate_public_fields": 2408,
+        "manufacturer_not_verified_for_market": 130665,
+        "missing_brand": 65156,
+        "missing_name_or_oversized_basic_field": 8,
+        "nonpublic_or_url_content": 5,
+        "private_label_or_retailer_brand": 33342,
+        "retailer_or_private_label_mention": 762
+      },
+      "read_only": true,
+      "public_fields_only": true,
+      "stock_status_categories_replaced_with_empty_category": 1,
+      "market_evidence": {
+        "country_code": "ES",
+        "nonempty_branch_geography_rows": 25,
+        "branch_geography_matching_market": 25,
+        "nonempty_source_url_rows": 177481,
+        "argentine_domain_rows": 0,
+        "country_arguments_checked_against_snapshot_contents": true,
+        "raw_branch_names_or_source_urls_exported": false
+      },
+      "selected_rows": 17188,
+      "eligible_rows_outside_cap": 0
+    }
+  ],
+  "brands_policy": "exact manufacturer allowlist, country-scoped; unknown brands skipped",
+  "source_identifiers_exported": false,
+  "source_urls_exported": false,
+  "gtin_exported": false,
+  "gtin_omission_reason": "source barcodes were not independently verified as public manufacturer barcodes",
+  "source_prices_read_or_exported": false,
+  "category_cleanup": "stock-status markers become empty category; product and its other basic fields are preserved",
+  "prices": "synthetic seeded values without declared real-world currency",
+  "retailer_private_labels_included": false
+}

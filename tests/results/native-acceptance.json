@@ -1,0 +1,1102 @@
+{
+  "passed": true,
+  "scope": "Native CMake engine and installed runtime acceptance; official language clients with native Quack CONNECT",
+  "completed_at": "2026-10-09T19:14:07.028688+00:00",
+  "platform": "macOS arm64",
+  "engine_version": "v2.1.0-dev0",
+  "quack_protocol": 7,
+  "builtin_extensions": [
+    "httpfs",
+    "quack"
+  ],
+  "manual_load_required": false,
+  "engine_library_sha256": "ed06b208de9b227b7e94a901806be8d20f01490e1cba19024a5cd4fa7491a5df",
+  "server_installed_sha256": "7d97c56b9486ee70c4d67145bed254a7d8d680fa23e55c5ef86d20f9d4ebb079",
+  "upstream_and_patches": [
+    {
+      "name": "duckdb",
+      "commit": "638b09261a334feb2f7deb742fe3996db3c974b1",
+      "patch_sha256": "88a88808e8df55ee675c4f14e74d1e0cd3caddd190e617da3f623804ab7f6280"
+    },
+    {
+      "name": "quack",
+      "commit": "984d45d27e4042906328fb2bd0cdb631d0e602a7",
+      "patch_sha256": "e63842a385e4ed48d7c0708d9f7c5a470e4638d8f9d25a1184f5cdc4d4a4d03c"
+    },
+    {
+      "name": "duckdb-python",
+      "commit": "b96ec17de8f38d0e52f954c0b97b2fd958b80e0b",
+      "patch_sha256": "652ffbaab5c5afeb04186523eb2a8a373273f704e86297a8917e14f659a1c6bc"
+    },
+    {
+      "name": "httpfs",
+      "commit": "96a2f2e88e5dd075facbc5a65dc3afd67aa2bb44",
+      "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "duckdb-java",
+      "commit": "5b624bb72a883e73356ed9f3a5109e1886383636",
+      "patch_sha256": "70e646f362b7c976a1103ff9708c26549020226664a0be3ff2e1299c1dfcbb05"
+    }
+  ],
+  "native_cpp": {
+    "passed": true,
+    "executed": 21,
+    "failed": 0,
+    "checks": [
+      {
+        "name": "builtin_extensions_and_private_descriptor",
+        "passed": true
+      },
+      {
+        "name": "typed_parameter_crud_no_sql_interpolation",
+        "passed": true
+      },
+      {
+        "name": "named_parameters",
+        "passed": true
+      },
+      {
+        "name": "repeated_prepared_batch_and_commit",
+        "passed": true
+      },
+      {
+        "name": "complex_typed_parameters_and_null",
+        "passed": true
+      },
+      {
+        "name": "native_result_types_and_duplicate_names",
+        "passed": true
+      },
+      {
+        "name": "ddl_visibility_between_sessions",
+        "passed": true
+      },
+      {
+        "name": "sql_and_bind_errors_leave_session_usable",
+        "passed": true
+      },
+      {
+        "name": "native_begin_commit_rollback_methods",
+        "passed": true
+      },
+      {
+        "name": "pending_changes_are_isolated",
+        "passed": true
+      },
+      {
+        "name": "closing_session_rolls_back",
+        "passed": true
+      },
+      {
+        "name": "reader_snapshot_until_new_transaction",
+        "passed": true
+      },
+      {
+        "name": "same_row_conflict_and_rollback_recovery",
+        "passed": true
+      },
+      {
+        "name": "streaming_result_pages",
+        "passed": true
+      },
+      {
+        "name": "commit_without_active_transaction_errors",
+        "passed": true
+      },
+      {
+        "name": "remote_query_interrupt_and_recovery",
+        "passed": true
+      },
+      {
+        "name": "reader_progress_while_writer_pending",
+        "passed": true
+      },
+      {
+        "name": "graceful_restart_persistence",
+        "passed": true
+      },
+      {
+        "name": "sigkill_recovers_commits_and_discards_pending",
+        "passed": true
+      },
+      {
+        "name": "real_cpp_transaction_flow",
+        "passed": true
+      },
+      {
+        "name": "native_demo_initialization_and_existing_data_protection",
+        "passed": true
+      }
+    ]
+  },
+  "transaction_flow": {
+    "passed": true,
+    "executed": 14,
+    "checks": [
+      {
+        "name": "builtin_extensions_default",
+        "passed": true
+      },
+      {
+        "name": "independent_sessions_autocommit",
+        "passed": true
+      },
+      {
+        "name": "autocommit_typed_insert_visible",
+        "passed": true
+      },
+      {
+        "name": "reader_snapshot_initial",
+        "passed": true
+      },
+      {
+        "name": "typed_crud_inside_writer_transaction",
+        "passed": true
+      },
+      {
+        "name": "reader_sees_committed_stock_during_pending_write",
+        "passed": true
+      },
+      {
+        "name": "reader_retains_snapshot_after_writer_commit",
+        "passed": true
+      },
+      {
+        "name": "new_transaction_sees_committed_stock",
+        "passed": true
+      },
+      {
+        "name": "rollback_preserves_committed_stock",
+        "passed": true
+      },
+      {
+        "name": "reader_progress_while_other_writer_has_pending_row",
+        "passed": true
+      },
+      {
+        "name": "same_row_write_conflict",
+        "passed": true
+      },
+      {
+        "name": "connections_recover_after_conflict_rollback",
+        "passed": true
+      },
+      {
+        "name": "committed_final_row_after_all_rollbacks",
+        "passed": true
+      },
+      {
+        "name": "temporary_table_removed",
+        "passed": true
+      }
+    ]
+  },
+  "python": {
+    "passed": true,
+    "collected": 21,
+    "executed": 21,
+    "passed_checks": 21,
+    "failed": 0,
+    "skipped": 0,
+    "package_version": "2.1.0.dev0+duckonwire.638b09261a",
+    "checks": [
+      {
+        "name": "test_native_connect_with_builtin_extensions_and_default_configuration",
+        "passed": true
+      },
+      {
+        "name": "test_native_identity_and_ordinary_attach_connect",
+        "passed": true
+      },
+      {
+        "name": "test_existing_foreign_keys_attach_connect_and_server_enforcement",
+        "passed": true
+      },
+      {
+        "name": "test_crud_ddl_and_existing_session_schema_freshness",
+        "passed": true
+      },
+      {
+        "name": "test_positional_named_and_executemany_typed_bindings",
+        "passed": true
+      },
+      {
+        "name": "test_complex_types_lossless_and_native_description",
+        "passed": true
+      },
+      {
+        "name": "test_native_fetchmany_fetchall_and_independent_cursor",
+        "passed": true
+      },
+      {
+        "name": "test_native_cursor_independent_transactions",
+        "passed": true
+      },
+      {
+        "name": "test_native_close_rolls_back_with_relation_retaining_client_context",
+        "passed": true
+      },
+      {
+        "name": "test_native_closed_parent_rejects_cursor_for_local_and_remote",
+        "passed": true
+      },
+      {
+        "name": "test_native_errors_recover_and_constraints_are_authoritative",
+        "passed": true
+      },
+      {
+        "name": "test_transaction_atomicity_snapshot_and_rollback[methods]",
+        "passed": true
+      },
+      {
+        "name": "test_transaction_atomicity_snapshot_and_rollback[sql]",
+        "passed": true
+      },
+      {
+        "name": "test_pending_transaction_rolls_back_on_native_connection_close",
+        "passed": true
+      },
+      {
+        "name": "test_mismatched_writers_conflict_and_reader_progress",
+        "passed": true
+      },
+      {
+        "name": "test_independent_processes_commit_400_rows_while_reader_holds_snapshot",
+        "passed": true
+      },
+      {
+        "name": "test_reader_interrupt_and_other_connection_progress",
+        "passed": true
+      },
+      {
+        "name": "test_native_restart_and_sigkill_wal_recovery[False]",
+        "passed": true
+      },
+      {
+        "name": "test_native_restart_and_sigkill_wal_recovery[True]",
+        "passed": true
+      },
+      {
+        "name": "test_direct_file_stays_locked_and_bad_auth_is_rejected",
+        "passed": true
+      },
+      {
+        "name": "test_native_original_result_metadata_and_duplicate_column_names",
+        "passed": true
+      }
+    ]
+  },
+  "language_compatibility": {
+    "passed": true,
+    "count": 10,
+    "clients": [
+      {
+        "language": "Python",
+        "passed": true,
+        "native_used": true,
+        "reported_versions": {
+          "driver": "duckdb.DuckDBPyConnection",
+          "package_version": "2.1.0.dev0+duckonwire.638b09261a"
+        }
+      },
+      {
+        "language": "C++",
+        "passed": true,
+        "native_used": true,
+        "reported_versions": {
+          "library_version": "v2.1.0-dev0"
+        }
+      },
+      {
+        "language": "C",
+        "passed": true,
+        "native_used": true,
+        "reported_versions": {
+          "library_version": "v2.1.0-dev0"
+        },
+        "checks": [
+          {
+            "name": "httpfs_and_quack_builtin_without_LOAD",
+            "passed": true
+          },
+          {
+            "name": "two_native_C_connections_same_Quack_endpoint",
+            "passed": true
+          },
+          {
+            "name": "prepared_positional_lossless_decimal_date_blob_hugeint_list_struct_NULL",
+            "passed": true
+          },
+          {
+            "name": "native_constraint_exception_and_connection_reuse",
+            "passed": true
+          },
+          {
+            "name": "native_named_parameter_indexes_and_prepared_reuse_NULL_to_integer",
+            "passed": true
+          },
+          {
+            "name": "independent_C_sessions_MVCC_snapshot_and_COMMIT_visibility",
+            "passed": true
+          },
+          {
+            "name": "native_SQL_ROLLBACK_discards_pending_write",
+            "passed": true
+          },
+          {
+            "name": "native_C_disconnect_rolls_back_pending_transaction",
+            "passed": true
+          },
+          {
+            "name": "C_reads_bound_Python_and_CPP_rows_and_inserts_bound_C_row",
+            "passed": true
+          },
+          {
+            "name": "C_native_marker_visible_to_other_languages",
+            "passed": true
+          },
+          {
+            "name": "temporary_C_probe_table_removed",
+            "passed": true
+          }
+        ]
+      },
+      {
+        "language": "Node.js",
+        "passed": true,
+        "native_used": true,
+        "reported_versions": {
+          "driver": "@duckdb/node-api",
+          "driver_version": "1.5.6-r.1",
+          "node_version": "v24.9.0"
+        },
+        "checks": [
+          {
+            "name": "official_native_driver_and_matching_engine",
+            "passed": true
+          },
+          {
+            "name": "prepared_positional_decimal_blob_list_struct_null_and_unicode",
+            "passed": true
+          },
+          {
+            "name": "fresh_named_parameters_and_prepared_reuse_null_to_integer",
+            "passed": true
+          },
+          {
+            "name": "two_sessions_uncommitted_visibility_commit_and_rollback",
+            "passed": true
+          },
+          {
+            "name": "MVCC_reader_snapshot_progresses_while_other_session_writes",
+            "passed": true
+          },
+          {
+            "name": "many_commits_progress_while_reader_holds_snapshot",
+            "passed": true
+          },
+          {
+            "name": "duplicate_result_names_and_DML_RETURNING_keep_native_metadata",
+            "passed": true
+          },
+          {
+            "name": "native_constraint_error_and_connection_reuse",
+            "passed": true
+          },
+          {
+            "name": "native_stream_paging_with_unrelated_writer",
+            "passed": true
+          },
+          {
+            "name": "native_disconnect_rolls_back_abandoned_transaction",
+            "passed": true
+          },
+          {
+            "name": "native_delete_commit_is_visible_and_shared_language_marker",
+            "passed": true
+          }
+        ]
+      },
+      {
+        "language": "Go",
+        "passed": true,
+        "native_used": true,
+        "reported_versions": {
+          "driver": "github.com/duckdb/duckdb-go/v2@v2.10506.0",
+          "native_version": "v2.1.0-dev0",
+          "client_library_version": "v2.1.0-dev0"
+        },
+        "checks": [
+          {
+            "name": "builtin_extensions_loaded_before_connect",
+            "passed": true
+          },
+          {
+            "name": "official_driver_native_identity",
+            "passed": true
+          },
+          {
+            "name": "ddl_schema_freshness_independent_connections",
+            "passed": true
+          },
+          {
+            "name": "positional_typed_list_blob_null_exact_decimal_cast",
+            "passed": true
+          },
+          {
+            "name": "native_complex_results_preserve_values",
+            "passed": true
+          },
+          {
+            "name": "named_repeated_prepared_parameters",
+            "passed": true
+          },
+          {
+            "name": "prepared_reuse_null_first_bulk_crud",
+            "passed": true
+          },
+          {
+            "name": "native_errors_and_recovery",
+            "passed": true
+          },
+          {
+            "name": "iterative_result_paging_15003_rows",
+            "passed": true
+          },
+          {
+            "name": "transactions_snapshot_nonblocking_reader_commit_rollback",
+            "passed": true
+          },
+          {
+            "name": "mvcc_conflicting_writers_recover",
+            "passed": true
+          },
+          {
+            "name": "connection_close_rolls_back_pending_transaction",
+            "passed": true
+          },
+          {
+            "name": "multiclient_shared_table",
+            "passed": true
+          }
+        ]
+      },
+      {
+        "language": "Rust",
+        "passed": true,
+        "native_used": true,
+        "reported_versions": {
+          "driver": "duckdb@1.10506.0",
+          "native_version": "v2.1.0-dev0",
+          "client_library_version": "v2.1.0-dev0"
+        },
+        "checks": [
+          {
+            "name": "builtin_extensions_loaded_before_connect",
+            "passed": true
+          },
+          {
+            "name": "official_driver_native_identity",
+            "passed": true
+          },
+          {
+            "name": "ddl_schema_freshness_independent_connections",
+            "passed": true
+          },
+          {
+            "name": "positional_typed_decimal_blob_null_list_struct_sql_cast",
+            "passed": true
+          },
+          {
+            "name": "native_complex_results_preserve_values",
+            "passed": true
+          },
+          {
+            "name": "named_repeated_prepared_parameters",
+            "passed": true
+          },
+          {
+            "name": "prepared_reuse_null_first_bulk_crud",
+            "passed": true
+          },
+          {
+            "name": "native_errors_recovery_and_driver_container_limit",
+            "passed": true
+          },
+          {
+            "name": "iterative_result_paging_15003_rows",
+            "passed": true
+          },
+          {
+            "name": "transactions_snapshot_nonblocking_reader_commit_rollback",
+            "passed": true
+          },
+          {
+            "name": "mvcc_conflicting_writers_recover",
+            "passed": true
+          },
+          {
+            "name": "transaction_drop_and_connection_close_roll_back",
+            "passed": true
+          },
+          {
+            "name": "multiclient_shared_table",
+            "passed": true
+          }
+        ]
+      },
+      {
+        "language": "Java",
+        "passed": true,
+        "native_used": true,
+        "reported_versions": {
+          "driver": "org.duckdb.DuckDBConnection",
+          "version": "v2.1.0-dev0"
+        },
+        "checks": [
+          {
+            "name": "builtin_httpfs_quack_without_LOAD",
+            "passed": true
+          },
+          {
+            "name": "official_class_and_native_version",
+            "passed": true
+          },
+          {
+            "name": "prepared_types_unicode_decimal_date_timestamp_blob_null",
+            "passed": true
+          },
+          {
+            "name": "direct_statement_update_count",
+            "passed": true
+          },
+          {
+            "name": "execute_batch",
+            "passed": true
+          },
+          {
+            "name": "native_constraint_error_and_recovery",
+            "passed": true
+          },
+          {
+            "name": "two_sessions_mvcc_nonblocking_commit_rollback_autocommit",
+            "passed": true
+          },
+          {
+            "name": "reader_transaction_snapshot_isolation",
+            "passed": true
+          },
+          {
+            "name": "official_duplicate_independent_session_close_rollback",
+            "passed": true
+          },
+          {
+            "name": "streaming_result_15003_rows",
+            "passed": true
+          },
+          {
+            "name": "shared_multilanguage_table_read_and_write",
+            "passed": true
+          },
+          {
+            "name": "close_retained_statement_rollback",
+            "passed": true
+          },
+          {
+            "name": "crud_delete",
+            "passed": true
+          }
+        ],
+        "rebuilt_current_jni": true,
+        "patch_sha256": "70e646f362b7c976a1103ff9708c26549020226664a0be3ff2e1299c1dfcbb05",
+        "jni_library_sha256": "ed060c1cc1a27a0306fdc593c53b4fbe5e064a84363ba347bf34b0266c568e0a",
+        "jar_sha256": "d5e6fad07aab7aef74010caca7930a67da902c63b76730aee840140647c5a735"
+      },
+      {
+        "language": "Swift",
+        "passed": true,
+        "native_used": true,
+        "reported_versions": {
+          "driver": "native C API through Swift compiler interop",
+          "version": "v2.1.0-dev0"
+        },
+        "checks": [
+          {
+            "name": "builtin_httpfs_quack_without_LOAD",
+            "passed": true
+          },
+          {
+            "name": "direct_native_C_interop_two_connections",
+            "passed": true
+          },
+          {
+            "name": "native_prepared_int64_unicode_blob_roundtrip",
+            "passed": true
+          },
+          {
+            "name": "native_mvcc_nonblocking_commit_rollback",
+            "passed": true
+          },
+          {
+            "name": "reader_transaction_snapshot_isolation",
+            "passed": true
+          },
+          {
+            "name": "shared_multilanguage_table_read_and_write",
+            "passed": true
+          },
+          {
+            "name": "native_close_rollback",
+            "passed": true
+          }
+        ]
+      },
+      {
+        "language": "C#",
+        "passed": true,
+        "native_used": true,
+        "reported_versions": {
+          "driver": "DuckDB.NET.Data.DuckDBConnection",
+          "version": "v2.1.0-dev0"
+        },
+        "checks": [
+          {
+            "name": "builtin_httpfs_quack_without_LOAD",
+            "passed": true
+          },
+          {
+            "name": "unmodified_official_ADO_NET_shared_native_engine",
+            "passed": true
+          },
+          {
+            "name": "native_prepared_named_bindings_types_unicode_decimal_blob_null",
+            "passed": true
+          },
+          {
+            "name": "native_constraint_error_and_recovery",
+            "passed": true
+          },
+          {
+            "name": "two_sessions_native_ADO_NET_transaction_mvcc_nonblocking_commit_rollback",
+            "passed": true
+          },
+          {
+            "name": "reader_transaction_snapshot_isolation_and_direct_update_count",
+            "passed": true
+          },
+          {
+            "name": "streaming_result_15003_rows",
+            "passed": true
+          },
+          {
+            "name": "shared_multilanguage_table_read_and_write",
+            "passed": true
+          },
+          {
+            "name": "native_close_rollback",
+            "passed": true
+          },
+          {
+            "name": "crud_delete",
+            "passed": true
+          }
+        ]
+      },
+      {
+        "language": "Lua",
+        "passed": true,
+        "native_used": true,
+        "reported_versions": {
+          "driver": "LuaJIT FFI direct official DuckDB C API",
+          "runtime": "LuaJIT 2.1.1788856981"
+        },
+        "checks": [
+          {
+            "name": "builtin_extensions_loaded_without_LOAD_and_unsigned_flags",
+            "passed": true
+          },
+          {
+            "name": "typed_prepared_CRUD_decimal_blob_list_null_unicode_and_reuse",
+            "passed": true
+          },
+          {
+            "name": "native_named_bindings_repeated_case_and_exact_bigint",
+            "passed": true
+          },
+          {
+            "name": "two_native_sessions_isolation_commit_and_rollback",
+            "passed": true
+          },
+          {
+            "name": "MVCC_reader_snapshot_progresses_through_32_writer_commits",
+            "passed": true
+          },
+          {
+            "name": "native_constraint_error_type_and_connection_recovery",
+            "passed": true
+          },
+          {
+            "name": "complex_CTE_window_aggregate_and_native_chunk_paging",
+            "passed": true
+          },
+          {
+            "name": "native_disconnect_rolls_back_abandoned_transaction",
+            "passed": true
+          },
+          {
+            "name": "prepared_delete_affected_rows_and_shared_language_marker",
+            "passed": true
+          }
+        ]
+      }
+    ],
+    "typed_committed_interoperability": true,
+    "corrected_java_requalification": "Java was rebuilt and retested separately after the shared ten-client fixture; its bound interoperability marker was checked by an independent native observer."
+  },
+  "normal_crud": {
+    "passed": true,
+    "languages": 10,
+    "runs_per_language": 2,
+    "total_runs": 20,
+    "durable_after_shutdown": true,
+    "clients": [
+      {
+        "language": "Python",
+        "passed": true,
+        "runs": [
+          {
+            "iteration": 1,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          },
+          {
+            "iteration": 2,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "language": "C++",
+        "passed": true,
+        "runs": [
+          {
+            "iteration": 1,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          },
+          {
+            "iteration": 2,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "language": "C",
+        "passed": true,
+        "runs": [
+          {
+            "iteration": 1,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          },
+          {
+            "iteration": 2,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "language": "Node.js",
+        "passed": true,
+        "runs": [
+          {
+            "iteration": 1,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          },
+          {
+            "iteration": 2,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "language": "Go",
+        "passed": true,
+        "runs": [
+          {
+            "iteration": 1,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          },
+          {
+            "iteration": 2,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "language": "Rust",
+        "passed": true,
+        "runs": [
+          {
+            "iteration": 1,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          },
+          {
+            "iteration": 2,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "language": "Java",
+        "passed": true,
+        "runs": [
+          {
+            "iteration": 1,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          },
+          {
+            "iteration": 2,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "language": "Swift",
+        "passed": true,
+        "runs": [
+          {
+            "iteration": 1,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          },
+          {
+            "iteration": 2,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "language": "C#",
+        "passed": true,
+        "runs": [
+          {
+            "iteration": 1,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          },
+          {
+            "iteration": 2,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "language": "Lua",
+        "passed": true,
+        "runs": [
+          {
+            "iteration": 1,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          },
+          {
+            "iteration": 2,
+            "passed": true,
+            "rows": [
+              [
+                1,
+                "Cafe",
+                "19.99",
+                4
+              ]
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "installed_consumers": {
+    "passed": true,
+    "languages": [
+      "C++",
+      "C"
+    ],
+    "find_package": "DuckDB CONFIG REQUIRED",
+    "imported_target": "duckdb",
+    "include_and_library_source": "relocated installed prefix only",
+    "dynamic_loader_overrides": false,
+    "source_build_library_fallback": false
+  },
+  "java_minimal_patch": {
+    "passed": true,
+    "hunks": 3,
+    "set_auto_commit_connected_branches": 1,
+    "prepare_source_twice_identical": true,
+    "git_apply_and_reverse_verified": true,
+    "patched_source_equals_compiled_source": true,
+    "jni_checks": 13,
+    "crud_runs": 2,
+    "jni_source_sha256": "df41a54d56538b3207c79981a1cd0b26765e2155a1d7d755b3eec2a9c601d18c",
+    "jni_library_sha256": "ed060c1cc1a27a0306fdc593c53b4fbe5e064a84363ba347bf34b0266c568e0a",
+    "jar_sha256": "d5e6fad07aab7aef74010caca7930a67da902c63b76730aee840140647c5a735",
+    "patch_sha256": "70e646f362b7c976a1103ff9708c26549020226664a0be3ff2e1299c1dfcbb05"
+  },
+  "limitations": [
+    "These language-client executions were qualified on macOS arm64. Linux native C++ server and engine qualification is recorded separately.",
+    "Public CMake builds the native engine, server, C/C++ applications, and native tests. It does not build every official language binding.",
+    "Nine language bindings were retained from the verified paired release. Java JNI/JAR was rebuilt against the current shared library with the published minimal lifecycle patch.",
+    "The Python wheel embeds its prior paired native engine from the same pinned patch/protocol generation; it was tested against the current native CMake server and was not relinked to this shared library.",
+    "Go binds exact decimal input as text converted by DuckDB to DECIMAL; direct duckdb.Decimal parameters are unsupported by this pinned driver.",
+    "The pinned Rust crate binds LIST/STRUCT input through native casts from bound text; direct LIST/STRUCT Value parameters are unsupported.",
+    "The pinned Rust crate reports is_autocommit() as true even inside a transaction and maps native execution errors to ErrorCode::Unknown; commit, rollback, snapshot isolation, conflict recovery, and native error messages were checked independently.",
+    "Development engine and patched Quack protocol 7 require matching native clients and owner; compatibility with stock release binaries is not claimed."
+  ]
+}

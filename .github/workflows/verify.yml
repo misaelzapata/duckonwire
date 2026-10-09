@@ -1,0 +1,41 @@
+name: Native C++ and CMake
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++ git libssl-dev libcurl4-openssl-dev
+      - name: Configure pinned DuckDB and builtin extensions
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNATIVE_ARCH=OFF -DCMAKE_C_FLAGS=-march=x86-64-v3 -DCMAKE_CXX_FLAGS=-march=x86-64-v3
+      - name: Build native library, server, clients and tests
+        run: cmake --build build --parallel 2
+      - name: Native acceptance and concurrent smoke
+        run: ctest --test-dir build --output-on-failure
+      - name: Two million inserts with concurrent complex reads
+        run: build/bin/duckonwire-benchmark --mode both --rows 2000000 --writers 4 --readers 4 --batch 25000 --server build/bin/duckonwire-server --environment 'GitHub Actions Linux' --output build/test-results/benchmark.json
+      - name: Install, verify relocation and package native runtime
+        run: cmake -DSOURCE_DIR="$GITHUB_WORKSPACE" -DBUILD_DIR="$GITHUB_WORKSPACE/build" -DVERSION=0.2.0-rc.4 -DPLATFORM=linux-x86_64-v3 -DOUTPUT_DIR="$GITHUB_WORKSPACE/build/packages" -P cmake/Package.cmake
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: native-linux-x86_64-v3
+          path: |
+            build/packages/duckonwire-0.2.0-rc.4-linux-x86_64-v3.tar.gz
+            build/packages/duckonwire-0.2.0-rc.4-linux-x86_64-v3.manifest.json
+            build/packages/duckonwire-0.2.0-rc.4-linux-x86_64-v3.sha256
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: native-test-results
+          path: |
+            build/Testing/Temporary/
+            build/test-results/

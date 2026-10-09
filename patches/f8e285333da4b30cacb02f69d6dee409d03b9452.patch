@@ -1,0 +1,60 @@
+From f8e285333da4b30cacb02f69d6dee409d03b9452 Mon Sep 17 00:00:00 2001
+From: Carlo Piovesan <piovesan.carlo@gmail.com>
+Date: Tue, 22 Sep 2026 11:45:37 +0200
+Subject: [PATCH] CONNECT to opt-out of transaction mechanism (while
+ RemoteExecute keeps it)
+
+Idea is that `BEGIN` / `COMMIT` / `ROLLBACK` once CONNECT-ed are only for the remote to decide, not tied to local transactional state
+---
+ src/include/storage/quack_catalog.hpp |  2 +-
+ src/storage/quack_catalog.cpp         | 12 ++++++++----
+ 2 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/src/include/storage/quack_catalog.hpp b/src/include/storage/quack_catalog.hpp
+index a541afc3..69076713 100644
+--- a/src/include/storage/quack_catalog.hpp
++++ b/src/include/storage/quack_catalog.hpp
+@@ -87,7 +87,7 @@ class QuackCatalog : public Catalog {
+ 
+ 	//! Build the "quack_query_by_name" table function call that runs "sql" on the server. Statements pushed
+ 	//! down by the RemotePushdownOptimizer change the remote catalog, so they ask for a catalog refresh
+-	unique_ptr<TableRef> CreateRemoteQueryRef(const string &sql, bool refresh_catalog);
++	unique_ptr<TableRef> CreateRemoteQueryRef(const string &sql, bool refresh_catalog, bool use_transaction = true);
+ 
+ 	QuackLoadCatalogData LoadCatalog(ClientContext &context);
+ 
+diff --git a/src/storage/quack_catalog.cpp b/src/storage/quack_catalog.cpp
+index 11772c69..e78fdcf7 100644
+--- a/src/storage/quack_catalog.cpp
++++ b/src/storage/quack_catalog.cpp
+@@ -206,7 +206,8 @@ DatabaseSize QuackCatalog::GetDatabaseSize(ClientContext &context) {
+ }
+ 
+ unique_ptr<TableRef> QuackCatalog::RemoteExecute(ClientContext &context, unique_ptr<QueryNode> node) {
+-	return RemoteExecute(context, node->ToString());
++	// attached-catalog path: a read of this catalog, so it joins the local transaction
++	return CreateRemoteQueryRef(node->ToString(), false, true);
+ }
+ 
+ unique_ptr<TableRef> QuackCatalog::RemoteExecute(ClientContext &context, unique_ptr<SQLStatement> statement) {
+@@ -216,14 +217,17 @@ unique_ptr<TableRef> QuackCatalog::RemoteExecute(ClientContext &context, unique_
+ }
+ 
+ unique_ptr<TableRef> QuackCatalog::RemoteExecute(ClientContext &context, const string &sql) {
+-	return CreateRemoteQueryRef(sql, false);
++	// CONNECT forwards statements verbatim - no synthesized transaction, or a forwarded BEGIN would
++	// land inside it and COMMIT/ROLLBACK arrive after it has closed
++	return CreateRemoteQueryRef(sql, false, false);
+ }
+ 
+-unique_ptr<TableRef> QuackCatalog::CreateRemoteQueryRef(const string &sql, bool refresh_catalog) {
++unique_ptr<TableRef> QuackCatalog::CreateRemoteQueryRef(const string &sql, bool refresh_catalog,
++                                                        bool use_transaction_p) {
+ 	vector<unique_ptr<ParsedExpression>> args;
+ 	args.push_back(make_uniq<ConstantExpression>(Value(GetName())));
+ 	args.push_back(make_uniq<ConstantExpression>(Value(sql)));
+-	auto use_transaction = make_uniq<ConstantExpression>(Value::BOOLEAN(true));
++	auto use_transaction = make_uniq<ConstantExpression>(Value::BOOLEAN(use_transaction_p));
+ 	use_transaction->SetAlias("use_transaction");
+ 	args.push_back(std::move(use_transaction));
+ 	if (refresh_catalog) {

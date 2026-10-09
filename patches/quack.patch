@@ -1,0 +1,1194 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -10,8 +10,9 @@
+ 
+ #set(CMAKE_CXX_STANDARD 17)
+ 
+-include_directories(src/include duckdb/third_party/httplib duckdb/extension/autocomplete/include
+-                    duckdb/third_party/mbedtls/include)
++include_directories(src/include "${DUCKDB_MODULE_BASE_DIR}/third_party/httplib"
++                    "${DUCKDB_MODULE_BASE_DIR}/extension/autocomplete/include"
++                    "${DUCKDB_MODULE_BASE_DIR}/third_party/mbedtls/include")
+ add_subdirectory(src)
+ 
+ build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
+--- a/src/include/quack_client.hpp
++++ b/src/include/quack_client.hpp
+@@ -104,6 +104,8 @@
+ 	                               string connection_id_p, idx_t heartbeat_timeout_seconds_p,
+ 	                               idx_t max_connections_cached = 1);
+ 	~QuackClientConnection();
++	//! Release the server session immediately, even when a relation still holds this object.
++	void Disconnect();
+ 
+ 	void CancelQuery(hugeint_t query_uuid);
+ 
+@@ -141,6 +143,7 @@
+ 	mutable vector<unique_ptr<QuackClient>> cached_clients;
+ 
+ 	QuackPeriodicWorker heartbeat;
++	atomic<bool> disconnected {false};
+ };
+ 
+ struct QuackClientWrapper {
+--- a/src/include/quack_fetch_ahead.hpp
++++ b/src/include/quack_fetch_ahead.hpp
+@@ -46,7 +46,7 @@
+ 	                          idx_t &batch_index, vector<unique_ptr<DataChunk>> &chunks);
+ 
+ 	//! Stop topping up and drain all in-flight fetches; errors were already surfaced through the buffer.
+-	void StopAndDrain();
++	void StopAndDrain(bool cancel_pending = true);
+ 
+ private:
+ 	//! Register fetch tasks until the batches in flight and in the buffer reach `depth`. Each task
+@@ -64,6 +64,7 @@
+ 
+ private:
+ 	unique_ptr<ManagedAsyncTaskQueue> queue;
++	shared_ptr<QuackClientConnection> client_connection;
+ 	shared_ptr<QuackFetchBuffer> buffer;
+ 	hugeint_t query_uuid;
+ 	string connection_id;
+--- a/src/include/quack_fetch_collector.hpp
++++ b/src/include/quack_fetch_collector.hpp
+@@ -12,6 +12,7 @@
+ #include "duckdb/common/serializer/memory_stream.hpp"
+ 
+ #include "quack_claim_buffer.hpp"
++#include "quack_message.hpp"
+ 
+ #include <condition_variable>
+ 
+@@ -38,11 +39,13 @@
+ struct QuackResultStream {
+ 	QuackFetchPayloadBuffer buffer;
+ 
+-	void SignalBound(vector<LogicalType> types_p, vector<string> names_p) {
++	void SignalBound(vector<LogicalType> types_p, vector<string> names_p,
++	                 unique_ptr<QuackPreparedMetadata> metadata_p = nullptr) {
+ 		{
+ 			lock_guard<mutex> guard(bind_lock);
+ 			types = std::move(types_p);
+ 			names = std::move(names_p);
++			metadata = std::move(metadata_p);
+ 			bound = true;
+ 		}
+ 		bind_cv.notify_all();
+@@ -75,6 +78,7 @@
+ 
+ 	vector<LogicalType> types;
+ 	vector<string> names;
++	unique_ptr<QuackPreparedMetadata> metadata;
+ 	bool client_data_pending = false;
+ 	//! The dense batches PREPARE consumed inline. FETCH subtracts this, so the client-facing indices
+ 	//! stay dense from 1. PREPARE writes it before the first FETCH arrives.
+--- a/src/include/quack_message.hpp
++++ b/src/include/quack_message.hpp
+@@ -7,6 +7,7 @@
+ #include "duckdb/parser/parsed_data/drop_info.hpp"
+ #include "duckdb/common/types/uuid.hpp"
+ #include "duckdb/common/error_data.hpp"
++#include "duckdb/main/prepared_statement.hpp"
+ 
+ namespace duckdb {
+ 
+@@ -14,7 +15,7 @@
+ class ClientContext;
+ 
+ //! Quack wire-protocol version. Client and server agree on it during the connection handshake.
+-static constexpr idx_t QUACK_VERSION = 3;
++static constexpr idx_t QUACK_VERSION = 7;
+ 
+ //! Upper bound both peers enforce on the heartbeat lease timeout
+ static constexpr idx_t MAX_HEARTBEAT_TIMEOUT_SECONDS = static_cast<idx_t>(NumericLimits<int64_t>::Maximum() / 1000);
+@@ -170,6 +171,28 @@
+ 	optional_idx InlineRows() const {
+ 		return inline_rows;
+ 	}
++	void SetParameters(vector<string> names, vector<Value> values) {
++		parameter_names = std::move(names);
++		parameter_values = std::move(values);
++	}
++	const vector<string> &ParameterNames() const {
++		return parameter_names;
++	}
++	const vector<Value> &ParameterValues() const {
++		return parameter_values;
++	}
++	void SetPrepareOnly(bool value) {
++		prepare_only = value;
++	}
++	bool PrepareOnly() const {
++		return prepare_only;
++	}
++	void SetTransactionStateOnly(bool value) {
++		transaction_state_only = value;
++	}
++	bool TransactionStateOnly() const {
++		return transaction_state_only;
++	}
+ 
+ public:
+ 	const string &Query() const {
+@@ -192,6 +215,44 @@
+ 	string sql_query;
+ 	hugeint_t query_uuid;
+ 	optional_idx inline_rows;
++	vector<string> parameter_names;
++	vector<Value> parameter_values;
++	bool prepare_only = false;
++	bool transaction_state_only = false;
++};
++
++//! Native metadata from a bind-only request. LogicalTypes stay binary encoded, including complex types.
++struct QuackPreparedMetadata {
++	StatementType statement_type = StatementType::INVALID_STATEMENT;
++	vector<string> parameter_names;
++	vector<LogicalType> parameter_types;
++	bool requires_valid_transaction = true;
++	QueryResultOutputType output_type = QueryResultOutputType::FORCE_MATERIALIZED;
++	bool bound_all_parameters = true;
++	StatementReturnType return_type = StatementReturnType::QUERY_RESULT;
++	idx_t parameter_count = 0;
++	bool always_require_rebind = false;
++	bool read_only = true;
++
++	explicit QuackPreparedMetadata(const PreparedStatement &statement)
++	    : QuackPreparedMetadata(statement.GetStatementType(), statement.GetStatementProperties()) {
++		for (auto &entry : statement.GetExpectedParameterTypes()) {
++			parameter_names.push_back(entry.first);
++			parameter_types.push_back(entry.second);
++		}
++	}
++	QuackPreparedMetadata(StatementType type, const StatementProperties &properties) : statement_type(type) {
++		requires_valid_transaction = properties.requires_valid_transaction;
++		output_type = properties.output_type;
++		bound_all_parameters = properties.bound_all_parameters;
++		return_type = properties.return_type;
++		parameter_count = properties.parameter_count;
++		always_require_rebind = properties.always_require_rebind;
++		read_only = properties.modified_databases.empty();
++	}
++	QuackPreparedMetadata() = default;
++	void Serialize(Serializer &serializer) const;
++	static unique_ptr<QuackPreparedMetadata> Deserialize(Deserializer &deserializer);
+ };
+ 
+ class PrepareResponseMessage : public QuackMessage {
+@@ -224,6 +285,21 @@
+ 	hugeint_t QueryUUID() const {
+ 		return query_uuid;
+ 	}
++	void SetPreparedMetadata(unique_ptr<QuackPreparedMetadata> metadata) {
++		prepared_metadata = std::move(metadata);
++	}
++	optional_ptr<QuackPreparedMetadata> PreparedMetadata() {
++		return prepared_metadata.get();
++	}
++	optional_ptr<const QuackPreparedMetadata> PreparedMetadata() const {
++		return prepared_metadata.get();
++	}
++	void SetRemoteAutoCommit(bool value) {
++		remote_auto_commit = value;
++	}
++	bool RemoteAutoCommit() const {
++		return remote_auto_commit;
++	}
+ 
+ 	void Serialize(Serializer &serializer) const override;
+ 	static unique_ptr<PrepareResponseMessage> Deserialize(Deserializer &deserializer);
+@@ -238,6 +314,8 @@
+ 	vector<unique_ptr<DataChunkWrapper>> results;
+ 	bool needs_more_fetch = false;
+ 	hugeint_t query_uuid;
++	unique_ptr<QuackPreparedMetadata> prepared_metadata;
++	bool remote_auto_commit = true;
+ };
+ 
+ // TODO this is where auth goes
+@@ -604,6 +682,9 @@
+ 	}
+ 	explicit ErrorResponse(const string &error_p) : QuackMessage(TYPE), error(ExceptionType::INVALID_INPUT, error_p) {
+ 	}
++	ErrorResponse(ExceptionType error_type, const string &message, const unordered_map<string, string> &extra_info)
++	    : QuackMessage(TYPE), error(StringUtil::ExceptionToJSONMap(error_type, message, extra_info)) {
++	}
+ 	template <typename... ARGS>
+ 	explicit ErrorResponse(const string &msg, ARGS &&...params)
+ 	    : ErrorResponse(Exception::ConstructMessage(msg, std::forward<ARGS>(params)...)) {
+--- a/src/include/quack_message.json
++++ b/src/include/quack_message.json
+@@ -4,7 +4,7 @@
+     "includes": [
+       "quack_message.hpp"
+     ],
+-    "members":  [
++    "members": [
+       {
+         "id": 1,
+         "name": "type",
+@@ -22,7 +22,10 @@
+       }
+     ],
+     "pointer_type": "none",
+-    "constructor": ["type", "connection_id"]
++    "constructor": [
++      "type",
++      "connection_id"
++    ]
+   },
+   {
+     "class": "ErrorResponse",
+@@ -32,9 +35,26 @@
+         "name": "message",
+         "type": "string",
+         "serialize_property": "error.RawMessage()"
++      },
++      {
++        "id": 2,
++        "name": "error_type",
++        "type": "ExceptionType",
++        "serialize_property": "error.Type()",
++        "default": "ExceptionType::INVALID_INPUT"
++      },
++      {
++        "id": 3,
++        "name": "extra_info",
++        "type": "unordered_map<string, string>",
++        "serialize_property": "error.ExtraInfo()"
+       }
+     ],
+-    "constructor": ["message"]
++    "constructor": [
++      "error_type",
++      "message",
++      "extra_info"
++    ]
+   },
+   {
+     "class": "PrepareRequestMessage",
+@@ -54,6 +74,26 @@
+         "name": "inline_rows",
+         "type": "optional_idx",
+         "default": "optional_idx()"
++      },
++      {
++        "id": 4,
++        "name": "parameter_names",
++        "type": "vector<string>"
++      },
++      {
++        "id": 5,
++        "name": "parameter_values",
++        "type": "vector<Value>"
++      },
++      {
++        "id": 6,
++        "name": "prepare_only",
++        "type": "bool"
++      },
++      {
++        "id": 7,
++        "name": "transaction_state_only",
++        "type": "bool"
+       }
+     ]
+   },
+@@ -114,9 +154,26 @@
+         "id": 5,
+         "name": "query_uuid",
+         "type": "hugeint_t"
++      },
++      {
++        "id": 6,
++        "name": "prepared_metadata",
++        "type": "unique_ptr<QuackPreparedMetadata>"
++      },
++      {
++        "id": 7,
++        "name": "remote_auto_commit",
++        "type": "bool",
++        "default": "true"
+       }
+     ],
+-    "constructor": ["result_types", "result_names",  "results", "needs_more_fetch", "query_uuid"]
++    "constructor": [
++      "result_types",
++      "result_names",
++      "results",
++      "needs_more_fetch",
++      "query_uuid"
++    ]
+   },
+   {
+     "class": "SendDataRequestMessage",
+@@ -268,5 +325,60 @@
+         "default": "hugeint_t(0, 0)"
+       }
+     ]
++  },
++  {
++    "class": "QuackPreparedMetadata",
++    "members": [
++      {
++        "id": 1,
++        "name": "statement_type",
++        "type": "StatementType"
++      },
++      {
++        "id": 2,
++        "name": "parameter_names",
++        "type": "vector<string>"
++      },
++      {
++        "id": 3,
++        "name": "parameter_types",
++        "type": "vector<LogicalType>"
++      },
++      {
++        "id": 4,
++        "name": "requires_valid_transaction",
++        "type": "bool"
++      },
++      {
++        "id": 5,
++        "name": "output_type",
++        "type": "QueryResultOutputType"
++      },
++      {
++        "id": 6,
++        "name": "bound_all_parameters",
++        "type": "bool"
++      },
++      {
++        "id": 7,
++        "name": "return_type",
++        "type": "StatementReturnType"
++      },
++      {
++        "id": 8,
++        "name": "parameter_count",
++        "type": "idx_t"
++      },
++      {
++        "id": 9,
++        "name": "always_require_rebind",
++        "type": "bool"
++      },
++      {
++        "id": 10,
++        "name": "read_only",
++        "type": "bool"
++      }
++    ]
+   }
+ ]
+--- a/src/include/storage/quack_catalog.hpp
++++ b/src/include/storage/quack_catalog.hpp
+@@ -17,6 +17,7 @@
+ class QuackCatalog;
+ class QuackClient;
+ class QuackClientConnection;
++class PrepareResponseMessage;
+ 
+ class QuackCatalog : public Catalog {
+ public:
+@@ -70,6 +71,11 @@
+ 	unique_ptr<TableRef> RemoteExecute(ClientContext &context, unique_ptr<QueryNode> node) override;
+ 	unique_ptr<TableRef> RemoteExecute(ClientContext &context, unique_ptr<SQLStatement> statement) override;
+ 	unique_ptr<TableRef> RemoteExecute(ClientContext &context, const string &sql) override;
++	unique_ptr<TableRef> RemoteExecute(ClientContext &context, const string &sql,
++	                                  const identifier_map_t<BoundParameterData> &parameters) override;
++	PreparedStatementInfo RemotePrepare(ClientContext &context, SQLStatement &statement) override;
++	bool RemoteIsAutoCommit(ClientContext &context) override;
++	static void SetConnectQueryMetadata(ClientContext &context, const PrepareResponseMessage &response);
+ 	string GetConnectDisplay() override {
+ 		return GetDBPath();
+ 	}
+@@ -79,6 +85,7 @@
+ 	const string &GetConnectionId();
+ 
+ 	shared_ptr<QuackClientConnection> GetClientConnection();
++	shared_ptr<QuackClientConnection> GetConnectClientConnection(ClientContext &context);
+ 
+ 	void Refresh(ClientContext &context);
+ 
+@@ -87,13 +94,18 @@
+ 
+ 	//! Build the "quack_query_by_name" table function call that runs "sql" on the server. Statements pushed
+ 	//! down by the RemotePushdownOptimizer change the remote catalog, so they ask for a catalog refresh
+-	unique_ptr<TableRef> CreateRemoteQueryRef(const string &sql, bool refresh_catalog);
++	unique_ptr<TableRef> CreateRemoteQueryRef(const string &sql, bool refresh_catalog, bool use_transaction = true,
++	                                        const identifier_map_t<BoundParameterData> *parameters = nullptr,
++	                                        bool connect_session = false);
+ 
+ 	QuackLoadCatalogData LoadCatalog(ClientContext &context);
+ 
+ private:
+ 	shared_ptr<QuackClientConnection> client_connection;
+ 	unique_ptr<QuackSchemaSet> schemas;
++	string auth_token;
++	string client_identifier;
++	idx_t requested_heartbeat_timeout;
+ };
+ 
+ } // namespace duckdb
+--- a/src/include/storage/quack_table.hpp
++++ b/src/include/storage/quack_table.hpp
+@@ -10,6 +10,7 @@
+ 
+ #include "duckdb/catalog/catalog.hpp"
+ #include "duckdb/catalog/catalog_entry/table_catalog_entry.hpp"
++#include "duckdb/parser/parsed_data/create_table_info.hpp"
+ 
+ namespace duckdb {
+ class QuackCatalog;
+@@ -29,12 +30,18 @@
+ class QuackTableCatalogEntry : public TableCatalogEntry {
+ public:
+ 	QuackTableCatalogEntry(Catalog &catalog_p, SchemaCatalogEntry &schema_p, CreateTableInfo &info_p)
+-	    : TableCatalogEntry(catalog_p, schema_p, info_p) {
++	    : TableCatalogEntry(catalog_p, schema_p, info_p), columns(std::move(info_p.columns)) {
++	}
++	const ColumnList &GetColumns() const override {
++		return columns;
+ 	}
+ 
+ 	unique_ptr<BaseStatistics> GetStatistics(ClientContext &context, column_t column_id) override;
+ 	TableFunction GetScanFunction(ClientContext &context, unique_ptr<FunctionData> &bind_data) override;
+ 	TableStorageInfo GetStorageInfo(ClientContext &context) override;
++
++protected:
++	ColumnList columns;
+ };
+ 
+ } // namespace duckdb
+--- a/src/quack_client.cpp
++++ b/src/quack_client.cpp
+@@ -25,12 +25,10 @@
+ }
+ 
+ void QuackClientConnection::CancelQuery(hugeint_t query_uuid) {
+-	lock_guard<mutex> guard(lock);
+-	if (cached_clients.empty()) {
+-		return;
+-	}
+-	// get a cached client, if any
+-	auto &client = cached_clients.back();
++	// FETCH may hold every cached client. TakeClient can open another without holding the pool lock
++	// over the request, so cancellation never waits for the query it is supposed to interrupt.
++	auto client = TakeClient(nullptr);
++	client->PrepareTeardownRequest();
+ 	client->Request<SuccessResponse>(nullptr, make_uniq<CancelRequestMessage>(connection_id, query_uuid));
+ }
+ 
+@@ -121,6 +119,8 @@
+ 		} else {
+ 			http_params = http_util.InitializeParameters(db, request_url);
+ 		}
++		// Replaying a PREPARE after a lost reply could execute a committed write twice.
++		http_params->retries = 0;
+ 	}
+ 	// http_params is cached across checkouts; re-scope its logger each request so a context-less
+ 	// teardown on a pooled client never logs under a prior query's scope.
+@@ -200,16 +200,20 @@
+ }
+ 
+ QuackClientConnection::~QuackClientConnection() {
++	Disconnect();
++}
++
++void QuackClientConnection::Disconnect() {
++	if (disconnected.exchange(true)) {
++		return;
++	}
+ 	heartbeat.Stop();
+-	if (!cached_clients.empty()) {
+-		try {
+-			auto &client = cached_clients.back();
+-			// A dead peer at teardown must not block the destructor for the full request timeout (which
+-			// task dispatch may have set to an hour). Bound the transport first.
+-			client->PrepareTeardownRequest();
+-			client->Request<SuccessResponse>(nullptr, make_uniq<DisconnectMessage>(connection_id));
+-		} catch (...) {
+-		}
++	try {
++		auto client = TakeClient(nullptr);
++		// A dead peer at teardown must not block the destructor for the full request timeout.
++		client->PrepareTeardownRequest();
++		client->Request<SuccessResponse>(nullptr, make_uniq<DisconnectMessage>(connection_id));
++	} catch (...) {
+ 	}
+ }
+ 
+--- a/src/quack_extension.cpp
++++ b/src/quack_extension.cpp
+@@ -324,8 +324,8 @@
+ }
+ 
+ std::string QuackExtension::Version() const {
+-#ifdef EXT_VERSION_RPC
+-	return EXT_VERSION_RPC;
++#ifdef EXT_VERSION_QUACK
++	return EXT_VERSION_QUACK;
+ #else
+ 	return "";
+ #endif
+--- a/src/quack_fetch_ahead.cpp
++++ b/src/quack_fetch_ahead.cpp
+@@ -125,7 +125,7 @@
+ 
+ QuackFetcher::QuackFetcher(ClientContext &context, QuackClientConnection &connection, hugeint_t query_uuid,
+                            idx_t depth_p)
+-    : depth(MaxValue<idx_t>(depth_p, 1)) {
++    : client_connection(connection.shared_from_this()), depth(MaxValue<idx_t>(depth_p, 1)) {
+ 	queue = make_uniq<ManagedAsyncTaskQueue>(context, depth);
+ 	if (!queue->IsAsync()) {
+ 		// Register runs the POST inline on the scan thread; deeper pipelining is impossible.
+@@ -264,9 +264,16 @@
+ 	}
+ }
+ 
+-void QuackFetcher::StopAndDrain() {
++void QuackFetcher::StopAndDrain(bool cancel_pending) {
+ 	stop = true;
+ 	if (queue) {
++		if (cancel_pending && !no_more_fetches) {
++			try {
++				client_connection->CancelQuery(query_uuid);
++			} catch (...) {
++				// A dead peer must not prevent the asynchronous queue from being joined.
++			}
++		}
+ 		try {
+ 			queue->Close();
+ 		} catch (...) {
+--- a/src/quack_fetch_collector.cpp
++++ b/src/quack_fetch_collector.cpp
+@@ -195,7 +195,8 @@
+ 	for (auto &name : data.names) {
+ 		result_names.push_back(name.GetIdentifierName());
+ 	}
+-	stream->SignalBound(data.types, std::move(result_names));
++	stream->SignalBound(data.types, std::move(result_names),
++	                    make_uniq<QuackPreparedMetadata>(data.statement_type, data.properties));
+ 	return make_uniq<QuackFetchCollector>(physical_plan, data, std::move(stream), order_mode);
+ }
+ 
+--- a/src/quack_scan.cpp
++++ b/src/quack_scan.cpp
+@@ -104,17 +104,45 @@
+ 	// TODO some of this stuff below is duplicated af
+ 	auto query = input.inputs[1].GetValue<string>();
+ 	auto bind_data = make_uniq<QuackScanBindData>();
+-	bind_data->client_connection = catalog.GetClientConnection();
++	auto session_entry = input.named_parameters.find("connect_session");
++	bool connect_session = session_entry != input.named_parameters.end() && BooleanValue::Get(session_entry->second);
++	bind_data->client_connection =
++	    connect_session ? catalog.GetConnectClientConnection(context) : catalog.GetClientConnection();
+ 	auto client_wrapper = bind_data->client_connection->GetClient(context);
+ 	auto &client = client_wrapper->GetClient();
+ 	bind_data->query_uuid = UUID::GenerateRandomUUID();
+-	auto bind_response = client.Request<PrepareResponseMessage>(
+-	    context,
+-	    make_uniq<PrepareRequestMessage>(bind_data->client_connection->ConnectionId(), query, bind_data->query_uuid));
++	auto request =
++	    make_uniq<PrepareRequestMessage>(bind_data->client_connection->ConnectionId(), query, bind_data->query_uuid);
++	if (connect_session) {
++		// Return bound schema before computation; native execution can then observe interrupts.
++		request->SetInlineRows(optional_idx(0));
++	}
++	auto parameter_entry = input.named_parameters.find("parameters");
++	if (parameter_entry != input.named_parameters.end()) {
++		auto &parameters = parameter_entry->second;
++		if (parameters.IsNull() || parameters.type().id() != LogicalTypeId::STRUCT) {
++			throw InvalidInputException("Quack typed parameters must be a non-null STRUCT");
++		}
++		vector<string> parameter_names;
++		auto values = StructValue::GetChildren(parameters);
++		for (idx_t i = 0; i < values.size(); i++) {
++			parameter_names.push_back(StructType::GetChildName(parameters.type(), i).GetIdentifierName());
++		}
++		request->SetParameters(std::move(parameter_names), std::move(values));
++	}
++	auto bind_response = client.Request<PrepareResponseMessage>(context, std::move(request));
+ 
+ 	return_types = bind_response->Types();
+-	for (auto &col_name : bind_response->Names()) {
+-		names.push_back(Identifier(col_name));
++	if (connect_session) {
++		QuackCatalog::SetConnectQueryMetadata(context, *bind_response);
++		for (idx_t i = 0; i < bind_response->Names().size(); i++) {
++			// These names only bind SELECT * over the transport; public result names are restored after planning.
++			names.push_back(Identifier("__quack_transport_" + std::to_string(i)));
++		}
++	} else {
++		for (auto &col_name : bind_response->Names()) {
++			names.push_back(Identifier(col_name));
++		}
+ 	}
+ 
+ 	// new stuff
+@@ -370,7 +398,7 @@
+ 		return;
+ 	}
+ 	if (global_state.fetcher) {
+-		global_state.fetcher->StopAndDrain();
++		global_state.fetcher->StopAndDrain(false);
+ 	}
+ 	SendAcknowledgement(context, global_state, bind_data);
+ }
+@@ -502,6 +530,8 @@
+ 	fun.get_bind_info = QuackScanGetBindInfo;
+ 	fun.named_parameters["use_transaction"] = LogicalType::BOOLEAN;
+ 	fun.named_parameters["refresh_catalog"] = LogicalType::BOOLEAN;
++	fun.named_parameters["connect_session"] = LogicalType::BOOLEAN;
++	fun.named_parameters["parameters"] = LogicalType::ANY;
+ 	// fun.filter_pushdown = true;
+ 	// fun.filter_prune = true;
+ 	return fun;
+--- a/src/quack_server.cpp
++++ b/src/quack_server.cpp
+@@ -11,6 +11,9 @@
+ 
+ #include "duckdb/main/client_config.hpp"
+ #include "duckdb/main/prepared_statement_data.hpp"
++#include "duckdb/main/prepared_statement.hpp"
++#include "duckdb/main/pending_query_result.hpp"
++#include "duckdb/main/materialized_query_result.hpp"
+ 
+ #include "quack_server.hpp"
+ #include "quack_message.hpp"
+@@ -124,7 +127,8 @@
+ //! Runs one client statement with the result collector installed. It holds the statement lock for the
+ //! full duration. A statement that returns rows fills the claim buffer in parallel. A statement that
+ //! returns a count leaves the count in batch 1, through the fallback below.
+-static void DriveQuery(QuackConnection &connection, shared_ptr<QuackResultStream> stream, string sql) {
++static void DriveQuery(QuackConnection &connection, shared_ptr<QuackResultStream> stream, string sql,
++                       identifier_map_t<BoundParameterData> parameters) {
+ 	// A failed statement must stop the client's sends, so its scan's streams get the error too.
+ 	auto fail_streams = [&](const ErrorData &error) {
+ 		if (auto session_state = QuackSessionState::Get(*connection.duckdb_connection->context)) {
+@@ -143,7 +147,13 @@
+ 		};
+ 		unique_ptr<QueryResult> result;
+ 		try {
+-			result = connection.duckdb_connection->Query(sql);
++			if (parameters.empty()) {
++				result = connection.duckdb_connection->Query(sql);
++			} else {
++				auto pending = connection.duckdb_connection->PendingQuery(sql, parameters);
++				result = pending->HasError() ? make_uniq<MaterializedQueryResult>(pending->GetErrorObject())
++				                            : pending->Execute();
++			}
+ 		} catch (...) {
+ 			// leave no collector hook on the connection's config
+ 			config.get_result_collector = nullptr;
+@@ -167,7 +177,9 @@
+ 			for (auto &col_name : result->GetNames()) {
+ 				result_names.push_back(col_name.GetIdentifierName());
+ 			}
+-			stream->SignalBound(result->GetTypes(), std::move(result_names));
++			stream->SignalBound(result->GetTypes(), std::move(result_names),
++			                    make_uniq<QuackPreparedMetadata>(result->GetStatementType(),
++			                                                     result->GetStatementProperties()));
+ 			unique_ptr<QuackChunkPayloadWriter> writer;
+ 			idx_t rows = 0;
+ 			while (auto chunk = result->Fetch()) {
+@@ -628,9 +640,43 @@
+ 		}
+ 		auto effective_sql = (authz.value.type().id() == LogicalTypeId::VARCHAR) ? authz.value.GetValue<string>()
+ 		                                                                         : prepare_request_message.Query();
++		if (prepare_request_message.TransactionStateOnly()) {
++			// A read-only control probe must not abort or replace the session's current result stream.
++			auto response = make_uniq<PrepareResponseMessage>(vector<LogicalType>(), vector<string>(),
++			    vector<unique_ptr<DataChunkWrapper>>(), false, hugeint_t {0, 0});
++			response->SetRemoteAutoCommit(connection.duckdb_connection->IsAutoCommit());
++			return response;
++		}
+ 
+ 		// Stop the previous producer first. This joins its thread, so it frees the statement lock.
+ 		AbortStatement(connection, "superseded by a new query");
++		if (prepare_request_message.PrepareOnly()) {
++			unique_lock<mutex> guard(connection.statement_lock);
++			auto prepared = connection.duckdb_connection->Prepare(effective_sql);
++			if (prepared->HasError()) {
++				return make_uniq<ErrorResponse>(prepared->GetErrorObject());
++			}
++			vector<string> result_names;
++			for (auto &name : prepared->GetNames()) {
++				result_names.push_back(name.GetIdentifierName());
++			}
++			auto response = make_uniq<PrepareResponseMessage>(prepared->GetTypes(), result_names,
++			    vector<unique_ptr<DataChunkWrapper>>(), false, hugeint_t {0, 0});
++			response->SetPreparedMetadata(make_uniq<QuackPreparedMetadata>(*prepared));
++			return response;
++		}
++		if (prepare_request_message.ParameterNames().size() != prepare_request_message.ParameterValues().size()) {
++			return make_uniq<ErrorResponse>(ErrorData(ExceptionType::INVALID_INPUT,
++			    "Quack parameter names and values must have equal lengths"));
++		}
++		identifier_map_t<BoundParameterData> parameters;
++		for (idx_t i = 0; i < prepare_request_message.ParameterNames().size(); i++) {
++			auto inserted = parameters.emplace(Identifier(prepare_request_message.ParameterNames()[i]),
++			                                   BoundParameterData(prepare_request_message.ParameterValues()[i]));
++			if (!inserted.second) {
++				return make_uniq<ErrorResponse>(ErrorData(ExceptionType::INVALID_INPUT, "Duplicate Quack parameter"));
++			}
++		}
+ 		{
+ 			std::unique_lock<std::mutex> lock(connection.lock);
+ 			if (prepare_request_message.QueryUUID() != hugeint_t {0, 0}) {
+@@ -675,7 +721,8 @@
+ 			if (auto session_state = QuackSessionState::Get(*connection.duckdb_connection->context)) {
+ 				session_state->SetStatement(stream);
+ 			}
+-			connection.statement.thread = std::thread(DriveQuery, std::ref(connection), stream, effective_sql);
++			connection.statement.thread =
++			    std::thread(DriveQuery, std::ref(connection), stream, effective_sql, std::move(parameters));
+ 		}
+ 		AbortDetachedStatement(connection, std::move(superseded), "superseded by a new query");
+ 
+@@ -755,8 +802,12 @@
+ 		if (!needs_more_fetch) {
+ 			connection.query_state = QuackQueryState::FINISHED;
+ 		}
+-		return make_uniq<PrepareResponseMessage>(stream->types, stream->names, std::move(results), needs_more_fetch,
+-		                                         prepare_request_message.QueryUUID());
++		auto response = make_uniq<PrepareResponseMessage>(stream->types, stream->names, std::move(results), needs_more_fetch,
++		                                                prepare_request_message.QueryUUID());
++		if (stream->metadata) {
++			response->SetPreparedMetadata(make_uniq<QuackPreparedMetadata>(*stream->metadata));
++		}
++		return response;
+ 	}
+ 
+ 	case MessageType::FETCH_REQUEST: {
+--- a/src/serialize_quack_message.cpp
++++ b/src/serialize_quack_message.cpp
+@@ -77,11 +77,15 @@
+ 
+ void ErrorResponse::Serialize(Serializer &serializer) const {
+ 	serializer.WritePropertyWithDefault<string>(1, "message", error.RawMessage());
++	serializer.WritePropertyWithDefault<ExceptionType>(2, "error_type", error.Type(), ExceptionType::INVALID_INPUT);
++	serializer.WritePropertyWithDefault<unordered_map<string, string>>(3, "extra_info", error.ExtraInfo());
+ }
+ 
+ unique_ptr<ErrorResponse> ErrorResponse::Deserialize(Deserializer &deserializer) {
+ 	auto message = deserializer.ReadPropertyWithDefault<string>(1, "message");
+-	auto result = duckdb::unique_ptr<ErrorResponse>(new ErrorResponse(std::move(message)));
++	auto error_type = deserializer.ReadPropertyWithExplicitDefault<ExceptionType>(2, "error_type", ExceptionType::INVALID_INPUT);
++	auto extra_info = deserializer.ReadPropertyWithDefault<unordered_map<string, string>>(3, "extra_info");
++	auto result = duckdb::unique_ptr<ErrorResponse>(new ErrorResponse(error_type, std::move(message), std::move(extra_info)));
+ 	return result;
+ }
+ 
+@@ -108,8 +112,7 @@
+ unique_ptr<FetchResponseMessage> FetchResponseMessage::Deserialize(Deserializer &deserializer) {
+ 	auto result = duckdb::unique_ptr<FetchResponseMessage>(new FetchResponseMessage());
+ 	deserializer.ReadPropertyWithExplicitDefault<idx_t>(1, "chunk_count", result->chunk_count, 0);
+-	deserializer.ReadPropertyWithExplicitDefault<optional_idx>(2, "total_batches", result->total_batches,
+-	                                                           optional_idx());
++	deserializer.ReadPropertyWithExplicitDefault<optional_idx>(2, "total_batches", result->total_batches, optional_idx());
+ 	deserializer.ReadPropertyWithExplicitDefault<optional_idx>(3, "batch_index", result->batch_index, optional_idx());
+ 	return result;
+ }
+@@ -140,6 +143,10 @@
+ 	serializer.WritePropertyWithDefault<string>(1, "sql_query", sql_query);
+ 	serializer.WriteProperty<hugeint_t>(2, "query_uuid", query_uuid);
+ 	serializer.WritePropertyWithDefault<optional_idx>(3, "inline_rows", inline_rows, optional_idx());
++	serializer.WritePropertyWithDefault<vector<string>>(4, "parameter_names", parameter_names);
++	serializer.WritePropertyWithDefault<vector<Value>>(5, "parameter_values", parameter_values);
++	serializer.WritePropertyWithDefault<bool>(6, "prepare_only", prepare_only);
++	serializer.WritePropertyWithDefault<bool>(7, "transaction_state_only", transaction_state_only);
+ }
+ 
+ unique_ptr<PrepareRequestMessage> PrepareRequestMessage::Deserialize(Deserializer &deserializer) {
+@@ -147,6 +154,10 @@
+ 	deserializer.ReadPropertyWithDefault<string>(1, "sql_query", result->sql_query);
+ 	deserializer.ReadProperty<hugeint_t>(2, "query_uuid", result->query_uuid);
+ 	deserializer.ReadPropertyWithExplicitDefault<optional_idx>(3, "inline_rows", result->inline_rows, optional_idx());
++	deserializer.ReadPropertyWithDefault<vector<string>>(4, "parameter_names", result->parameter_names);
++	deserializer.ReadPropertyWithDefault<vector<Value>>(5, "parameter_values", result->parameter_values);
++	deserializer.ReadPropertyWithDefault<bool>(6, "prepare_only", result->prepare_only);
++	deserializer.ReadPropertyWithDefault<bool>(7, "transaction_state_only", result->transaction_state_only);
+ 	return result;
+ }
+ 
+@@ -156,6 +167,8 @@
+ 	serializer.WritePropertyWithDefault<bool>(3, "needs_more_fetch", needs_more_fetch);
+ 	serializer.WritePropertyWithDefault<vector<unique_ptr<DataChunkWrapper>>>(4, "results", results);
+ 	serializer.WriteProperty<hugeint_t>(5, "query_uuid", query_uuid);
++	serializer.WritePropertyWithDefault<unique_ptr<QuackPreparedMetadata>>(6, "prepared_metadata", prepared_metadata);
++	serializer.WritePropertyWithDefault<bool>(7, "remote_auto_commit", remote_auto_commit, true);
+ }
+ 
+ unique_ptr<PrepareResponseMessage> PrepareResponseMessage::Deserialize(Deserializer &deserializer) {
+@@ -164,8 +177,37 @@
+ 	auto needs_more_fetch = deserializer.ReadPropertyWithDefault<bool>(3, "needs_more_fetch");
+ 	auto results = deserializer.ReadPropertyWithDefault<vector<unique_ptr<DataChunkWrapper>>>(4, "results");
+ 	auto query_uuid = deserializer.ReadProperty<hugeint_t>(5, "query_uuid");
+-	auto result = duckdb::unique_ptr<PrepareResponseMessage>(new PrepareResponseMessage(
+-	    std::move(result_types), std::move(result_names), std::move(results), needs_more_fetch, query_uuid));
++	auto result = duckdb::unique_ptr<PrepareResponseMessage>(new PrepareResponseMessage(std::move(result_types), std::move(result_names), std::move(results), needs_more_fetch, query_uuid));
++	deserializer.ReadPropertyWithDefault<unique_ptr<QuackPreparedMetadata>>(6, "prepared_metadata", result->prepared_metadata);
++	deserializer.ReadPropertyWithExplicitDefault<bool>(7, "remote_auto_commit", result->remote_auto_commit, true);
++	return result;
++}
++
++void QuackPreparedMetadata::Serialize(Serializer &serializer) const {
++	serializer.WriteProperty<StatementType>(1, "statement_type", statement_type);
++	serializer.WritePropertyWithDefault<vector<string>>(2, "parameter_names", parameter_names);
++	serializer.WritePropertyWithDefault<vector<LogicalType>>(3, "parameter_types", parameter_types);
++	serializer.WritePropertyWithDefault<bool>(4, "requires_valid_transaction", requires_valid_transaction);
++	serializer.WriteProperty<QueryResultOutputType>(5, "output_type", output_type);
++	serializer.WritePropertyWithDefault<bool>(6, "bound_all_parameters", bound_all_parameters);
++	serializer.WriteProperty<StatementReturnType>(7, "return_type", return_type);
++	serializer.WritePropertyWithDefault<idx_t>(8, "parameter_count", parameter_count);
++	serializer.WritePropertyWithDefault<bool>(9, "always_require_rebind", always_require_rebind);
++	serializer.WritePropertyWithDefault<bool>(10, "read_only", read_only);
++}
++
++unique_ptr<QuackPreparedMetadata> QuackPreparedMetadata::Deserialize(Deserializer &deserializer) {
++	auto result = duckdb::unique_ptr<QuackPreparedMetadata>(new QuackPreparedMetadata());
++	deserializer.ReadProperty<StatementType>(1, "statement_type", result->statement_type);
++	deserializer.ReadPropertyWithDefault<vector<string>>(2, "parameter_names", result->parameter_names);
++	deserializer.ReadPropertyWithDefault<vector<LogicalType>>(3, "parameter_types", result->parameter_types);
++	deserializer.ReadPropertyWithDefault<bool>(4, "requires_valid_transaction", result->requires_valid_transaction);
++	deserializer.ReadProperty<QueryResultOutputType>(5, "output_type", result->output_type);
++	deserializer.ReadPropertyWithDefault<bool>(6, "bound_all_parameters", result->bound_all_parameters);
++	deserializer.ReadProperty<StatementReturnType>(7, "return_type", result->return_type);
++	deserializer.ReadPropertyWithDefault<idx_t>(8, "parameter_count", result->parameter_count);
++	deserializer.ReadPropertyWithDefault<bool>(9, "always_require_rebind", result->always_require_rebind);
++	deserializer.ReadPropertyWithDefault<bool>(10, "read_only", result->read_only);
+ 	return result;
+ }
+ 
+@@ -180,8 +222,7 @@
+ 	auto result = duckdb::unique_ptr<SendDataRequestMessage>(new SendDataRequestMessage());
+ 	deserializer.ReadPropertyWithDefault<string>(1, "stream_id", result->stream_id);
+ 	deserializer.ReadPropertyWithExplicitDefault<idx_t>(2, "chunk_count", result->chunk_count, 0);
+-	deserializer.ReadPropertyWithExplicitDefault<optional_idx>(3, "total_batches", result->total_batches,
+-	                                                           optional_idx());
++	deserializer.ReadPropertyWithExplicitDefault<optional_idx>(3, "total_batches", result->total_batches, optional_idx());
+ 	deserializer.ReadPropertyWithExplicitDefault<optional_idx>(4, "batch_index", result->batch_index, optional_idx());
+ 	return result;
+ }
+--- a/src/storage/quack_catalog.cpp
++++ b/src/storage/quack_catalog.cpp
+@@ -1,5 +1,8 @@
+ #include "duckdb/common/exception.hpp"
+ #include "duckdb/main/connection.hpp"
++#include "duckdb/main/client_context_state.hpp"
++#include "duckdb/main/prepared_statement.hpp"
++#include "duckdb/main/prepared_statement_data.hpp"
+ #include "duckdb/main/database.hpp"
+ #include "duckdb/main/database_manager.hpp"
+ #include "duckdb/main/attached_database.hpp"
+@@ -26,9 +29,56 @@
+ 
+ namespace duckdb {
+ 
++//! Catalogs are shared by duplicate DuckDB connections; SQL sessions must not be shared.
++class QuackConnectState : public ClientContextState {
++public:
++	static constexpr const char *KEY = "quack_connect_sessions";
++	mutex lock;
++	unordered_map<idx_t, shared_ptr<QuackClientConnection>> sessions;
++	unique_ptr<QuackPreparedMetadata> result_metadata;
++	vector<Identifier> result_names;
++
++	bool CanRequestRebind() override {
++		return true;
++	}
++	void QueryBegin(ClientContext &context) override {
++		result_metadata.reset();
++		result_names.clear();
++	}
++	RebindQueryInfo OnFinalizePrepare(ClientContext &context, PreparedStatementData &statement,
++	                                  PreparedStatementMode mode) override {
++		if (result_metadata && context.IsConnected()) {
++			if (result_names.size() != statement.names.size()) {
++				throw InternalException("Quack result names do not match the local transport schema");
++			}
++			// The local SELECT is only a transport plan. Native clients must see the original SQL's result metadata.
++			statement.names = std::move(result_names);
++			statement.statement_type = result_metadata->statement_type;
++			statement.properties.return_type = result_metadata->return_type;
++			statement.properties.output_type = result_metadata->output_type;
++			result_metadata.reset();
++		}
++		return RebindQueryInfo::DO_NOT_REBIND;
++	}
++
++	void ConnectionClosed() override {
++		unordered_map<idx_t, shared_ptr<QuackClientConnection>> closing;
++		{
++			lock_guard<mutex> guard(lock);
++			closing.swap(sessions);
++		}
++		for (auto &entry : closing) {
++			entry.second->Disconnect();
++		}
++	}
++};
++
+ QuackCatalog::QuackCatalog(AttachedDatabase &db_p, const QuackUri &server_uri, ClientContext &context,
+                            const string &token, string client_id, idx_t heartbeat_timeout_seconds)
+     : Catalog(db_p) {
++	auth_token = token;
++	client_identifier = client_id;
++	requested_heartbeat_timeout = heartbeat_timeout_seconds;
+ 	// connect to the server
+ 	client_connection =
+ 	    QuackClient::ConnectToServer(context, server_uri, token, std::move(client_id), heartbeat_timeout_seconds);
+@@ -118,6 +168,17 @@
+ 	return client_connection;
+ }
+ 
++shared_ptr<QuackClientConnection> QuackCatalog::GetConnectClientConnection(ClientContext &context) {
++	auto state = context.registered_state->GetOrCreate<QuackConnectState>(QuackConnectState::KEY);
++	lock_guard<mutex> guard(state->lock);
++	auto &session = state->sessions[GetOid()];
++	if (!session) {
++		session = QuackClient::ConnectToServer(context, GetServerUri(), auth_token, client_identifier,
++		                                       requested_heartbeat_timeout);
++	}
++	return session;
++}
++
+ void QuackCatalog::Refresh(ClientContext &context) {
+ 	auto load_info = LoadCatalog(context);
+ 	schemas->Reload(context, *this, load_info);
+@@ -206,7 +267,8 @@
+ }
+ 
+ unique_ptr<TableRef> QuackCatalog::RemoteExecute(ClientContext &context, unique_ptr<QueryNode> node) {
+-	return RemoteExecute(context, node->ToString());
++	// attached-catalog path: a read of this catalog, so it joins the local transaction
++	return CreateRemoteQueryRef(node->ToString(), false, true);
+ }
+ 
+ unique_ptr<TableRef> QuackCatalog::RemoteExecute(ClientContext &context, unique_ptr<SQLStatement> statement) {
+@@ -216,18 +278,98 @@
+ }
+ 
+ unique_ptr<TableRef> QuackCatalog::RemoteExecute(ClientContext &context, const string &sql) {
+-	return CreateRemoteQueryRef(sql, false);
+-}
+-
+-unique_ptr<TableRef> QuackCatalog::CreateRemoteQueryRef(const string &sql, bool refresh_catalog) {
++	// Forward transaction control verbatim, using this ClientContext's independent server session.
++	GetConnectClientConnection(context);
++	return CreateRemoteQueryRef(sql, false, false, nullptr, true);
++}
++
++unique_ptr<TableRef> QuackCatalog::RemoteExecute(ClientContext &context, const string &sql,
++                                               const identifier_map_t<BoundParameterData> &parameters) {
++	GetConnectClientConnection(context);
++	return CreateRemoteQueryRef(sql, false, false, &parameters, true);
++}
++
++void QuackCatalog::SetConnectQueryMetadata(ClientContext &context, const PrepareResponseMessage &response) {
++	auto metadata = response.PreparedMetadata();
++	if (!metadata) {
++		throw InvalidInputException("The Quack server did not return native execution metadata; use the matching build");
++	}
++	auto state = context.registered_state->GetOrCreate<QuackConnectState>(QuackConnectState::KEY);
++	state->result_metadata = make_uniq<QuackPreparedMetadata>(*metadata);
++	state->result_names.clear();
++	for (auto &name : response.Names()) {
++		state->result_names.push_back(Identifier(name));
++	}
++}
++
++PreparedStatementInfo QuackCatalog::RemotePrepare(ClientContext &context, SQLStatement &statement) {
++	auto session = GetConnectClientConnection(context);
++	auto client = session->GetClient(context);
++	auto request = make_uniq<PrepareRequestMessage>(session->ConnectionId(), statement.query, hugeint_t {0, 0});
++	request->SetPrepareOnly(true);
++	auto response = client->GetClient().Request<PrepareResponseMessage>(context, std::move(request));
++	auto metadata = response->PreparedMetadata();
++	if (!metadata || metadata->parameter_names.size() != metadata->parameter_types.size()) {
++		throw IOException("Quack server did not return valid prepared-statement metadata");
++	}
++	PreparedStatementInfo info;
++	info.statement_type = metadata->statement_type;
++	info.types = response->Types();
++	for (auto &name : response->Names()) {
++		info.names.push_back(Identifier(name));
++	}
++	info.named_param_map = statement.named_param_map;
++	for (idx_t i = 0; i < metadata->parameter_names.size(); i++) {
++		info.parameter_types.emplace(Identifier(metadata->parameter_names[i]), metadata->parameter_types[i]);
++	}
++	info.properties.requires_valid_transaction = metadata->requires_valid_transaction;
++	info.properties.output_type = metadata->output_type;
++	info.properties.bound_all_parameters = metadata->bound_all_parameters;
++	info.properties.return_type = metadata->return_type;
++	info.properties.parameter_count = metadata->parameter_count;
++	info.properties.always_require_rebind = metadata->always_require_rebind;
++	if (!metadata->read_only) {
++		// Remote catalog identity is deliberately represented by the client-side attachment.
++		info.properties.modified_databases[GetName()] = {{GetOid(), {}}, DatabaseModificationType()};
++	}
++	return info;
++}
++
++bool QuackCatalog::RemoteIsAutoCommit(ClientContext &context) {
++	auto session = GetConnectClientConnection(context);
++	auto client = session->GetClient(context);
++	auto request = make_uniq<PrepareRequestMessage>(session->ConnectionId(), "COMMIT", hugeint_t {0, 0});
++	request->SetTransactionStateOnly(true);
++	auto response = client->GetClient().Request<PrepareResponseMessage>(context, std::move(request));
++	return response->RemoteAutoCommit();
++}
++
++unique_ptr<TableRef> QuackCatalog::CreateRemoteQueryRef(const string &sql, bool refresh_catalog,
++                                                      bool use_transaction_p,
++                                                      const identifier_map_t<BoundParameterData> *parameters,
++                                                      bool connect_session) {
+ 	vector<unique_ptr<ParsedExpression>> args;
+-	args.push_back(make_uniq<ConstantExpression>(Value(GetName())));
+-	args.push_back(make_uniq<ConstantExpression>(Value(sql)));
+-	auto use_transaction = make_uniq<ConstantExpression>(Value::BOOLEAN(true));
++	args.push_back(ConstantExpression::FromValue(Value(GetName())));
++	args.push_back(ConstantExpression::FromValue(Value(sql)));
++	auto use_transaction = ConstantExpression::FromValue(Value::BOOLEAN(use_transaction_p));
+ 	use_transaction->SetAlias("use_transaction");
+ 	args.push_back(std::move(use_transaction));
++	if (connect_session) {
++		auto session = ConstantExpression::FromValue(Value::BOOLEAN(true));
++		session->SetAlias("connect_session");
++		args.push_back(std::move(session));
++	}
++	if (parameters && !parameters->empty()) {
++		child_list_t<Value> fields;
++		for (auto &entry : *parameters) {
++			fields.emplace_back(entry.first.GetIdentifierName(), entry.second.GetValue());
++		}
++		auto values = ConstantExpression::FromValue(Value::STRUCT(std::move(fields)));
++		values->SetAlias("parameters");
++		args.push_back(std::move(values));
++	}
+ 	if (refresh_catalog) {
+-		auto refresh = make_uniq<ConstantExpression>(Value::BOOLEAN(true));
++		auto refresh = ConstantExpression::FromValue(Value::BOOLEAN(true));
+ 		refresh->SetAlias("refresh_catalog");
+ 		args.push_back(std::move(refresh));
+ 	}
+--- a/src/storage/quack_table.cpp
++++ b/src/storage/quack_table.cpp
+@@ -6,7 +6,9 @@
+ #include "duckdb/parser/statement/create_statement.hpp"
+ #include "duckdb/parser/parsed_data/alter_info.hpp"
+ #include "duckdb/planner/parsed_data/bound_create_table_info.hpp"
++#include "duckdb/planner/binder.hpp"
+ #include "duckdb/parser/parsed_data/create_view_info.hpp"
++#include "duckdb/parser/constraint.hpp"
+ #include "storage/quack_view.hpp"
+ 
+ namespace duckdb {
+@@ -47,6 +49,21 @@
+ 			// the entire ATTACH with a misleading "Catalog \"...\" does not exist" (issue #132).
+ 			// The parsed DEFAULT stays on the column and binds on first use, once the catalog exists.
+ 			auto binder = Binder::CreateBinder(context);
++			// Foreign keys are already resolved and enforced by the server. During
++			// ATTACH this local catalog is not registered yet, so rebinding a foreign
++			// key here cannot look up its referenced table. Keep the parsed metadata
++			// while binding column types and the other local constraints.
++			auto &table_info = info->Cast<CreateTableInfo>();
++			vector<unique_ptr<Constraint>> foreign_keys;
++			vector<unique_ptr<Constraint>> local_constraints;
++			for (auto &constraint : table_info.constraints) {
++				if (constraint->type == ConstraintType::FOREIGN_KEY) {
++					foreign_keys.push_back(std::move(constraint));
++				} else {
++					local_constraints.push_back(std::move(constraint));
++				}
++			}
++			table_info.constraints = std::move(local_constraints);
+ 			unique_ptr<BoundCreateTableInfo> bound_info;
+ 			try {
+ 				bound_info = binder->BindCreateTableInfo(std::move(info), schema, AlterBindMode::SKIP_BINDING);
+@@ -54,6 +71,9 @@
+ 				throw BinderException(
+ 				    "Failed to bind remote table while attaching quack catalog \"%s\" (schema \"%s\"): %s\nSQL: %s",
+ 				    catalog.GetName().GetIdentifierName(), schema.name.GetIdentifierName(), ex.what(), sql);
++			}
++			for (auto &foreign_key : foreign_keys) {
++				bound_info->Base().constraints.push_back(std::move(foreign_key));
+ 			}
+ 			auto table = make_uniq<QuackTableCatalogEntry>(catalog, parent, bound_info->Base());
+ 			entry = std::move(table);
+--- /dev/null
++++ b/test/sql/connect_transactions.test
+@@ -0,0 +1,67 @@
++# name: test/sql/connect_transactions.test
++# description: once CONNECT-ed, BEGIN/COMMIT/ROLLBACK are forwarded verbatim and are the remote's to decide
++# group: [sql]
++
++include test/template/quack_setup.test_template
++
++statement ok
++attach {server} as q (token 'asdf')
++
++statement ok
++CONNECT q;
++
++# BEGIN is shipped as-is. It used to land inside a synthesized per-statement transaction,
++# so the remote refused it (and the matching COMMIT/ROLLBACK arrived after that transaction
++# had already closed).
++statement ok
++BEGIN;
++
++statement ok
++CREATE TABLE connect_tx(i INT);
++
++statement ok
++INSERT INTO connect_tx VALUES (42);
++
++# the open remote transaction sees its own uncommitted rows
++query I
++SELECT i FROM connect_tx;
++----
++42
++
++statement ok
++ROLLBACK;
++
++# the rollback was the remote's: the table never landed
++statement error
++SELECT i FROM connect_tx;
++----
++connect_tx
++
++# ... and a committed one does land
++statement ok
++BEGIN;
++
++statement ok
++CREATE TABLE connect_tx(i INT);
++
++statement ok
++INSERT INTO connect_tx VALUES (7);
++
++statement ok
++COMMIT;
++
++query I
++SELECT i FROM connect_tx;
++----
++7
++
++statement ok
++DROP TABLE connect_tx;
++
++statement ok
++DISCONNECT;
++
++statement ok
++detach q;
++
++include test/template/quack_teardown.test_template

@@ -1,0 +1,35 @@
+diff --git a/src/jni/duckdb_java.cpp b/src/jni/duckdb_java.cpp
+--- a/src/jni/duckdb_java.cpp
++++ b/src/jni/duckdb_java.cpp
+@@ -88,6 +88,10 @@
+ 	auto config = ClientConfig::GetConfig(*conn_ref->connection->context);
+ 	auto conn = new ConnectionHolder(conn_ref->db);
+ 	conn->connection->context->config = config;
++	if (conn_ref->connection->context->IsConnected()) {
++		conn->connection->context->ConnectToCatalog(
++		    conn_ref->connection->context->TryGetConnectedCatalog());
++	}
+ 	return env->NewDirectByteBuffer(conn, 0);
+ }
+ 
+@@ -163,7 +167,11 @@
+ 	if (!conn_ref) {
+ 		return;
+ 	}
+-	conn_ref->context->RunFunctionInTransaction([&]() { conn_ref->SetAutoCommit(auto_commit); });
++	if (conn_ref->context->IsConnected()) {
++		conn_ref->SetAutoCommit(auto_commit);
++	} else {
++		conn_ref->context->RunFunctionInTransaction([&]() { conn_ref->SetAutoCommit(auto_commit); });
++	}
+ }
+ 
+ jboolean _duckdb_jdbc_get_auto_commit(JNIEnv *env, jclass, jobject conn_ref_buf) {
+@@ -198,6 +206,7 @@
+ 	}
+ 	auto conn_ref = (ConnectionHolder *)env->GetDirectBufferAddress(conn_ref_buf);
+ 	if (conn_ref) {
++		conn_ref->connection->context->CloseRemoteConnections();
+ 		delete conn_ref;
+ 	}
+ }

@@ -1,0 +1,285 @@
+--- a/src/catalog/catalog.cpp
++++ b/src/catalog/catalog.cpp
+@@ -37,6 +37,7 @@
+ #include "duckdb/main/extension_entries.hpp"
+ #include "duckdb/main/extension/generated_extension_loader.hpp"
+ #include "duckdb/main/connection.hpp"
++#include "duckdb/main/prepared_statement.hpp"
+ #include "duckdb/main/attached_database.hpp"
+ #include "duckdb/main/database_manager.hpp"
+ #include "duckdb/function/built_in_functions.hpp"
+@@ -367,6 +368,22 @@
+ 
+ unique_ptr<TableRef> Catalog::RemoteExecute(ClientContext &context, const string &sql) {
+ 	throw NotImplementedException("RemoteExecute(string) not supported by this catalog");
++}
++
++unique_ptr<TableRef> Catalog::RemoteExecute(ClientContext &context, const string &sql,
++                                          const identifier_map_t<BoundParameterData> &parameters) {
++	if (!parameters.empty()) {
++		throw NotImplementedException("Typed CONNECT parameters are not supported by this catalog");
++	}
++	return RemoteExecute(context, sql);
++}
++
++PreparedStatementInfo Catalog::RemotePrepare(ClientContext &context, SQLStatement &statement) {
++	throw NotImplementedException("CONNECT prepared statements are not supported by this catalog");
++}
++
++bool Catalog::RemoteIsAutoCommit(ClientContext &context) {
++	throw NotImplementedException("CONNECT transaction-state inspection is not supported by this catalog");
+ }
+ 
+ bool Catalog::SupportsPushdown(const ParsedExpression &expression) {
+--- a/src/include/duckdb/catalog/catalog.hpp
++++ b/src/include/duckdb/catalog/catalog.hpp
+@@ -28,6 +28,8 @@
+ #include <functional>
+ 
+ namespace duckdb {
++struct BoundParameterData;
++struct PreparedStatementInfo;
+ struct AttachOptions;
+ struct CreateSchemaInfo;
+ struct DropInfo;
+@@ -403,6 +405,13 @@
+ 	//! Execute a full (non-query) statement remotely - the returned table ref yields the statement's result
+ 	virtual unique_ptr<TableRef> RemoteExecute(ClientContext &context, unique_ptr<SQLStatement> statement);
+ 	virtual unique_ptr<TableRef> RemoteExecute(ClientContext &context, const string &sql);
++	//! Route typed API parameters without substituting them into SQL text.
++	virtual unique_ptr<TableRef> RemoteExecute(ClientContext &context, const string &sql,
++	                                         const identifier_map_t<BoundParameterData> &parameters);
++	//! Bind a CONNECT-ed API prepared statement on its server, without executing it.
++	virtual PreparedStatementInfo RemotePrepare(ClientContext &context, SQLStatement &statement);
++	//! Inspect transaction state without replacing a currently streaming result.
++	virtual bool RemoteIsAutoCommit(ClientContext &context);
+ 	virtual bool SupportsPushdown(const ParsedExpression &expression);
+ 	virtual bool SupportsPushdown(const TableRef &ref);
+ 	virtual bool SupportsPushdown(const QueryNode &node);
+--- a/src/include/duckdb/main/client_context.hpp
++++ b/src/include/duckdb/main/client_context.hpp
+@@ -122,6 +122,10 @@
+ 	DUCKDB_API void ConnectToCatalog(const shared_ptr<AttachedDatabase> &target);
+ 	//! Clear any active CONNECT; subsequent SQL goes through the normal DuckDB pipeline.
+ 	DUCKDB_API void DisconnectFromCatalog();
++	//! Release remote sessions promptly, including those retained across DISCONNECT.
++	DUCKDB_API void CloseRemoteConnections();
++	//! Read the server's authoritative auto-commit flag without cleaning up the current query.
++	DUCKDB_API bool RemoteIsAutoCommit();
+ 	//! True iff a CONNECT is currently active (even if the target was detached out from under us).
+ 	DUCKDB_API bool IsConnected() const {
+ 		return is_connected;
+--- a/src/include/duckdb/main/client_context_state.hpp
++++ b/src/include/duckdb/main/client_context_state.hpp
+@@ -36,6 +36,9 @@
+ class ClientContextState {
+ public:
+ 	virtual ~ClientContextState() = default;
++	//! Explicit connection close may precede destruction of contexts retained by relations.
++	virtual void ConnectionClosed() {
++	}
+ 	virtual void QueryBegin(ClientContext &context) {
+ 	}
+ 	virtual void QueryEnd() {
+--- a/src/include/duckdb/transaction/transaction_context.hpp
++++ b/src/include/duckdb/transaction/transaction_context.hpp
+@@ -9,6 +9,7 @@
+ #pragma once
+ 
+ #include "duckdb/common/assert.hpp"
++#include "duckdb/common/atomic.hpp"
+ #include "duckdb/common/common.hpp"
+ #include "duckdb/common/error_data.hpp"
+ #include "duckdb/common/exception.hpp"
+@@ -48,7 +49,7 @@
+ 
+ 	void SetAutoCommit(bool value);
+ 	bool IsAutoCommit() const {
+-		return auto_commit;
++		return auto_commit.load();
+ 	}
+ 
+ 	void SetReadOnly();
+@@ -70,7 +71,8 @@
+ 
+ private:
+ 	ClientContext &context;
+-	bool auto_commit;
++	//! Native state may be inspected by a remote control request while a query produces results.
++	atomic<bool> auto_commit;
+ 	TransactionInvalidationPolicy invalidation_policy = TransactionInvalidationPolicy::STANDARD_POLICY;
+ 	bool auto_rollback = false;
+ 
+--- a/src/main/client_context.cpp
++++ b/src/main/client_context.cpp
+@@ -246,6 +246,30 @@
+ 	is_connected = false;
+ }
+ 
++void ClientContext::CloseRemoteConnections() {
++	auto lock = LockContext();
++	for (auto &state : registered_state->States()) {
++		try {
++			state->ConnectionClosed();
++		} catch (...) {
++			// A dead peer must not prevent the native connection from closing.
++		}
++	}
++	DisconnectFromCatalog();
++}
++
++bool ClientContext::RemoteIsAutoCommit() {
++	auto lock = LockContext();
++	if (!is_connected) {
++		return transaction.IsAutoCommit();
++	}
++	auto live = TryGetConnectedCatalog();
++	if (!live) {
++		throw InvalidInputException("The connected database has been detached; DISCONNECT first");
++	}
++	return live->GetCatalog().RemoteIsAutoCommit(*this);
++}
++
+ shared_ptr<AttachedDatabase> ClientContext::TryGetConnectedCatalog() const {
+ 	if (!is_connected) {
+ 		return nullptr;
+@@ -855,6 +879,15 @@
+ 	auto statement_query = statement->query;
+ 	// prepare the statement under a generated name - the returned PreparedStatement only refers to that name
+ 	auto name = "duckdb_prepare_internal_" + UUID::ToString(UUID::GenerateRandomUUID());
++	if (is_connected && !IsConnectControlStatement(statement->type)) {
++		auto live = TryGetConnectedCatalog();
++		if (!live) {
++			throw InvalidInputException("The connected database has been detached; DISCONNECT first");
++		}
++		auto info = live->GetCatalog().RemotePrepare(*this, *statement);
++		return make_uniq<PreparedStatement>(shared_from_this(), std::move(name), std::move(statement_query),
++		                                    std::move(info));
++	}
+ 	auto prepare = make_uniq<PrepareStatement>();
+ 	prepare->name = Identifier(name);
+ 	prepare->query = statement_query;
+@@ -996,29 +1029,14 @@
+ }
+ 
+ //! Whether this statement executes a prepared statement with parameter values supplied through the C/C++ API
+-static bool HasBoundParameterValues(const SQLStatement &statement) {
+-	if (statement.type != StatementType::EXECUTE_STATEMENT) {
+-		return false;
+-	}
+-	return !statement.Cast<ExecuteStatement>().bound_values.empty();
+-}
+-
+ unique_ptr<PendingQueryResult> ClientContext::PendingStatement(ClientContextLock &lock,
+                                                                unique_ptr<SQLStatement> statement,
+                                                                const PendingQueryParameters &parameters) {
++	auto local_parameters = parameters;
+ 	// CONNECT chokepoint: when connected, non-control SQL is rewritten in place and falls through to
+ 	// the normal pipeline. No recursion — the rewrite goes through PendingStatementInternal, not back here.
+ 	if (is_connected) {
+ 		if (!IsConnectControlStatement(statement->type)) {
+-			// Parameterized prepared statements would need parameter substitution we don't do in v0 — reject.
+-			// No-param prepared statements have a fully-resolved `query` already, route them.
+-			if (HasBoundParameterValues(*statement)) {
+-				return ErrorResult<PendingQueryResult>(
+-				    ErrorData(InvalidInputException("Parameterized prepared statements cannot be executed while "
+-				                                    "CONNECT-ed; DISCONNECT first, or run the SQL as a fresh "
+-				                                    "statement to route through the CONNECT binding")),
+-				    statement->query);
+-			}
+ 			auto live = TryGetConnectedCatalog();
+ 			if (!live) {
+ 				// Target was detached elsewhere; user must explicitly DISCONNECT to clear is_connected.
+@@ -1030,11 +1048,19 @@
+ 			}
+ 			// Dispatch via the catalog — Supports(CONNECT) was validated at CONNECT time, so RemoteExecute
+ 			// is contracted to be implemented. Wrap the returned TableRef into a SelectStatement.
+-			auto remote_ref = live->GetCatalog().RemoteExecute(*this, statement->query);
++			identifier_map_t<BoundParameterData> empty_values;
++			auto values = parameters.parameters ? parameters.parameters : &empty_values;
++			if (statement->type == StatementType::EXECUTE_STATEMENT &&
++			    !statement->Cast<ExecuteStatement>().bound_values.empty()) {
++				values = &statement->Cast<ExecuteStatement>().bound_values;
++			}
++			auto remote_ref = live->GetCatalog().RemoteExecute(*this, statement->query, *values);
+ 			auto rewritten = WrapAsSelect(std::move(remote_ref));
+ 			// the rewrite is invisible to the user - keep reporting the SQL they issued
+ 			rewritten->query = std::move(statement->query);
+ 			statement = std::move(rewritten);
++			// The server owns parameter binding; the local wrapper has no SQL placeholders.
++			local_parameters.parameters = nullptr;
+ 			AttachedDatabase::InvokeCloseIfLastReference(live, *this);
+ 			// statement is now SELECT * FROM <remote-ref>; fall through.
+ 		}
+@@ -1056,7 +1082,7 @@
+ 
+ 	bool invalidate_query = true;
+ 	try {
+-		pending = PendingStatementInternal(lock, std::move(statement), parameters);
++		pending = PendingStatementInternal(lock, std::move(statement), local_parameters);
+ 	} catch (std::exception &ex) {
+ 		ErrorData error(ex);
+ 		if (!ErrorInvalidatesTransaction(error.Type())) {
+@@ -1474,6 +1500,22 @@
+ }
+ 
+ void ClientContext::InternalTryBindRelation(Relation &relation, vector<ColumnDefinition> &result_columns) {
++	if (is_connected) {
++		auto live = TryGetConnectedCatalog();
++		if (!live) {
++			throw InvalidInputException("The connected database has been detached; DISCONNECT first");
++		}
++		Parser parser(GetParserOptions());
++		parser.ParseQuery(relation.GetQuery());
++		if (parser.statements.size() != 1) {
++			throw InvalidInputException("A CONNECT-ed relation must contain exactly one statement");
++		}
++		auto info = live->GetCatalog().RemotePrepare(*this, *parser.statements[0]);
++		for (idx_t i = 0; i < info.names.size(); i++) {
++			result_columns.emplace_back(info.names[i], info.types[i]);
++		}
++		return;
++	}
+ 	// bind the expressions
+ 	auto binder = Binder::CreateBinder(*this);
+ 	auto result = relation.Bind(*binder);
+--- a/src/main/connection.cpp
++++ b/src/main/connection.cpp
+@@ -360,10 +360,23 @@
+ }
+ 
+ void Connection::SetAutoCommit(bool auto_commit) {
++	if (context->IsConnected()) {
++		if (context->RemoteIsAutoCommit() != auto_commit) {
++			if (auto_commit) {
++				Commit();
++			} else {
++				BeginTransaction();
++			}
++		}
++		return;
++	}
+ 	context->transaction.SetAutoCommit(auto_commit);
+ }
+ 
+ bool Connection::IsAutoCommit() {
++	if (context->IsConnected()) {
++		return context->RemoteIsAutoCommit();
++	}
+ 	return context->transaction.IsAutoCommit();
+ }
+ bool Connection::HasActiveTransaction() {
+--- a/src/storage/external_file_cache/external_file_cache.cpp
++++ b/src/storage/external_file_cache/external_file_cache.cpp
+@@ -1,3 +1,4 @@
++#line 1 "duckdb/src/storage/external_file_cache/external_file_cache.cpp"
+ #include "duckdb/storage/external_file_cache/external_file_cache.hpp"
+ 
+ #include "duckdb/common/checksum.hpp"
+--- a/src/storage/table/row_group_collection.cpp
++++ b/src/storage/table/row_group_collection.cpp
+@@ -1,3 +1,4 @@
++#line 1 "duckdb/src/storage/table/row_group_collection.cpp"
+ #include "duckdb/storage/table/row_group_collection.hpp"
+ #include "duckdb/main/attached_database.hpp"
+ #include "duckdb/transaction/commit_state.hpp"

@@ -1,0 +1,311 @@
+{
+  "project": "DuckOnWire",
+  "version": "0.2.0-rc.4",
+  "status": "experimental fork-source release candidate; binary acceptance reported separately",
+  "native_engine_version": "v2.1.0-dev0",
+  "quack_protocol": 7,
+  "paired_drivers_required": true,
+  "patches_sha256": {
+    "88e1f9030e355c82784b45646698b6c1ada4d885.patch": "e27a248dafa313eebc34f3852ec7466c1157553e663dc9f9aa2b326787161247",
+    "duckdb-java.patch": "70e646f362b7c976a1103ff9708c26549020226664a0be3ff2e1299c1dfcbb05",
+    "duckdb-python.patch": "652ffbaab5c5afeb04186523eb2a8a373273f704e86297a8917e14f659a1c6bc",
+    "duckdb.patch": "88a88808e8df55ee675c4f14e74d1e0cd3caddd190e617da3f623804ab7f6280",
+    "f8e285333da4b30cacb02f69d6dee409d03b9452.patch": "55ce6d1d42e5ac4e18e3d88a3a28cb3e1e3c11fdaef2c094ce8f823ae6dafbf1",
+    "httpfs.patch": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "quack.patch": "e63842a385e4ed48d7c0708d9f7c5a470e4638d8f9d25a1184f5cdc4d4a4d03c"
+  },
+  "results": [
+    {
+      "path": "native-acceptance.json",
+      "sha256": "5174b071869909dc8156aafb96bdfe2d05ec8dfd9b293a28ea6ca0ccd4c69f8e"
+    },
+    {
+      "path": "native-germany.json",
+      "sha256": "740f94469588d331c3cf7f2b2be4177b1cf1388407a24e75210ac30c2837de07"
+    },
+    {
+      "path": "native-aws.json",
+      "sha256": "4c665823a2756bd077471e8647074001e0aed26efeda8ca35835e1251c394fe4"
+    },
+    {
+      "path": "benchmark.json",
+      "sha256": "836fa7d6150e67c9f83a353be28f5f03d427fdca3d653279dad58a7871e7cf8d"
+    },
+    {
+      "path": "benchmark-germany.json",
+      "sha256": "f0562bcd648151cc87f0f6f4fc37ac05f1cdcd64fa1ad8197e5866f216dd196d"
+    },
+    {
+      "path": "benchmark-aws.json",
+      "sha256": "5e0869542c3fd16b87c86ce0c3b5b739c0e191671c6c6abaca5f068a33a44a76"
+    }
+  ],
+  "benchmark_runs": [
+    {
+      "environment": "Local Apple M1 Pro",
+      "mode": "embedded",
+      "rows": 2000000,
+      "writers": 4,
+      "readers": 4,
+      "insert_rows_per_second": 2765341.583,
+      "read_latency": {
+        "samples": 151,
+        "completed_while_writers_active": 144,
+        "mean_ms": 19.42883359,
+        "p50_ms": 14.975166,
+        "p95_ms": 47.92325,
+        "max_ms": 127.894125
+      },
+      "durable_reopen_verified": true
+    },
+    {
+      "environment": "Local Apple M1 Pro",
+      "mode": "quack_loopback",
+      "rows": 2000000,
+      "writers": 4,
+      "readers": 4,
+      "insert_rows_per_second": 1773510.579,
+      "read_latency": {
+        "samples": 170,
+        "completed_while_writers_active": 163,
+        "mean_ms": 26.67143238,
+        "p50_ms": 24.816708,
+        "p95_ms": 56.919708,
+        "max_ms": 83.800583
+      },
+      "durable_reopen_verified": true
+    },
+    {
+      "environment": "Germany",
+      "mode": "embedded",
+      "rows": 2000000,
+      "writers": 4,
+      "readers": 4,
+      "insert_rows_per_second": 616371.214,
+      "read_latency": {
+        "samples": 239,
+        "completed_while_writers_active": 230,
+        "mean_ms": 54.5241644,
+        "p50_ms": 18.459791,
+        "p95_ms": 180.796654,
+        "max_ms": 212.348636
+      },
+      "durable_reopen_verified": true
+    },
+    {
+      "environment": "Germany",
+      "mode": "quack_loopback",
+      "rows": 2000000,
+      "writers": 4,
+      "readers": 4,
+      "insert_rows_per_second": 482686.1041,
+      "read_latency": {
+        "samples": 193,
+        "completed_while_writers_active": 185,
+        "mean_ms": 86.55272077,
+        "p50_ms": 94.397798,
+        "p95_ms": 200.03875,
+        "max_ms": 301.415028
+      },
+      "durable_reopen_verified": true
+    },
+    {
+      "environment": "AWS Sao Paulo",
+      "mode": "embedded",
+      "rows": 2000000,
+      "writers": 4,
+      "readers": 4,
+      "insert_rows_per_second": 283705.4241,
+      "read_latency": {
+        "samples": 141,
+        "completed_while_writers_active": 134,
+        "mean_ms": 200.404566,
+        "p50_ms": 48.668331,
+        "p95_ms": 571.239696,
+        "max_ms": 634.134786
+      },
+      "durable_reopen_verified": true
+    },
+    {
+      "environment": "AWS Sao Paulo",
+      "mode": "quack_loopback",
+      "rows": 2000000,
+      "writers": 4,
+      "readers": 4,
+      "insert_rows_per_second": 181258.7081,
+      "read_latency": {
+        "samples": 184,
+        "completed_while_writers_active": 175,
+        "mean_ms": 244.7342545,
+        "p50_ms": 239.417814,
+        "p95_ms": 493.650715,
+        "max_ms": 839.209551
+      },
+      "durable_reopen_verified": true
+    }
+  ],
+  "total_benchmark_rows": 12000000,
+  "worker_model": "One native client process with eight worker threads and independent DuckDB connections; a separate native owner process in Quack mode",
+  "network_scope": "Loopback on each measured host; cross-host WAN latency is not measured",
+  "resource_limits": {
+    "local": "Apple M1 Pro 8 logical CPUs, 16 GiB RAM; engine threads 2",
+    "Germany": "Docker quota 2 CPUs, memory 4 GiB, swap disabled; engine threads 2",
+    "AWS Sao Paulo": "Docker quota 2 CPUs, memory 768 MiB, swap disabled; engine threads 2"
+  },
+  "commands": [
+    "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release",
+    "cmake --build build --parallel 3",
+    "ctest --test-dir build --output-on-failure",
+    "cmake --install build --prefix dist",
+    "cmake --install build --prefix dist --component Tests",
+    "build/bin/duckonwire-benchmark --mode both --rows 2000000 --writers 4 --readers 4 --batch 25000 --server build/bin/duckonwire-server --output tests/results/benchmark.json"
+  ],
+  "limitations": [
+    "Development DuckDB pin and modified Quack protocol 7; stock bundled engines are incompatible.",
+    "Native CMake builds C/C++ engine, server, examples and tests; the other eight bindings are paired separately.",
+    "Ten language clients were executed on macOS; Linux acceptance here covers native C/C++ and benchmarks.",
+    "Six recorded workload runs are measured examples, not hardware-normalized comparisons or WAN performance guarantees.",
+    "The selected DuckDB/Quack fork sources include the canonical changes. Fresh binary acceptance is reported separately by GitHub Actions and release package manifests; historical result files remain unchanged."
+  ],
+  "project_repository": {
+    "url": "https://github.com/misaelzapata/duckonwire",
+    "default_branch": "main",
+    "release_page": "https://github.com/misaelzapata/duckonwire/releases"
+  },
+  "pins": [
+    {
+      "name": "duckdb",
+      "repository": "https://github.com/misaelzapata/duckdb",
+      "branch": "duckonwire/native",
+      "commit": "848126236a4a8879f232bed7ab5f702683a55300",
+      "git_tree": "1d03b4066149470a7d66ecd2ce1c0f51db003ac9",
+      "source_mode": "COMMITTED",
+      "upstream_repository": "https://github.com/duckdb/duckdb",
+      "upstream_commit": "638b09261a334feb2f7deb742fe3996db3c974b1",
+      "canonical_patch_sha256": "88a88808e8df55ee675c4f14e74d1e0cd3caddd190e617da3f623804ab7f6280",
+      "apply_canonical_patch_during_build": false
+    },
+    {
+      "name": "quack",
+      "repository": "https://github.com/misaelzapata/duckdb-quack",
+      "branch": "duckonwire/native",
+      "commit": "a6e7cb9243ee3d7ec0e5371b720be3292a32061f",
+      "git_tree": "76f090ce849a1820832489fb4926ee14b113e995",
+      "source_mode": "COMMITTED",
+      "upstream_repository": "https://github.com/duckdb/duckdb-quack",
+      "upstream_commit": "984d45d27e4042906328fb2bd0cdb631d0e602a7",
+      "canonical_patch_sha256": "e63842a385e4ed48d7c0708d9f7c5a470e4638d8f9d25a1184f5cdc4d4a4d03c",
+      "apply_canonical_patch_during_build": false
+    },
+    {
+      "name": "httpfs",
+      "repository": "https://github.com/duckdb/duckdb-httpfs",
+      "commit": "96a2f2e88e5dd075facbc5a65dc3afd67aa2bb44",
+      "source_mode": "APPLY",
+      "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "fork_validation": {
+    "status": "reported separately by GitHub Actions and release package manifests",
+    "source_byte_equivalence_to_recorded_build_verified": true,
+    "github_actions": "https://github.com/misaelzapata/duckonwire/actions",
+    "release_package_manifests": "https://github.com/misaelzapata/duckonwire/releases",
+    "evidence_scope": "Match the source commit, platform and artifact hashes to its Actions run and release manifest. Compilation and acceptance evidence is generated after the source snapshot; this snapshot does not assert a binary test outcome."
+  },
+  "recorded_qualification": {
+    "version": "0.2.0-rc.3",
+    "status": "qualified experimental release candidate",
+    "source_selection": "Official upstream commits with canonical patches applied",
+    "native_engine_version": "v2.1.0-dev0",
+    "quack_protocol": 7,
+    "native_cpp_checks_per_platform": 21,
+    "platforms": [
+      "macOS arm64",
+      "Linux x86_64-v3 Ubuntu 24.04 glibc 2.39"
+    ],
+    "driver_matrix_platform": "macOS arm64",
+    "official_languages_tested": [
+      "C",
+      "C++",
+      "Python",
+      "Node.js",
+      "Go",
+      "Rust",
+      "Java",
+      "Swift",
+      "C#",
+      "Lua"
+    ],
+    "paired_drivers_required": true,
+    "cpp_transaction_flow_checks": 14,
+    "python_native_checks": 21,
+    "normal_crud_runs": 20,
+    "bootstrap_regressions": 10,
+    "pins": [
+      {
+        "name": "duckdb",
+        "commit": "638b09261a334feb2f7deb742fe3996db3c974b1",
+        "patch_sha256": "88a88808e8df55ee675c4f14e74d1e0cd3caddd190e617da3f623804ab7f6280"
+      },
+      {
+        "name": "quack",
+        "commit": "984d45d27e4042906328fb2bd0cdb631d0e602a7",
+        "patch_sha256": "e63842a385e4ed48d7c0708d9f7c5a470e4638d8f9d25a1184f5cdc4d4a4d03c"
+      },
+      {
+        "name": "duckdb-python",
+        "commit": "b96ec17de8f38d0e52f954c0b97b2fd958b80e0b",
+        "patch_sha256": "652ffbaab5c5afeb04186523eb2a8a373273f704e86297a8917e14f659a1c6bc"
+      },
+      {
+        "name": "httpfs",
+        "commit": "96a2f2e88e5dd075facbc5a65dc3afd67aa2bb44",
+        "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "duckdb-java",
+        "commit": "5b624bb72a883e73356ed9f3a5109e1886383636",
+        "patch_sha256": "70e646f362b7c976a1103ff9708c26549020226664a0be3ff2e1299c1dfcbb05"
+      }
+    ],
+    "evidence_paths": [
+      "native-acceptance.json",
+      "native-germany.json",
+      "native-aws.json",
+      "benchmark.json",
+      "benchmark-germany.json",
+      "benchmark-aws.json"
+    ]
+  },
+  "recorded_results_scope": "The result files and benchmark runs below belong to the qualified 0.2.0-rc.3 upstream-plus-patch build. They do not qualify the new fork-source build.",
+  "release": {
+    "version": "0.2.0-rc.4",
+    "status": "publication and acceptance reported by GitHub Actions and release package manifests",
+    "download_page": "https://github.com/misaelzapata/duckonwire/releases",
+    "other_language_bindings": "The other eight official bindings are paired separately; their binaries are not included in the native bundles.",
+    "bundle_types": [
+      "source",
+      "macOS ARM64 native C/C++",
+      "Linux x86-64-v3 Ubuntu 24.04 glibc 2.39 native C/C++"
+    ],
+    "github_actions": "https://github.com/misaelzapata/duckonwire/actions",
+    "package_workflow": {
+      "script": "cmake/Package.cmake",
+      "requirements": "Clean committed tracked Git tree and completed native CMake build with BUILD_TESTING=ON",
+      "command": "cmake -DSOURCE_DIR=\"$PWD\" -DBUILD_DIR=\"$PWD/build\" -DVERSION=0.2.0-rc.4 -DPLATFORM=macos26-arm64 -DOUTPUT_DIR=\"$PWD/build/packages\" -P cmake/Package.cmake",
+      "linux_platform_label": "linux-x86_64-v3",
+      "outputs": [
+        "duckonwire-0.2.0-rc.4-PLATFORM.tar.gz",
+        "duckonwire-0.2.0-rc.4-PLATFORM.manifest.json",
+        "duckonwire-0.2.0-rc.4-PLATFORM.sha256"
+      ],
+      "post_install_checks": [
+        "native acceptance",
+        "10000-row embedded and Quack loopback smoke with reopen verification"
+      ],
+      "extra_driver_binaries_included": false,
+      "native_archive_contents": "Git HEAD project sources/examples plus installed native C/C++ programs, paired engine and headers; Package.cmake does not emit a separate source archive."
+    },
+    "source_archives": "Provided by GitHub at the release tag"
+  }
+}

@@ -1,0 +1,4 @@
+duckdb_extension_load(httpfs SOURCE_DIR "@DUCKONWIRE_HTTPFS_SOURCE@"
+                      EXTENSION_VERSION "96a2f2e88e5")
+duckdb_extension_load(quack SOURCE_DIR "@DUCKONWIRE_QUACK_SOURCE@"
+                      EXTENSION_VERSION "@DUCKONWIRE_QUACK_COMMIT@")

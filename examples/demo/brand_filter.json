@@ -1,0 +1,3251 @@
+{
+  "schema_version": 1,
+  "reviewed_at": "2026-10-08T23:40:05.698778+00:00",
+  "policy": {
+    "max_products": 100000,
+    "allowed_countries": [
+      "AR",
+      "ES"
+    ],
+    "country_semantics": "market of the explicitly selected national readonly snapshot, not manufacturing origin",
+    "reject_unknown": true,
+    "infer_brand_from_name": false,
+    "brand_input": "products.brand",
+    "brand_match": "exact after normalization; deny takes precedence; country restrictions apply",
+    "normalization": "Unicode NFKD, remove combining marks, casefold, keep only ASCII a-z0-9",
+    "name_match": "Unicode NFKD, remove combining marks, casefold, replace punctuation by spaces, collapse whitespace; denied terms match whole phrases",
+    "public_fields": [
+      "new_integer_id",
+      "name",
+      "canonical_brand",
+      "category",
+      "subcategory",
+      "quantity",
+      "unit_qty",
+      "unit_base",
+      "country_code"
+    ],
+    "excluded_fields": [
+      "source_ids",
+      "source_urls",
+      "image_urls",
+      "local_paths",
+      "raw_json",
+      "retailer",
+      "branch",
+      "real_prices",
+      "barcode",
+      "inferred_ean"
+    ],
+    "prices": "independently generated synthetic values, explicitly labelled as demo prices",
+    "limit_note": "Conservative allowlist intentionally does not aim to fill the 100000 cap; uncertain and missing brands are skipped.",
+    "name_filter_limit": "Some retailer names are ordinary words (for example Dia or Mas). Whole-phrase rejection is deliberately conservative and may exclude legitimate manufacturer products; no fuzzy brand inference or padding is used."
+  },
+  "allowed_brands": [
+    {
+      "brand": "Arcor",
+      "aliases": [
+        "Arcor"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_food"
+      ]
+    },
+    {
+      "brand": "BC",
+      "aliases": [
+        "BC"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_food"
+      ]
+    },
+    {
+      "brand": "La Campagnola",
+      "aliases": [
+        "La Campagnola"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_food"
+      ]
+    },
+    {
+      "brand": "Salsati",
+      "aliases": [
+        "Salsati"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_food"
+      ]
+    },
+    {
+      "brand": "Presto Pronta",
+      "aliases": [
+        "Presto Pronta"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_food"
+      ]
+    },
+    {
+      "brand": "Bon o Bon",
+      "aliases": [
+        "Bon o Bon"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_chocolate"
+      ]
+    },
+    {
+      "brand": "Cofler",
+      "aliases": [
+        "Cofler"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_chocolate"
+      ]
+    },
+    {
+      "brand": "Tofi",
+      "aliases": [
+        "Tofi"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_chocolate"
+      ]
+    },
+    {
+      "brand": "Aguila",
+      "aliases": [
+        "Aguila",
+        "Águila"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_chocolate"
+      ]
+    },
+    {
+      "brand": "Rocklets",
+      "aliases": [
+        "Rocklets"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_chocolate"
+      ]
+    },
+    {
+      "brand": "Tortuguita",
+      "aliases": [
+        "Tortuguita"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_chocolate"
+      ]
+    },
+    {
+      "brand": "Nikolo",
+      "aliases": [
+        "Nikolo"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_chocolate"
+      ]
+    },
+    {
+      "brand": "Hamlet",
+      "aliases": [
+        "Hamlet"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_chocolate"
+      ]
+    },
+    {
+      "brand": "Cabsha",
+      "aliases": [
+        "Cabsha"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_chocolate"
+      ]
+    },
+    {
+      "brand": "Sapito",
+      "aliases": [
+        "Sapito"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_chocolate"
+      ]
+    },
+    {
+      "brand": "Chokko Snack",
+      "aliases": [
+        "Chokko Snack"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor",
+      "source_ids": [
+        "arcor_chocolate"
+      ]
+    },
+    {
+      "brand": "Criollitas",
+      "aliases": [
+        "Criollitas"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor / Bagley",
+      "source_ids": [
+        "arcor_bagley"
+      ]
+    },
+    {
+      "brand": "Opera",
+      "aliases": [
+        "Opera"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor / Bagley",
+      "source_ids": [
+        "arcor_bagley"
+      ]
+    },
+    {
+      "brand": "Rex",
+      "aliases": [
+        "Rex"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor / Bagley",
+      "source_ids": [
+        "arcor_bagley"
+      ]
+    },
+    {
+      "brand": "Sonrisas",
+      "aliases": [
+        "Sonrisas"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor / Bagley",
+      "source_ids": [
+        "arcor_bagley"
+      ]
+    },
+    {
+      "brand": "Tentaciones",
+      "aliases": [
+        "Tentaciones"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor / Bagley",
+      "source_ids": [
+        "arcor_bagley"
+      ]
+    },
+    {
+      "brand": "Traviata",
+      "aliases": [
+        "Traviata"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor / Bagley",
+      "source_ids": [
+        "arcor_bagley"
+      ]
+    },
+    {
+      "brand": "Chocolinas",
+      "aliases": [
+        "Chocolinas"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor / Bagley",
+      "source_ids": [
+        "arcor_bagley"
+      ]
+    },
+    {
+      "brand": "Surtido Bagley",
+      "aliases": [
+        "Surtido Bagley"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Arcor / Bagley",
+      "source_ids": [
+        "arcor_bagley"
+      ]
+    },
+    {
+      "brand": "Lucchetti",
+      "aliases": [
+        "Lucchetti"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Matarazzo",
+      "aliases": [
+        "Matarazzo"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Don Vicente",
+      "aliases": [
+        "Don Vicente"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Rina Matarazzo",
+      "aliases": [
+        "Rina Matarazzo"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Favorita",
+      "aliases": [
+        "Favorita"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Vitina",
+      "aliases": [
+        "Vitina"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Don Felipe",
+      "aliases": [
+        "Don Felipe"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Terrabusi",
+      "aliases": [
+        "Terrabusi"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "La Saltena",
+      "aliases": [
+        "La Saltena",
+        "La Salteña"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Exquisita",
+      "aliases": [
+        "Exquisita"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Blancaflor",
+      "aliases": [
+        "Blancaflor"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Gallo",
+      "aliases": [
+        "Gallo"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Maximo",
+      "aliases": [
+        "Maximo"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Gallo Snacks",
+      "aliases": [
+        "Gallo Snacks"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Chocoarroz",
+      "aliases": [
+        "Chocoarroz"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Preferido",
+      "aliases": [
+        "Preferido"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Cocinero",
+      "aliases": [
+        "Cocinero"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Lira",
+      "aliases": [
+        "Lira"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Minerva",
+      "aliases": [
+        "Minerva"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Nieto Senetiner",
+      "aliases": [
+        "Nieto Senetiner"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Cadus Wines",
+      "aliases": [
+        "Cadus Wines"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Ruca Malen",
+      "aliases": [
+        "Ruca Malen"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Sibarita",
+      "aliases": [
+        "Sibarita"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Patitas",
+      "aliases": [
+        "Patitas"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Granja del Sol",
+      "aliases": [
+        "Granja del Sol"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Cruz de Malta",
+      "aliases": [
+        "Cruz de Malta"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Arlistan",
+      "aliases": [
+        "Arlistan",
+        "Arlistán"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Salus",
+      "aliases": [
+        "Salus"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Nobleza Gaucha",
+      "aliases": [
+        "Nobleza Gaucha"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Chamigo",
+      "aliases": [
+        "Chamigo"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Molinos documented product portfolio",
+      "source_ids": [
+        "molinos"
+      ]
+    },
+    {
+      "brand": "Skip",
+      "aliases": [
+        "Skip"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Ala",
+      "aliases": [
+        "Ala"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Vivere",
+      "aliases": [
+        "Vivere"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Comfort",
+      "aliases": [
+        "Comfort"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Cif",
+      "aliases": [
+        "Cif"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Vim",
+      "aliases": [
+        "Vim"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Drive",
+      "aliases": [
+        "Drive"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Rexona",
+      "aliases": [
+        "Rexona"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Sedal",
+      "aliases": [
+        "Sedal"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Dove",
+      "aliases": [
+        "Dove"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Lux",
+      "aliases": [
+        "Lux"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Suave",
+      "aliases": [
+        "Suave"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Tresemme",
+      "aliases": [
+        "Tresemme",
+        "TRESemmé"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Hellmanns",
+      "aliases": [
+        "Hellmanns",
+        "Hellmann’s",
+        "Hellmann's"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Knorr",
+      "aliases": [
+        "Knorr"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Maizena",
+      "aliases": [
+        "Maizena"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Unilever",
+      "source_ids": [
+        "unilever"
+      ]
+    },
+    {
+      "brand": "Colgate",
+      "aliases": [
+        "Colgate"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Colgate-Palmolive",
+      "source_ids": [
+        "colgate"
+      ]
+    },
+    {
+      "brand": "Elmex",
+      "aliases": [
+        "Elmex"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Colgate-Palmolive",
+      "source_ids": [
+        "colgate"
+      ]
+    },
+    {
+      "brand": "Meridol",
+      "aliases": [
+        "Meridol"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Colgate-Palmolive",
+      "source_ids": [
+        "colgate"
+      ]
+    },
+    {
+      "brand": "Speed Stick",
+      "aliases": [
+        "Speed Stick"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Colgate-Palmolive",
+      "source_ids": [
+        "colgate"
+      ]
+    },
+    {
+      "brand": "Lady Speed Stick",
+      "aliases": [
+        "Lady Speed Stick"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Colgate-Palmolive",
+      "source_ids": [
+        "colgate"
+      ]
+    },
+    {
+      "brand": "Palmolive",
+      "aliases": [
+        "Palmolive"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Colgate-Palmolive",
+      "source_ids": [
+        "colgate"
+      ]
+    },
+    {
+      "brand": "Protex",
+      "aliases": [
+        "Protex"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Colgate-Palmolive",
+      "source_ids": [
+        "colgate"
+      ]
+    },
+    {
+      "brand": "Sanex",
+      "aliases": [
+        "Sanex"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Colgate-Palmolive",
+      "source_ids": [
+        "colgate"
+      ]
+    },
+    {
+      "brand": "Ajax",
+      "aliases": [
+        "Ajax"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Colgate-Palmolive",
+      "source_ids": [
+        "colgate"
+      ]
+    },
+    {
+      "brand": "Axion",
+      "aliases": [
+        "Axion"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Colgate-Palmolive",
+      "source_ids": [
+        "colgate"
+      ]
+    },
+    {
+      "brand": "Fabuloso",
+      "aliases": [
+        "Fabuloso"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Colgate-Palmolive",
+      "source_ids": [
+        "colgate"
+      ]
+    },
+    {
+      "brand": "Suavitel",
+      "aliases": [
+        "Suavitel"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Colgate-Palmolive",
+      "source_ids": [
+        "colgate"
+      ]
+    },
+    {
+      "brand": "Soupline",
+      "aliases": [
+        "Soupline"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Colgate-Palmolive",
+      "source_ids": [
+        "colgate"
+      ]
+    },
+    {
+      "brand": "Dodot",
+      "aliases": [
+        "Dodot"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Ariel",
+      "aliases": [
+        "Ariel"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Ausonia",
+      "aliases": [
+        "Ausonia"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Evax",
+      "aliases": [
+        "Evax"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Tampax",
+      "aliases": [
+        "Tampax"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Braun",
+      "aliases": [
+        "Braun"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Gillette",
+      "aliases": [
+        "Gillette"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Aussie",
+      "aliases": [
+        "Aussie"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Head & Shoulders",
+      "aliases": [
+        "Head & Shoulders",
+        "H&S"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Herbal Essences",
+      "aliases": [
+        "Herbal Essences"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Pantene",
+      "aliases": [
+        "Pantene"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Ambi Pur",
+      "aliases": [
+        "Ambi Pur"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Don Limpio",
+      "aliases": [
+        "Don Limpio"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Fairy",
+      "aliases": [
+        "Fairy"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Swiffer",
+      "aliases": [
+        "Swiffer"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Viakal",
+      "aliases": [
+        "Viakal"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Oral-B",
+      "aliases": [
+        "Oral-B"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Olay",
+      "aliases": [
+        "Olay"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Old Spice",
+      "aliases": [
+        "Old Spice"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Procter & Gamble",
+      "source_ids": [
+        "pg"
+      ]
+    },
+    {
+      "brand": "Nivea",
+      "aliases": [
+        "Nivea"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Beiersdorf",
+      "source_ids": [
+        "beiersdorf"
+      ]
+    },
+    {
+      "brand": "Nivea Men",
+      "aliases": [
+        "Nivea Men"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Beiersdorf",
+      "source_ids": [
+        "beiersdorf"
+      ]
+    },
+    {
+      "brand": "Eucerin",
+      "aliases": [
+        "Eucerin"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Beiersdorf",
+      "source_ids": [
+        "beiersdorf"
+      ]
+    },
+    {
+      "brand": "Liposan",
+      "aliases": [
+        "Liposan"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Beiersdorf",
+      "source_ids": [
+        "beiersdorf"
+      ]
+    },
+    {
+      "brand": "Labello",
+      "aliases": [
+        "Labello"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Beiersdorf",
+      "source_ids": [
+        "beiersdorf"
+      ]
+    },
+    {
+      "brand": "Hansaplast",
+      "aliases": [
+        "Hansaplast"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Beiersdorf",
+      "source_ids": [
+        "beiersdorf"
+      ]
+    },
+    {
+      "brand": "Milka",
+      "aliases": [
+        "Milka"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Mondelez",
+      "source_ids": [
+        "mondelez"
+      ]
+    },
+    {
+      "brand": "Oreo",
+      "aliases": [
+        "Oreo"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Mondelez",
+      "source_ids": [
+        "mondelez"
+      ]
+    },
+    {
+      "brand": "Philadelphia",
+      "aliases": [
+        "Philadelphia"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Mondelez",
+      "source_ids": [
+        "mondelez"
+      ]
+    },
+    {
+      "brand": "Royal",
+      "aliases": [
+        "Royal"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Mondelez",
+      "source_ids": [
+        "mondelez"
+      ]
+    },
+    {
+      "brand": "Tang",
+      "aliases": [
+        "Tang"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Mondelez",
+      "source_ids": [
+        "mondelez"
+      ]
+    },
+    {
+      "brand": "Toblerone",
+      "aliases": [
+        "Toblerone"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Mondelez",
+      "source_ids": [
+        "mondelez"
+      ]
+    },
+    {
+      "brand": "Cadbury",
+      "aliases": [
+        "Cadbury"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Mondelez",
+      "source_ids": [
+        "mondelez"
+      ]
+    },
+    {
+      "brand": "Daim",
+      "aliases": [
+        "Daim"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Mondelez",
+      "source_ids": [
+        "mondelez"
+      ]
+    },
+    {
+      "brand": "LU",
+      "aliases": [
+        "LU"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Mondelez",
+      "source_ids": [
+        "mondelez"
+      ]
+    },
+    {
+      "brand": "Ritz",
+      "aliases": [
+        "Ritz"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Mondelez",
+      "source_ids": [
+        "mondelez"
+      ]
+    },
+    {
+      "brand": "TUC",
+      "aliases": [
+        "TUC"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Mondelez",
+      "source_ids": [
+        "mondelez"
+      ]
+    },
+    {
+      "brand": "Halls",
+      "aliases": [
+        "Halls"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Mondelez",
+      "source_ids": [
+        "mondelez"
+      ]
+    },
+    {
+      "brand": "Nestle",
+      "aliases": [
+        "Nestle",
+        "Nestlé"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "KitKat",
+      "aliases": [
+        "KitKat"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Nesquik",
+      "aliases": [
+        "Nesquik"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Nescafe",
+      "aliases": [
+        "Nescafe",
+        "Nescafé"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Nespresso",
+      "aliases": [
+        "Nespresso"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Bonka",
+      "aliases": [
+        "Bonka"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Eko",
+      "aliases": [
+        "Eko"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Buitoni",
+      "aliases": [
+        "Buitoni"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Maggi",
+      "aliases": [
+        "Maggi"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Garden Gourmet",
+      "aliases": [
+        "Garden Gourmet"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Chocapic",
+      "aliases": [
+        "Chocapic"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Cheerios",
+      "aliases": [
+        "Cheerios"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Golden Grahams",
+      "aliases": [
+        "Golden Grahams"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Cookie Crisp",
+      "aliases": [
+        "Cookie Crisp"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Milkybar",
+      "aliases": [
+        "Milkybar"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Crunch",
+      "aliases": [
+        "Crunch"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "After Eight",
+      "aliases": [
+        "After Eight"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Smarties",
+      "aliases": [
+        "Smarties"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Purina",
+      "aliases": [
+        "Purina"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Purina Gourmet",
+      "aliases": [
+        "Purina Gourmet"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Purina One",
+      "aliases": [
+        "Purina One"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Purina Pro Plan",
+      "aliases": [
+        "Purina Pro Plan"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Purina Friskies",
+      "aliases": [
+        "Purina Friskies"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Purina Dog Chow",
+      "aliases": [
+        "Purina Dog Chow"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Purina Cat Chow",
+      "aliases": [
+        "Purina Cat Chow"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Solís",
+      "aliases": [
+        "Solís"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "La Lechera",
+      "aliases": [
+        "La Lechera"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "Litoral",
+      "aliases": [
+        "Litoral"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Nestle documented Spain portfolio",
+      "source_ids": [
+        "nestle"
+      ]
+    },
+    {
+      "brand": "L’Oreal Paris",
+      "aliases": [
+        "L’Oreal Paris",
+        "L'Oréal Paris",
+        "LOREAL PARIS"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "L’Oreal",
+      "source_ids": [
+        "loreal"
+      ]
+    },
+    {
+      "brand": "Maybelline",
+      "aliases": [
+        "Maybelline"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "L’Oreal",
+      "source_ids": [
+        "loreal"
+      ]
+    },
+    {
+      "brand": "Maybelline New York",
+      "aliases": [
+        "Maybelline New York"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "L’Oreal",
+      "source_ids": [
+        "loreal"
+      ]
+    },
+    {
+      "brand": "Garnier",
+      "aliases": [
+        "Garnier"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "L’Oreal",
+      "source_ids": [
+        "loreal"
+      ]
+    },
+    {
+      "brand": "Elvive",
+      "aliases": [
+        "Elvive"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "L’Oreal / Garnier",
+      "source_ids": [
+        "loreal_lines"
+      ]
+    },
+    {
+      "brand": "Fructis",
+      "aliases": [
+        "Fructis"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "L’Oreal / Garnier",
+      "source_ids": [
+        "loreal_lines"
+      ]
+    },
+    {
+      "brand": "Nutrisse",
+      "aliases": [
+        "Nutrisse"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "L’Oreal / Garnier",
+      "source_ids": [
+        "loreal_lines"
+      ]
+    },
+    {
+      "brand": "La Virginia",
+      "aliases": [
+        "La Virginia"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "La Virginia",
+      "source_ids": [
+        "lavirginia"
+      ]
+    },
+    {
+      "brand": "Alicante",
+      "aliases": [
+        "Alicante"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "La Virginia",
+      "source_ids": [
+        "lavirginia"
+      ]
+    },
+    {
+      "brand": "Giacomo",
+      "aliases": [
+        "Giacomo"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "La Virginia",
+      "source_ids": [
+        "lavirginia"
+      ]
+    },
+    {
+      "brand": "Chocolino",
+      "aliases": [
+        "Chocolino"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "La Virginia",
+      "source_ids": [
+        "lavirginia"
+      ]
+    },
+    {
+      "brand": "Tuy",
+      "aliases": [
+        "Tuy"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "La Virginia",
+      "source_ids": [
+        "lavirginia"
+      ]
+    },
+    {
+      "brand": "Litoral",
+      "aliases": [
+        "Litoral"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "La Virginia",
+      "source_ids": [
+        "lavirginia"
+      ]
+    },
+    {
+      "brand": "Virgin Islands",
+      "aliases": [
+        "Virgin Islands"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "La Virginia",
+      "source_ids": [
+        "lavirginia"
+      ]
+    },
+    {
+      "brand": "La Virginia Espresso",
+      "aliases": [
+        "La Virginia Espresso"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "La Virginia",
+      "source_ids": [
+        "lavirginia"
+      ]
+    },
+    {
+      "brand": "Danone",
+      "aliases": [
+        "Danone"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Danone",
+      "source_ids": [
+        "danone"
+      ]
+    },
+    {
+      "brand": "Actimel",
+      "aliases": [
+        "Actimel"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Danone",
+      "source_ids": [
+        "danone"
+      ]
+    },
+    {
+      "brand": "Activia",
+      "aliases": [
+        "Activia"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Danone",
+      "source_ids": [
+        "danone"
+      ]
+    },
+    {
+      "brand": "Alpro",
+      "aliases": [
+        "Alpro"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Danone",
+      "source_ids": [
+        "danone"
+      ]
+    },
+    {
+      "brand": "Danacol",
+      "aliases": [
+        "Danacol"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Danone",
+      "source_ids": [
+        "danone"
+      ]
+    },
+    {
+      "brand": "Danet",
+      "aliases": [
+        "Danet"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Danone",
+      "source_ids": [
+        "danone"
+      ]
+    },
+    {
+      "brand": "YoPRO",
+      "aliases": [
+        "YoPRO"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Danone",
+      "source_ids": [
+        "danone"
+      ]
+    },
+    {
+      "brand": "Pascual",
+      "aliases": [
+        "Pascual"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Calidad Pascual",
+      "source_ids": [
+        "pascual"
+      ]
+    },
+    {
+      "brand": "Leche Pascual",
+      "aliases": [
+        "Leche Pascual"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Calidad Pascual",
+      "source_ids": [
+        "pascual"
+      ]
+    },
+    {
+      "brand": "Bezoya",
+      "aliases": [
+        "Bezoya"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Calidad Pascual",
+      "source_ids": [
+        "pascual"
+      ]
+    },
+    {
+      "brand": "Bifrutas",
+      "aliases": [
+        "Bifrutas"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Calidad Pascual",
+      "source_ids": [
+        "pascual"
+      ]
+    },
+    {
+      "brand": "Vivesoy",
+      "aliases": [
+        "Vivesoy"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Calidad Pascual",
+      "source_ids": [
+        "pascual"
+      ]
+    },
+    {
+      "brand": "Mocay",
+      "aliases": [
+        "Mocay"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Calidad Pascual",
+      "source_ids": [
+        "pascual"
+      ]
+    },
+    {
+      "brand": "Gullon",
+      "aliases": [
+        "Gullon",
+        "Gullón"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Galletas Gullon",
+      "source_ids": [
+        "gullon"
+      ]
+    },
+    {
+      "brand": "ElPozo",
+      "aliases": [
+        "ElPozo",
+        "El Pozo"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "ElPozo Alimentacion",
+      "source_ids": [
+        "elpozo"
+      ]
+    },
+    {
+      "brand": "Gallo",
+      "aliases": [
+        "Gallo"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Pastas Gallo",
+      "source_ids": [
+        "gallo_es"
+      ]
+    },
+    {
+      "brand": "Pastas Gallo",
+      "aliases": [
+        "Pastas Gallo"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Pastas Gallo",
+      "source_ids": [
+        "gallo_es"
+      ]
+    },
+    {
+      "brand": "Carbonell",
+      "aliases": [
+        "Carbonell"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "Deoleo",
+      "source_ids": [
+        "carbonell"
+      ]
+    },
+    {
+      "brand": "Brillante",
+      "aliases": [
+        "Brillante"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Ebro Foods",
+      "source_ids": [
+        "ebro"
+      ]
+    },
+    {
+      "brand": "SOS",
+      "aliases": [
+        "SOS"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Ebro Foods",
+      "source_ids": [
+        "ebro"
+      ]
+    },
+    {
+      "brand": "La Fallera",
+      "aliases": [
+        "La Fallera"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Ebro Foods",
+      "source_ids": [
+        "ebro"
+      ]
+    },
+    {
+      "brand": "La Cigala",
+      "aliases": [
+        "La Cigala"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Ebro Foods",
+      "source_ids": [
+        "ebro"
+      ]
+    },
+    {
+      "brand": "Sundari",
+      "aliases": [
+        "Sundari"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Ebro Foods",
+      "source_ids": [
+        "ebro"
+      ]
+    },
+    {
+      "brand": "Arroz Rocio",
+      "aliases": [
+        "Arroz Rocio"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Ebro Foods",
+      "source_ids": [
+        "ebro"
+      ]
+    },
+    {
+      "brand": "Garofalo",
+      "aliases": [
+        "Garofalo"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Ebro Foods",
+      "source_ids": [
+        "ebro"
+      ]
+    },
+    {
+      "brand": "Vegetalia",
+      "aliases": [
+        "Vegetalia"
+      ],
+      "countries": [
+        "ES"
+      ],
+      "manufacturer": "Ebro Foods",
+      "source_ids": [
+        "ebro"
+      ]
+    },
+    {
+      "brand": "Coca-Cola",
+      "aliases": [
+        "Coca-Cola"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "The Coca-Cola Company",
+      "source_ids": [
+        "coca"
+      ]
+    },
+    {
+      "brand": "Fanta",
+      "aliases": [
+        "Fanta"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "The Coca-Cola Company",
+      "source_ids": [
+        "coca"
+      ]
+    },
+    {
+      "brand": "Sprite",
+      "aliases": [
+        "Sprite"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "The Coca-Cola Company",
+      "source_ids": [
+        "coca"
+      ]
+    },
+    {
+      "brand": "Aquarius",
+      "aliases": [
+        "Aquarius"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "The Coca-Cola Company",
+      "source_ids": [
+        "coca"
+      ]
+    },
+    {
+      "brand": "Glade",
+      "aliases": [
+        "Glade"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "SC Johnson",
+      "source_ids": [
+        "scjohnson"
+      ]
+    },
+    {
+      "brand": "Lysoform",
+      "aliases": [
+        "Lysoform"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "SC Johnson",
+      "source_ids": [
+        "scjohnson"
+      ]
+    },
+    {
+      "brand": "Mr Muscle",
+      "aliases": [
+        "Mr Muscle",
+        "Mr Musculo",
+        "Mr Músculo"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "SC Johnson",
+      "source_ids": [
+        "scjohnson"
+      ]
+    },
+    {
+      "brand": "Pledge",
+      "aliases": [
+        "Pledge"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "SC Johnson",
+      "source_ids": [
+        "scjohnson"
+      ]
+    },
+    {
+      "brand": "Raid",
+      "aliases": [
+        "Raid"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "SC Johnson",
+      "source_ids": [
+        "scjohnson"
+      ]
+    },
+    {
+      "brand": "OFF",
+      "aliases": [
+        "OFF"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "SC Johnson",
+      "source_ids": [
+        "scjohnson"
+      ]
+    },
+    {
+      "brand": "Ziploc",
+      "aliases": [
+        "Ziploc"
+      ],
+      "countries": [
+        "AR",
+        "ES"
+      ],
+      "manufacturer": "SC Johnson",
+      "source_ids": [
+        "scjohnson"
+      ]
+    },
+    {
+      "brand": "La Serenisima",
+      "aliases": [
+        "La Serenisima",
+        "La Serenísima"
+      ],
+      "countries": [
+        "AR"
+      ],
+      "manufacturer": "Mastellone",
+      "source_ids": [
+        "mastellone"
+      ]
+    }
+  ],
+  "denied_brands": [
+    {
+      "aliases": [
+        "Carrefour",
+        "Carrefour Classic",
+        "Carrefour Home",
+        "Carrefour Cristal",
+        "Carrefour Bio",
+        "Carrefour Soft",
+        "Carrefour Seleccion"
+      ],
+      "reason": "retailer_brand",
+      "source_ids": [
+        "carrefour_private"
+      ]
+    },
+    {
+      "aliases": [
+        "Cuisine & Co",
+        "Cuisine & Co Premium",
+        "Krea",
+        "Home Care",
+        "Family Care"
+      ],
+      "reason": "retailer_private_brand_or_excluded_related_range",
+      "source_ids": [
+        "cencosud_private"
+      ]
+    },
+    {
+      "aliases": [
+        "Eroski",
+        "Eroski Basic",
+        "E. Basic",
+        "Eroski Natur",
+        "E. Natur",
+        "Seleqtia",
+        "Eroski Seleqtia",
+        "Belle",
+        "Belle Natural",
+        "Ecron"
+      ],
+      "reason": "retailer_private_brand",
+      "source_ids": [
+        "eroski_private"
+      ]
+    },
+    {
+      "aliases": [
+        "Hacendado",
+        "Bosque Verde",
+        "Deliplus",
+        "Compy"
+      ],
+      "reason": "historically_documented_retailer_private_brand_excluded",
+      "source_ids": [
+        "mercadona_private"
+      ]
+    },
+    {
+      "aliases": [
+        "Dia",
+        "Bonte",
+        "Baby Smile",
+        "Junior Smile",
+        "Basic Cosmetics",
+        "AS",
+        "Delicious",
+        "Dia Imaqe",
+        "Dia Vegecampo",
+        "El Molino de Dia"
+      ],
+      "reason": "retailer_brand_or_related_unverified_range_excluded",
+      "source_ids": [
+        "dia_private",
+        "dia_private_history"
+      ]
+    },
+    {
+      "aliases": [
+        "Coto",
+        "La Anonima",
+        "Jumbo",
+        "Disco",
+        "Vea",
+        "Changomas",
+        "Super Mami",
+        "Cordiez",
+        "Roldan",
+        "PedidosYa",
+        "Rappi Turbo",
+        "Alcampo",
+        "Producto Alcampo",
+        "Consumo",
+        "Consum",
+        "Condis",
+        "Caprabo",
+        "Bonpreu",
+        "Froiz",
+        "Gadis",
+        "BM",
+        "Lupa",
+        "Mas",
+        "Masymas",
+        "Sorli",
+        "Hiperdino",
+        "Hiperber",
+        "Ahorramas",
+        "La Despensa",
+        "Plusfresc",
+        "Superamara",
+        "Spar",
+        "Lidl",
+        "Aldi",
+        "IFA",
+        "IFA Eliges",
+        "IFA Sabe",
+        "Alteza",
+        "Alipende",
+        "Selex",
+        "Eroski Sannia",
+        "Sannia",
+        "Visto Bueno",
+        "Romester",
+        "Home Studio",
+        "Home Design",
+        "Market Self",
+        "Top Design",
+        "Little TD",
+        "Hg",
+        "H&G",
+        "Check",
+        "URB",
+        "La Hacienda",
+        "Opposite",
+        "Alaniz",
+        "Aretha",
+        "Nex",
+        "OU",
+        "Silvercrest",
+        "Parkside",
+        "Livarno",
+        "Livarno Home",
+        "Crivit",
+        "Esmara",
+        "Esmara Men",
+        "Lupilu"
+      ],
+      "reason": "retailer_or_unverified_brand_not_in_verified_manufacturer_allowlist",
+      "source_ids": []
+    },
+    {
+      "aliases": [
+        "",
+        "Generico",
+        "Generic",
+        "Sin Marca",
+        "S/d",
+        "SD",
+        "Unbranded",
+        "No Name",
+        "Marca Nacional Sin Marca",
+        "Primer Precio Sin Marca",
+        "Elaboracion Propia",
+        "Verduleria Propia",
+        "."
+      ],
+      "reason": "missing_generic_or_store_prepared_brand",
+      "source_ids": []
+    }
+  ],
+  "deny_name_terms": [
+    "Carrefour",
+    "Cuisine & Co",
+    "Krea",
+    "Eroski",
+    "Seleqtia",
+    "Hacendado",
+    "Bosque Verde",
+    "Deliplus",
+    "Compy",
+    "Bonte",
+    "Dia Imaqe",
+    "Dia Vegecampo",
+    "El Molino de Dia",
+    "La Anonima",
+    "Coto",
+    "Jumbo",
+    "Super Mami",
+    "Changomas",
+    "Cordiez",
+    "PedidosYa",
+    "Rappi Turbo",
+    "Alcampo",
+    "Consum",
+    "Condis",
+    "Caprabo",
+    "Bonpreu",
+    "Froiz",
+    "Gadis",
+    "Supermercados BM",
+    "Lupa",
+    "Supermercados Mas",
+    "Masymas",
+    "Sorli",
+    "Hiperdino",
+    "Hiperber",
+    "Ahorramas",
+    "La Despensa",
+    "Plusfresc",
+    "Superamara",
+    "Spar",
+    "Lidl",
+    "Aldi",
+    "IFA Eliges",
+    "IFA Sabe",
+    "Alteza",
+    "Alipende",
+    "Selex",
+    "Eroski Sannia",
+    "Sannia",
+    "Visto Bueno",
+    "Romester",
+    "Home Studio",
+    "Home Design",
+    "Market Self",
+    "Top Design",
+    "Little TD",
+    "Silvercrest",
+    "Parkside",
+    "Livarno",
+    "Crivit",
+    "Esmara",
+    "Lupilu",
+    "Elaboracion Propia",
+    "Verduleria Propia",
+    "Carrefour Classic",
+    "Carrefour Home",
+    "Carrefour Cristal",
+    "Carrefour Bio",
+    "Carrefour Soft",
+    "Carrefour Seleccion",
+    "Cuisine & Co Premium",
+    "Home Care",
+    "Family Care",
+    "Eroski Basic",
+    "E. Basic",
+    "Eroski Natur",
+    "E. Natur",
+    "Eroski Seleqtia",
+    "Belle",
+    "Belle Natural",
+    "Ecron",
+    "Dia",
+    "Baby Smile",
+    "Junior Smile",
+    "Basic Cosmetics",
+    "AS",
+    "Delicious",
+    "Disco",
+    "Vea",
+    "Roldan",
+    "Producto Alcampo",
+    "Consumo",
+    "BM",
+    "Mas",
+    "IFA",
+    "Hg",
+    "H&G",
+    "Check",
+    "URB",
+    "La Hacienda",
+    "Opposite",
+    "Alaniz",
+    "Aretha",
+    "Nex",
+    "OU",
+    "Livarno Home",
+    "Esmara Men"
+  ],
+  "sources": {
+    "arcor_food": {
+      "url": "https://www.arcor.com/ar/nuestros-negocios-alimentos",
+      "evidence": "Manufacturer food portfolio identifies Arcor, BC, La Campagnola, Salsati and Presto Pronta.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "arcor_chocolate": {
+      "url": "https://www.arcor.com/ar/nuestros-negocios-chocolates",
+      "evidence": "Manufacturer chocolate portfolio identifies its consumer brands.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "arcor_bagley": {
+      "url": "https://www.arcor.com/es/empresas-y-alianzas-estrategicas",
+      "evidence": "Arcor documents Bagley and its biscuit consumer brands.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "molinos": {
+      "url": "https://www.molinos.com.ar/productos/",
+      "evidence": "Current manufacturer product portfolio lists pasta, rice, baking, mate and frozen-food consumer brands; portfolio inclusion does not imply exclusive ownership.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "unilever": {
+      "url": "https://careers.unilever.com/en/argentina-early-careers",
+      "evidence": "Official Argentina site identifies consumer home-care, personal-care and food brands.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "colgate": {
+      "url": "https://www.colgatepalmolive.com/en-us/brands",
+      "evidence": "Official consumer-brand portfolio identifies oral, personal and home-care brands.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "pg": {
+      "url": "https://es.pg.com/marcas-y-productos/",
+      "evidence": "Official Spanish consumer-brand portfolio lists baby, laundry, hygiene, hair and home-care brands.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "beiersdorf": {
+      "url": "https://www.beiersdorf.es/quienes-somos/our-profile/en-un-vistazo",
+      "evidence": "Official company profile identifies its skincare brands, including Nivea, Eucerin, Liposan and Hansaplast.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "mondelez": {
+      "url": "https://www.mondelezinternational.com/our-brands/",
+      "evidence": "Official brand index identifies manufacturer consumer brands; avoid attributing licensed categories to an exclusive manufacturer.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "nestle": {
+      "url": "https://empresa.nestle.es/sites/g/files/pydnoa431/files/2025-06/n-espana-inf-nestle-24.pdf",
+      "evidence": "Official 2024 Spain report identifies chocolate, cereal, coffee, culinary and pet-food consumer brands.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "loreal": {
+      "url": "https://www.loreal.com/es-es/espana/pages/sobre-loreal-/strategy-and-model-es/",
+      "evidence": "Official Spain company page identifies L’Oreal Paris, Maybelline and Garnier.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "loreal_lines": {
+      "url": "https://www.loreal.com/en/press-release/finance/first-quarter-2026-sales/",
+      "evidence": "Official 2026 report identifies Elvive, Garnier Fructis and Nutrisse product lines.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "lavirginia": {
+      "url": "https://www.lavirginia.com.ar/nuestras-marcas/",
+      "evidence": "Official manufacturer page lists La Virginia, Alicante, Giacomo, Chocolino, Tuy, Litoral and Virgin Islands.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "danone": {
+      "url": "https://www.danone.com/es/es/marcas/productos-lacteos-esenciales-y-de-origen-vegetal.html",
+      "evidence": "Official Spain portfolio identifies Danone, Actimel, Activia, Alpro, Danacol, Danet and YoPRO.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "pascual": {
+      "url": "https://www.calidadpascual.com/ayuda/",
+      "evidence": "Official company page identifies Pascual, Bezoya, Bifrutas, Vivesoy and Mocay consumer brands.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "gullon": {
+      "url": "https://gullon.es/sobre-gullon/",
+      "evidence": "Official manufacturer page identifies Galletas Gullon; allow branded Gullon products only, never retailer-label products from the same factory.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "elpozo": {
+      "url": "https://www.elpozo.com/",
+      "evidence": "Official manufacturer site identifies ElPozo Alimentacion consumer products.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "gallo_es": {
+      "url": "https://www.pastasgallo.es/historia/",
+      "evidence": "Official Spanish manufacturer history identifies Pastas Gallo; separate from Argentine Molinos Gallo.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "carbonell": {
+      "url": "https://deoleo.com/carbonell-consolida-su-liderazgo-en-el-mercado-espanol-y-anuncia-el-lanzamiento-de-un-nuevo-formato-innovador/",
+      "evidence": "Official manufacturer identifies Carbonell as a Deoleo olive-oil brand.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "ebro": {
+      "url": "https://www.ebrofoods.es/informacion-de-interes/faq/",
+      "evidence": "Official manufacturer identifies Brillante, SOS, La Fallera, La Cigala, Sundari, Arroz Rocio, Garofalo and Vegetalia.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "coca": {
+      "url": "https://www.coca-cola.com/es/es/about-us/faq",
+      "evidence": "Official company identifies Coca-Cola, Fanta, Sprite and Aquarius consumer beverages.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "scjohnson": {
+      "url": "https://scjohnson.com/en/products",
+      "evidence": "Official manufacturer index identifies Glade, Lysoform, Mr Muscle, Pledge, Raid, OFF and Ziploc.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "mastellone": {
+      "url": "https://www.mastellone.com.ar/",
+      "evidence": "Official manufacturer website identifies La Serenisima.",
+      "kind": "primary_manufacturer",
+      "checked_at": "2026-10-08"
+    },
+    "carrefour_private": {
+      "url": "https://www.carrefour.com.ar/productos-carrefour",
+      "evidence": "Official retailer presents its Carrefour-branded products.",
+      "kind": "primary_retailer",
+      "checked_at": "2026-10-08"
+    },
+    "cencosud_private": {
+      "url": "https://www.cencosud.com/cencosud/site/docs/20250507/20250507114753/corporate_presentation_3q25__esp_.pdf",
+      "evidence": "Official corporate presentation places Cuisine & Co and Krea in its private-brand growth portfolio.",
+      "kind": "primary_retailer",
+      "checked_at": "2026-10-08"
+    },
+    "eroski_private": {
+      "url": "https://www.eroski.es/eroski-y-tu/nuestras-marcas/",
+      "evidence": "Official retailer identifies Eroski, Eroski Basic, Seleqtia, Eroski Natur, Belle and Ecron as its brands.",
+      "kind": "primary_retailer",
+      "checked_at": "2026-10-08"
+    },
+    "mercadona_private": {
+      "url": "https://info.mercadona.es/document/es/memoria-anual-2018.pdf",
+      "evidence": "Official historical annual report explicitly identifies Hacendado, Bosque Verde, Deliplus and Compy as private brands; exclude conservatively irrespective of later ownership changes.",
+      "kind": "primary_retailer",
+      "checked_at": "2026-10-08"
+    },
+    "dia_private": {
+      "url": "https://www.dia.es/tiendas/webdia/bonte",
+      "evidence": "Official retailer presents Bonte as its hygiene and beauty product range.",
+      "kind": "primary_retailer",
+      "checked_at": "2026-10-08"
+    },
+    "dia_private_history": {
+      "url": "https://memoriaanual2017.diacorporate.com/en/business-and-sustainability-report/business-and-financial-year-profits/business-model-and-strategy/",
+      "evidence": "Official historical annual report documents Dia own-label strategy and Bonte, Baby Smile, Basic Cosmetics, As and Delicious; exclude conservatively.",
+      "kind": "primary_retailer",
+      "checked_at": "2026-10-08"
+    }
+  }
+}

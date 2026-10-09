@@ -1,0 +1,158 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -124,6 +124,23 @@
+ # add _duckdb_dependencies
+ target_link_libraries(_duckdb PRIVATE _duckdb_dependencies)
+ duckdb_link_extensions(_duckdb)
++# Extension configs can register builtins in addition to BUILD_EXTENSIONS.
++# Use DuckDB's actual registry and linkage flags from the generated loader's
++# directory so the Python module links the same builtins as the native engine.
++get_target_property(_DUCKDB_EXTENSION_DIR duckdb_generated_extension_loader SOURCE_DIR)
++get_directory_property(_DUCKDB_REGISTERED_EXTENSIONS
++  DIRECTORY "${_DUCKDB_EXTENSION_DIR}" DEFINITION DUCKDB_EXTENSION_NAMES)
++foreach(ext IN LISTS _DUCKDB_REGISTERED_EXTENSIONS)
++  if(NOT ext IN_LIST BUILD_EXTENSIONS)
++    string(TOUPPER "${ext}" _DUCKDB_EXTENSION_UPPERCASE)
++    get_directory_property(_DUCKDB_EXTENSION_LINKED
++      DIRECTORY "${_DUCKDB_EXTENSION_DIR}"
++      DEFINITION DUCKDB_EXTENSION_${_DUCKDB_EXTENSION_UPPERCASE}_SHOULD_LINK)
++    if(_DUCKDB_EXTENSION_LINKED AND TARGET ${ext}_extension)
++      target_link_libraries(_duckdb PRIVATE ${ext}_extension)
++    endif()
++  endif()
++endforeach()
+ 
+ # ────────────────────────────────────────────
+ # Put the object file in the correct place
+--- a/cmake/duckdb_loader.cmake
++++ b/cmake/duckdb_loader.cmake
+@@ -163,8 +163,7 @@
+   elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+     target_compile_options(
+       ${target_name}
+-      INTERFACE -stdlib=libc++ # for libc++ in favor of older libstdc++
+-                -mmacosx-version-min=10.7 # minimum osx version compatibility
++      INTERFACE -stdlib=libc++ # CMake supplies the configured OSX deployment target.
+     )
+   endif()
+ 
+--- a/src/pyconnection.cpp
++++ b/src/pyconnection.cpp
+@@ -1889,8 +1889,19 @@
+ }
+ 
+ std::shared_ptr<DuckDBPyConnection> DuckDBPyConnection::Commit() {
+-	auto &connection = con.GetConnection();
+-	if (connection.context->transaction.IsAutoCommit()) {
++	ConnectionLockGuard conn_lock(*this);
++	auto &connection = con.GetConnection();
++	const auto connected = connection.context->IsConnected();
++	bool auto_commit;
++	if (connected) {
++		// Ask the authoritative server before starting another SQL statement:
++		// a no-op commit must preserve the current native result and its stream.
++		nb::gil_scoped_release release;
++		auto_commit = connection.context->RemoteIsAutoCommit();
++	} else {
++		auto_commit = connection.context->transaction.IsAutoCommit();
++	}
++	if (auto_commit) {
+ 		return shared_from_this();
+ 	}
+ 	ExecuteFromString("COMMIT");
+@@ -1934,6 +1945,11 @@
+ 	// duckdb-python#456.
+ 	{
+ 		nb::gil_scoped_release release;
++		if (!con.ConnectionIsClosed()) {
++			// Retained relations may keep ClientContext alive beyond close(). End
++			// owned remote sessions now so their uncommitted writes roll back.
++			con.GetConnection().context->CloseRemoteConnections();
++		}
+ 		con.SetConnection(nullptr);
+ 		con.SetDatabase(nullptr);
+ 	}
+@@ -2059,9 +2075,20 @@
+ }
+ 
+ std::shared_ptr<DuckDBPyConnection> DuckDBPyConnection::Cursor() {
++	ConnectionLockGuard conn_lock(*this);
++	auto &connection = con.GetConnection();
+ 	auto res = std::make_shared<DuckDBPyConnection>();
+ 	res->con.SetDatabase(con);
+ 	res->con.SetConnection(make_uniq<Connection>(res->con.GetDatabase()));
++	if (connection.context->IsConnected()) {
++		auto target = connection.context->TryGetConnectedCatalog();
++		if (!target) {
++			throw ConnectionException("Cannot create a cursor: the connected database has been detached");
++		}
++		// The endpoint/catalog is inherited, not the parent's remote session or
++		// transaction. Quack resolves a separate server session per ClientContext.
++		res->con.GetConnection().context->ConnectToCatalog(target);
++	}
+ 	cursors.AddCursor(res);
+ 	return res;
+ }
+--- a/src/pyexpression.cpp
++++ b/src/pyexpression.cpp
+@@ -501,7 +501,7 @@
+ }
+ 
+ std::unique_ptr<DuckDBPyExpression> DuckDBPyExpression::InternalConstantExpression(Value val) {
+-	return make_uniq<DuckDBPyExpression>(make_uniq<duckdb::ConstantExpression>(std::move(val)));
++	return make_uniq<DuckDBPyExpression>(duckdb::ConstantExpression::FromValue(val));
+ }
+ 
+ std::unique_ptr<DuckDBPyExpression> DuckDBPyExpression::ComparisonExpression(ExpressionType type,
+@@ -521,7 +521,7 @@
+ 
+ 	// Add NULL as default Else expression
+ 	auto &internal_expression = reinterpret_cast<duckdb::CaseExpression &>(*case_expr->expression);
+-	internal_expression.ElseMutable() = make_uniq<duckdb::ConstantExpression>(Value(LogicalTypeId::SQLNULL));
++	internal_expression.ElseMutable() = duckdb::ConstantExpression::FromValue(Value(LogicalTypeId::SQLNULL));
+ 	return case_expr;
+ }
+ 
+--- a/src/python_replacement_scan.cpp
++++ b/src/python_replacement_scan.cpp
+@@ -48,7 +48,7 @@
+ 			}
+ 		}
+ 		auto list_value = Value::LIST(values);
+-		children.push_back(make_uniq<ConstantExpression>(list_value));
++		children.push_back(ConstantExpression::FromValue(list_value));
+ 		table_function.function = make_uniq<FunctionExpression>("scan_arrow_ipc", std::move(children));
+ 		auto dependency_item = PythonDependencyItem::Create(stream_messages);
+ 		external_dependency->AddDependency("replacement_cache", std::move(dependency_item));
+@@ -57,10 +57,10 @@
+ 		auto stream_factory_produce = PythonTableArrowArrayStreamFactory::Produce;
+ 		auto stream_factory_get_schema = PythonTableArrowArrayStreamFactory::GetSchema;
+ 
+-		children.push_back(make_uniq<ConstantExpression>(Value::POINTER(CastPointerToValue(stream_factory.get()))));
+-		children.push_back(make_uniq<ConstantExpression>(Value::POINTER(CastPointerToValue(stream_factory_produce))));
++		children.push_back(ConstantExpression::FromValue(Value::POINTER(CastPointerToValue(stream_factory.get()))));
++		children.push_back(ConstantExpression::FromValue(Value::POINTER(CastPointerToValue(stream_factory_produce))));
+ 		children.push_back(
+-		    make_uniq<ConstantExpression>(Value::POINTER(CastPointerToValue(stream_factory_get_schema))));
++		    ConstantExpression::FromValue(Value::POINTER(CastPointerToValue(stream_factory_get_schema))));
+ 
+ 		if (type == PyArrowObjectType::PyCapsule) {
+ 			// Disable projection+filter pushdown for bare capsules (single-use, no PyArrow wrapper)
+@@ -124,7 +124,7 @@
+ 		} else {
+ 			string name = "df_" + StringUtil::GenerateRandomName();
+ 			auto new_df = PandasScanFunction::PandasReplaceCopiedNames(entry);
+-			children.push_back(make_uniq<ConstantExpression>(Value::POINTER(CastPointerToValue(new_df.ptr()))));
++			children.push_back(ConstantExpression::FromValue(Value::POINTER(CastPointerToValue(new_df.ptr()))));
+ 			table_function->function = make_uniq<FunctionExpression>("pandas_scan", std::move(children));
+ 			auto dependency = make_uniq<ExternalDependency>();
+ 			dependency->AddDependency("replacement_cache", PythonDependencyItem::Create(entry));
+@@ -192,7 +192,7 @@
+ 			throw NotImplementedException("Unsupported Numpy object");
+ 			break;
+ 		}
+-		children.push_back(make_uniq<ConstantExpression>(Value::POINTER(CastPointerToValue(data.ptr()))));
++		children.push_back(ConstantExpression::FromValue(Value::POINTER(CastPointerToValue(data.ptr()))));
+ 		table_function->function = make_uniq<FunctionExpression>("pandas_scan", std::move(children));
+ 		auto dependency = make_uniq<ExternalDependency>();
+ 		dependency->AddDependency("replacement_cache", PythonDependencyItem::Create(entry));

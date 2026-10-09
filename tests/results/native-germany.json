@@ -1,0 +1,172 @@
+{
+  "environment": "Germany",
+  "native_cpp": {
+    "passed": true,
+    "native_checks": 21,
+    "checks": [
+      "builtin_extensions_and_private_descriptor",
+      "typed_parameter_crud_no_sql_interpolation",
+      "named_parameters",
+      "repeated_prepared_batch_and_commit",
+      "complex_typed_parameters_and_null",
+      "native_result_types_and_duplicate_names",
+      "ddl_visibility_between_sessions",
+      "sql_and_bind_errors_leave_session_usable",
+      "native_begin_commit_rollback_methods",
+      "pending_changes_are_isolated",
+      "closing_session_rolls_back",
+      "reader_snapshot_until_new_transaction",
+      "same_row_conflict_and_rollback_recovery",
+      "streaming_result_pages",
+      "commit_without_active_transaction_errors",
+      "remote_query_interrupt_and_recovery",
+      "reader_progress_while_writer_pending",
+      "graceful_restart_persistence",
+      "sigkill_recovers_commits_and_discards_pending",
+      "real_cpp_transaction_flow",
+      "native_demo_initialization_and_existing_data_protection"
+    ]
+  },
+  "transaction_flow": {
+    "passed": true,
+    "client": "native C++ duckdb::Connection",
+    "native_used": true,
+    "python_used": false,
+    "library_version": "v2.1.0-dev0",
+    "sessions": 2,
+    "checks": [
+      {
+        "name": "builtin_extensions_default",
+        "expected": 2,
+        "actual": 2,
+        "passed": true
+      },
+      {
+        "name": "independent_sessions_autocommit",
+        "expected": true,
+        "actual": true,
+        "passed": true
+      },
+      {
+        "name": "autocommit_typed_insert_visible",
+        "expected": 3,
+        "actual": 3,
+        "passed": true
+      },
+      {
+        "name": "reader_snapshot_initial",
+        "expected": 3,
+        "actual": 3,
+        "passed": true
+      },
+      {
+        "name": "typed_crud_inside_writer_transaction",
+        "expected": [
+          2,
+          4,
+          1
+        ],
+        "actual": [
+          2,
+          4,
+          1
+        ],
+        "passed": true
+      },
+      {
+        "name": "reader_sees_committed_stock_during_pending_write",
+        "expected": 3,
+        "actual": 3,
+        "passed": true
+      },
+      {
+        "name": "reader_retains_snapshot_after_writer_commit",
+        "expected": 3,
+        "actual": 3,
+        "passed": true
+      },
+      {
+        "name": "new_transaction_sees_committed_stock",
+        "expected": 4,
+        "actual": 4,
+        "passed": true
+      },
+      {
+        "name": "rollback_preserves_committed_stock",
+        "expected": [
+          99,
+          4,
+          4
+        ],
+        "actual": [
+          99,
+          4,
+          4
+        ],
+        "passed": true
+      },
+      {
+        "name": "reader_progress_while_other_writer_has_pending_row",
+        "expected": {
+          "stock": 4,
+          "seconds_less_than": 2
+        },
+        "actual": {
+          "stock": 4,
+          "seconds": 0.00372907
+        },
+        "passed": true
+      },
+      {
+        "name": "same_row_write_conflict",
+        "expected": "TRANSACTION conflict",
+        "actual": "TRANSACTION conflict",
+        "passed": true
+      },
+      {
+        "name": "connections_recover_after_conflict_rollback",
+        "expected": 4,
+        "actual": 4,
+        "passed": true
+      },
+      {
+        "name": "committed_final_row_after_all_rollbacks",
+        "expected": [
+          [
+            1,
+            "Cafe",
+            "19.99",
+            4
+          ]
+        ],
+        "actual": [
+          [
+            1,
+            "Cafe",
+            "19.99",
+            4
+          ]
+        ],
+        "passed": true
+      },
+      {
+        "name": "temporary_table_removed",
+        "expected": 0,
+        "actual": 0,
+        "passed": true
+      }
+    ],
+    "rows_before_cleanup": [
+      [
+        1,
+        "Cafe",
+        "19.99",
+        4
+      ]
+    ],
+    "temporary_table_removed": true
+  },
+  "library_sha256": "515db242abc09fc28cf3769bb82084b787910896da40383dc431595165521f34",
+  "server_sha256": "1855217a3069791d3e3417ddbd5518eeb3fb87c94311473fc7b9e751b67ab7d2",
+  "system": "Linux x86_64-v3, Ubuntu 24.04, glibc 2.39"
+}
