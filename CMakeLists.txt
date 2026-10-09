@@ -83,11 +83,25 @@ function(duckonwire_executable target source)
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     INSTALL_RPATH "${DUCKONWIRE_INSTALL_RPATH}")
 endfunction()
+find_package(Threads REQUIRED)
+find_package(OpenSSL 1.1.1 REQUIRED COMPONENTS SSL Crypto)
+add_library(duckonwire-auth STATIC src/scram.cpp src/access.cpp)
+target_include_directories(duckonwire-auth PUBLIC "${CMAKE_SOURCE_DIR}/include")
+target_link_libraries(duckonwire-auth PUBLIC OpenSSL::Crypto)
+add_library(duckonwire-pgwire STATIC src/pgwire.cpp)
+target_include_directories(duckonwire-pgwire PUBLIC "${CMAKE_SOURCE_DIR}/include")
+target_link_libraries(duckonwire-pgwire PUBLIC DuckDB::DuckDB Threads::Threads duckonwire-auth OpenSSL::SSL)
+add_executable(duckonwire-password src/password.cpp)
+target_link_libraries(duckonwire-password PRIVATE duckonwire-auth)
+set_target_properties(duckonwire-password PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 duckonwire_executable(duckonwire-server src/server.cpp)
+target_sources(duckonwire-server PRIVATE examples/demo/initialize.cpp)
+target_include_directories(duckonwire-server PRIVATE "${CMAKE_SOURCE_DIR}/examples/demo")
+target_link_libraries(duckonwire-server PRIVATE duckonwire-pgwire)
 duckonwire_executable(cpp-crud-client examples/crud_cpp.cpp)
 duckonwire_executable(c-crud-client examples/crud_c.c)
 duckonwire_executable(transaction-flow examples/transaction_flow.cpp)
-install(TARGETS duckonwire-server cpp-crud-client c-crud-client transaction-flow
+install(TARGETS duckonwire-server duckonwire-password cpp-crud-client c-crud-client transaction-flow
         RUNTIME DESTINATION bin)
 install(DIRECTORY examples/ DESTINATION examples
   PATTERN node_modules EXCLUDE PATTERN target EXCLUDE PATTERN obj EXCLUDE
@@ -98,19 +112,36 @@ install(FILES LICENSE THIRD_PARTY_NOTICES.txt DESTINATION share/duckonwire)
 include(CTest)
 if(BUILD_TESTING)
   duckonwire_executable(native-tests tests/native_tests.cpp)
+  duckonwire_executable(pgwire-protocol-tests tests/pgwire_protocol_tests.cpp)
+  add_executable(access-tests tests/access_tests.cpp)
+  target_link_libraries(access-tests PRIVATE duckonwire-auth)
+  set_target_properties(access-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+  add_executable(scram-tests tests/scram_tests.cpp)
+  target_link_libraries(scram-tests PRIVATE duckonwire-auth)
+  set_target_properties(scram-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
   duckonwire_executable(duckonwire-benchmark tests/concurrent_benchmark.cpp)
   target_include_directories(native-tests PRIVATE "${CMAKE_SOURCE_DIR}/tests/support")
+  target_include_directories(pgwire-protocol-tests PRIVATE "${CMAKE_SOURCE_DIR}/tests/support")
   target_include_directories(duckonwire-benchmark PRIVATE "${CMAKE_SOURCE_DIR}/tests/support")
-  install(TARGETS native-tests duckonwire-benchmark RUNTIME DESTINATION bin
+  install(TARGETS native-tests pgwire-protocol-tests access-tests scram-tests duckonwire-benchmark RUNTIME DESTINATION bin
           COMPONENT Tests EXCLUDE_FROM_ALL)
   add_dependencies(native-tests duckonwire-server transaction-flow)
+  add_dependencies(pgwire-protocol-tests duckonwire-server)
   add_dependencies(duckonwire-benchmark duckonwire-server)
   add_test(NAME native-tests COMMAND native-tests
     --server "$<TARGET_FILE:duckonwire-server>" --flow "$<TARGET_FILE:transaction-flow>")
+  add_test(NAME pgwire-protocol COMMAND pgwire-protocol-tests
+    --server "$<TARGET_FILE:duckonwire-server>"
+    --fixture-parent "${CMAKE_BINARY_DIR}/test-results")
+  add_test(NAME access-rules COMMAND access-tests --fixture-parent "${CMAKE_BINARY_DIR}/test-results")
+  add_test(NAME scram-authentication COMMAND scram-tests)
   add_test(NAME concurrent-smoke COMMAND duckonwire-benchmark
     --rows 10000 --batch 250 --mode both --server "$<TARGET_FILE:duckonwire-server>"
     --output "${CMAKE_BINARY_DIR}/test-results/concurrent-smoke.json")
-  set_tests_properties(native-tests concurrent-smoke PROPERTIES TIMEOUT 120)
+  set_tests_properties(native-tests pgwire-protocol concurrent-smoke PROPERTIES TIMEOUT 120)
+  file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/test-results")
+  set_tests_properties(native-tests pgwire-protocol concurrent-smoke access-rules PROPERTIES
+    ENVIRONMENT "TMPDIR=${CMAKE_BINARY_DIR}/test-results")
   add_test(NAME bootstrap-regressions COMMAND "${CMAKE_COMMAND}"
     "-DTEST_ROOT=${CMAKE_BINARY_DIR}/bootstrap-test-fixture"
     -P "${CMAKE_SOURCE_DIR}/cmake/BootstrapTests.cmake")

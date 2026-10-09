@@ -1,5 +1,8 @@
 #include "duckdb.hpp"
 #include "duckonwire/json.hpp"
+#include "duckonwire/pgwire.hpp"
+#include "duckonwire/access.hpp"
+#include "initialize.hpp"
 
 #include <cerrno>
 #include <csignal>
@@ -8,6 +11,7 @@
 #include <fcntl.h>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <sys/stat.h>
@@ -24,15 +28,6 @@ void RequestStop(int) {
 }
 
 using duckonwire::JsonString;
-
-std::string SqlString(const std::string &value) {
-	std::string result = "'";
-	for (char byte : value) {
-		result += byte;
-		if (byte == '\'') result += '\'';
-	}
-	return result + "'";
-}
 
 std::string RandomToken() {
 	int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
@@ -72,9 +67,22 @@ fs::path OwnedPath(const fs::path &input, const fs::path &root) {
 	return path;
 }
 
+fs::path ConfigurationPath(const fs::path &input, const fs::path &root) {
+	auto requested = (input.is_absolute() ? input : root / input).lexically_normal();
+	OwnedPath(requested, root);
+	if (fs::is_symlink(fs::symlink_status(requested)))
+		throw std::runtime_error("Configuration and TLS files must not be symlinks");
+	return requested;
+}
+
 struct Options {
 	fs::path root, database, state;
+	fs::path access_file, tls_cert, tls_key;
+	std::string pg_host = "127.0.0.1";
 	int port = 9495;
+	int pg_port = 9496;
+	int max_queries = 8;
+	int query_timeout_ms = 30000;
 	bool init_demo = false;
 };
 
@@ -84,8 +92,12 @@ Options Parse(int argc, char **argv) {
 		std::string name(argv[i]);
 		if (name == "--init-demo") { options.init_demo = true; continue; }
 		if (name == "--help") {
-			std::cout << "duckonwire-server [--root DIRECTORY] [--database PATH] [--port 9495] [--state PATH] [--init-demo]\n"
-			          << "DUCKONWIRE_TOKEN sets the server token; otherwise one is generated.\n";
+			std::cout << "duckonwire-server [--root DIRECTORY] [--database PATH] [--port 9495] [--pg-port 9496] [--state PATH] [--init-demo]\n"
+			          << "Quack uses --port; PostgreSQL drivers use --pg-port (0 selects a free port).\n"
+			          << "DUCKONWIRE_TOKEN sets local endpoint passwords; otherwise one is generated.\n"
+			          << "Public: --pg-host ADDRESS --access-file PATH --tls-cert PATH --tls-key PATH\n"
+			          << "PostgreSQL limits: --max-queries 8 --query-timeout-ms 30000\n"
+			          << "Access rules select one database name and users with read/write permissions; TLS and SCRAM required.\n";
 			std::exit(0);
 		}
 		if (i + 1 == argc) throw std::runtime_error("Every option requires a value");
@@ -93,11 +105,30 @@ Options Parse(int argc, char **argv) {
 		if (name == "--root") options.root = value;
 		else if (name == "--database") options.database = value;
 		else if (name == "--state") options.state = value;
+		else if (name == "--access-file") options.access_file = value;
+		else if (name == "--tls-cert") options.tls_cert = value;
+		else if (name == "--tls-key") options.tls_key = value;
+		else if (name == "--pg-host") options.pg_host = value;
+		else if (name == "--max-queries" || name == "--query-timeout-ms") {
+			size_t consumed = 0;
+			const int number = std::stoi(value, &consumed);
+			const int maximum = name == "--max-queries" ? 256 : 3600000;
+			if (consumed != value.size() || number < 1 || number > maximum)
+				throw std::runtime_error("Invalid PostgreSQL capacity or timeout limit");
+			if (name == "--max-queries") options.max_queries = number;
+			else options.query_timeout_ms = number;
+		}
 		else if (name == "--port") {
 			size_t consumed = 0;
 			options.port = std::stoi(value, &consumed);
 			if (consumed != value.size() || options.port < 1 || options.port > 65535) {
 				throw std::runtime_error("Port must be between 1 and 65535");
+			}
+		} else if (name == "--pg-port") {
+			size_t consumed = 0;
+			options.pg_port = std::stoi(value, &consumed);
+			if (consumed != value.size() || options.pg_port < 0 || options.pg_port > 65535) {
+				throw std::runtime_error("PostgreSQL port must be between 0 and 65535");
 			}
 		} else throw std::runtime_error("Unknown option: " + name);
 	}
@@ -108,6 +139,26 @@ Options Parse(int argc, char **argv) {
 	                             options.root);
 	options.state = OwnedPath(options.state.empty() ? fs::path(".runtime/native.json") : options.state, options.root);
 	if (options.database == options.state) throw std::runtime_error("Database and descriptor paths must differ");
+	const bool protected_mode = !options.access_file.empty();
+	if (!protected_mode && ((options.pg_host != "127.0.0.1" && options.pg_host != "localhost") || !options.tls_cert.empty() || !options.tls_key.empty()))
+		throw std::runtime_error("Public listeners and TLS require --access-file with user rules");
+	if (protected_mode) {
+		if (options.tls_cert.empty() || options.tls_key.empty())
+			throw std::runtime_error("Access rules require both --tls-cert and --tls-key");
+		options.access_file = ConfigurationPath(options.access_file, options.root);
+		options.tls_cert = ConfigurationPath(options.tls_cert, options.root);
+		options.tls_key = ConfigurationPath(options.tls_key, options.root);
+		struct stat private_key_status {};
+		if (stat(options.tls_key.c_str(), &private_key_status) != 0 || !S_ISREG(private_key_status.st_mode) ||
+		    ((private_key_status.st_mode & 07777) != 0600 && (private_key_status.st_mode & 07777) != 0400))
+			throw std::runtime_error("TLS private key must be a regular file with mode 0600 or 0400");
+		for (const auto &sensitive : {options.access_file, options.tls_cert, options.tls_key}) {
+			if (sensitive == options.database || sensitive == options.state)
+				throw std::runtime_error("Configuration, TLS and database paths must differ");
+		}
+		if (options.access_file == options.tls_cert || options.access_file == options.tls_key || options.tls_cert == options.tls_key)
+			throw std::runtime_error("Access rules and TLS files must use separate paths");
+	}
 	return options;
 }
 
@@ -169,32 +220,6 @@ void InstallSignals() {
 	if (sigaction(SIGPIPE, &action, nullptr) != 0) throw std::runtime_error("Cannot protect native socket writes");
 }
 
-void InitDemo(duckdb::Connection &owner, const fs::path &root) {
-	auto tables = owner.Query("SELECT count(*) FROM duckdb_tables() WHERE NOT internal AND NOT temporary");
-	if (tables->HasError()) tables->ThrowError();
-	if (tables->GetValue<int64_t>(0, 0) != 0) {
-		throw std::runtime_error("--init-demo requires an empty database; existing tables are preserved");
-	}
-	const auto products = OwnedPath("examples/demo/products.csv", root);
-	const auto prices = OwnedPath("examples/demo/prices.csv", root);
-	if (!fs::is_regular_file(products) || !fs::is_regular_file(prices)) {
-		throw std::runtime_error("Demo CSV files are missing under examples/demo");
-	}
-	owner.BeginTransaction();
-	try {
-		auto schema = owner.Query("CREATE TABLE products(id INTEGER PRIMARY KEY,name VARCHAR,brand VARCHAR,category VARCHAR,size VARCHAR,unit VARCHAR,country_code VARCHAR); CREATE TABLE prices(id INTEGER PRIMARY KEY,product_id INTEGER,price DECIMAL(18,2),day DATE)");
-		if (schema->HasError()) schema->ThrowError();
-		auto a = owner.Query("INSERT INTO products SELECT * FROM read_csv(?, header=true, quote='\"', escape='\"', columns={'id':'INTEGER','name':'VARCHAR','brand':'VARCHAR','category':'VARCHAR','size':'VARCHAR','unit':'VARCHAR','country_code':'VARCHAR'})", duckdb::Value(products.string()));
-		if (a->HasError()) a->ThrowError();
-		auto b = owner.Query("INSERT INTO prices SELECT * FROM read_csv(?, header=true, quote='\"', escape='\"', columns={'id':'INTEGER','product_id':'INTEGER','price':'DECIMAL(18,2)','day':'DATE'})", duckdb::Value(prices.string()));
-		if (b->HasError()) b->ThrowError();
-		auto valid = owner.Query("SELECT (SELECT count(*) FROM products)=46462 AND (SELECT count(*) FROM prices)=46462 AND NOT EXISTS(SELECT 1 FROM products WHERE country_code NOT IN ('AR','ES')) AND NOT EXISTS(SELECT 1 FROM prices p LEFT JOIN products x ON p.product_id=x.id WHERE x.id IS NULL)");
-		if (valid->HasError()) valid->ThrowError();
-		if (!valid->GetValue<bool>(0, 0)) throw std::runtime_error("Demo CSV integrity check failed");
-		owner.Commit();
-	} catch (...) { owner.Rollback(); throw; }
-}
-
 void Serve(const Options &options, const std::string &token) {
 	Descriptor descriptor(options.state);
 	fs::create_directories(options.database.parent_path());
@@ -203,17 +228,58 @@ void Serve(const Options &options, const std::string &token) {
 		duckdb::DBConfig config;
 		config.SetOptionByName(duckdb::Identifier("temp_directory"), duckdb::Value((options.database.parent_path() / "native-spill").string()));
 		config.SetOptionByName(duckdb::Identifier("threads"), duckdb::Value::BIGINT(2));
+		const bool protected_mode = !options.access_file.empty();
+		duckonwire::AccessConfig rules;
+		if (protected_mode) {
+			rules = duckonwire::ReadAccessConfig(options.access_file.string());
+			config.SetOptionByName(duckdb::Identifier("enable_external_access"), duckdb::Value(false));
+			config.SetOptionByName(duckdb::Identifier("allow_unsigned_extensions"), duckdb::Value(false));
+			config.SetOptionByName(duckdb::Identifier("allow_persistent_secrets"), duckdb::Value(false));
+			config.SetOptionByName(duckdb::Identifier("secret_directory"), duckdb::Value((options.root / ".runtime/engine-secrets").string()));
+			config.SetOptionByName(duckdb::Identifier("memory_limit"), duckdb::Value("1GiB"));
+			config.SetOptionByName(duckdb::Identifier("max_temp_directory_size"), duckdb::Value("1GiB"));
+		}
 		duckdb::DuckDB database(options.database.string(), &config);
 		duckdb::Connection owner(database);
-		if (options.init_demo) InitDemo(owner, options.root);
+		if (options.init_demo) {
+			if (protected_mode) throw std::runtime_error("Initialize the demo locally before enabling access rules");
+			duckonwire::demo::Initialize(owner, options.root);
+		}
+		std::unique_ptr<duckonwire::PgWireServer> pg_owner;
+		if (protected_mode) {
+			duckonwire::PgWireOptions settings;
+			settings.host = options.pg_host;
+			settings.port = static_cast<std::uint16_t>(options.pg_port);
+			settings.database_name = rules.database;
+			settings.max_active_queries = static_cast<std::size_t>(options.max_queries);
+			settings.query_timeout_ms = static_cast<std::uint32_t>(options.query_timeout_ms);
+			settings.tls_cert = options.tls_cert.string();
+			settings.tls_key = options.tls_key.string();
+			for (const auto &rule : rules.users)
+				settings.users.push_back({rule.name, rule.verifier, rule.read_only});
+			pg_owner = std::make_unique<duckonwire::PgWireServer>(database, std::move(settings));
+		} else {
+			pg_owner = std::make_unique<duckonwire::PgWireServer>(database, options.pg_host, static_cast<std::uint16_t>(options.pg_port), token,
+			    static_cast<std::size_t>(options.max_queries), static_cast<std::uint32_t>(options.query_timeout_ms));
+		}
+		auto &postgres = *pg_owner;
 		bool active = false;
 		try {
-			auto builtins = owner.Query("SELECT count(*) FROM duckdb_extensions() WHERE extension_name IN ('httpfs','quack') AND loaded AND installed AND install_mode='STATICALLY_LINKED'");
-			if (builtins->HasError()) builtins->ThrowError();
-			if (builtins->GetValue<int64_t>(0, 0) != 2) throw std::runtime_error("This server requires the integrated native DuckDB build");
+			if (!protected_mode) {
+				auto builtins = owner.Query("SELECT count(*) FROM duckdb_extensions() WHERE extension_name IN ('httpfs','quack') AND loaded AND installed AND install_mode='STATICALLY_LINKED'");
+				if (builtins->HasError()) builtins->ThrowError();
+				if (builtins->GetValue<int64_t>(0, 0) != 2) throw std::runtime_error("This server requires the integrated native DuckDB build");
+			}
 			Query(owner, "CALL quack_serve(?, token=?)", duckdb::Value(endpoint), duckdb::Value(token));
 			active = true;
+			if (protected_mode) {
+				Query(owner, "SET TimeZone = 'UTC'");
+				Query(owner, "SET lock_configuration = true");
+			}
+			postgres.Start();
 			const std::string shared = "\"pid\":" + std::to_string(getpid()) +
+			    ",\"pg_endpoint\":" + JsonString(postgres.Endpoint()) +
+			    ",\"pg_port\":" + std::to_string(postgres.Port()) +
 			    ",\"database\":" + JsonString(options.database.string()) + ",\"builtin_extensions\":[\"httpfs\",\"quack\"]";
 			descriptor.Write("{\"endpoint\":" + JsonString(endpoint) + ",\"token\":" + JsonString(token) + "," + shared +
 			                 ",\"duckdb\":" + JsonString(duckdb::DuckDB::LibraryVersion()) + "}\n");
@@ -224,16 +290,18 @@ void Serve(const Options &options, const std::string &token) {
 				struct timespec interval {0, 100000000};
 				nanosleep(&interval, nullptr);
 			}
+			postgres.Stop();
 			Query(owner, "CALL quack_stop(?)", duckdb::Value(endpoint));
 			active = false;
 		} catch (...) {
+			postgres.Stop();
 			if (active) {
 				try { Query(owner, "CALL quack_stop(?)", duckdb::Value(endpoint)); } catch (...) {}
 			}
 			throw;
 		}
 	}
-	// Quack sessions, Connection and DuckDB are closed before descriptor removal.
+	// PostgreSQL and Quack sessions, Connection and DuckDB close before descriptor removal.
 }
 } // namespace
 
@@ -249,8 +317,11 @@ int main(int argc, char **argv) {
 	} catch (const std::exception &error) {
 		std::string message(error.what());
 		if (!token.empty()) {
-			size_t position;
-			while ((position = message.find(token)) != std::string::npos) message.replace(position, token.size(), "[redacted]");
+			size_t position = 0;
+			while ((position = message.find(token, position)) != std::string::npos) {
+				message.replace(position, token.size(), "[redacted]");
+				position += std::strlen("[redacted]");
+			}
 		}
 		std::cerr << "duckonwire-server: " << message << '\n';
 		return 1;

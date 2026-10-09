@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "passed": true,
+  "completed_at": "2026-10-09T21:59:13.306817+00:00",
+  "engine_source_id": "848126236a",
+  "engine_library_sha256": "5beb16eb653a59c11a37471da2c4182ffcf882adebb1774e55d6fef2b88b6e39",
+  "tested_server_sha256": "065fd9e60c8ab427a0fc5b60a303510f653d2e401a7e3a49a5aa8d7145d5ed39",
+  "scope": "Real cloud reads in local trusted mode, native Quack and ordinary PostgreSQL driver; not proof of unrestricted cloud SQL on a protected public listener.",
+  "s3": {
+    "passed": true,
+    "public_object_uri": "s3://noaa-ghcn-pds/ghcnd-countries.txt",
+    "size_bytes": 3659,
+    "content_sha256": "dfc325c0f89cc6f95e03ed5d4155a78b644ad28b044017c76fcb709df104df7f",
+    "modes": [
+      "native_local",
+      "quack_connect",
+      "postgresql_psycopg"
+    ],
+    "postgresql_checks": [
+      {
+        "label": "postgresql_psycopg_real_s3_read",
+        "passed": true,
+        "size_bytes": 3659,
+        "content_sha256": "dfc325c0f89cc6f95e03ed5d4155a78b644ad28b044017c76fcb709df104df7f"
+      },
+      {
+        "label": "postgresql_psycopg_real_s3_join",
+        "passed": true,
+        "count": 3,
+        "sum_size_bytes": 10977,
+        "content_sha256": "dfc325c0f89cc6f95e03ed5d4155a78b644ad28b044017c76fcb709df104df7f"
+      }
+    ],
+    "anonymous_read": true
+  },
+  "r2": {
+    "passed": true,
+    "provider": "Cloudflare R2, signed S3 API",
+    "modes": [
+      "native_local",
+      "quack_connect",
+      "postgresql_psycopg"
+    ],
+    "checks_passed": 6,
+    "object_size_bytes": 417,
+    "content_sha256": "9bfdede1f588b2f31fb137a837b0cc6e813060cb0368362535a54daf6a3d23df",
+    "tls_verification_enabled": true,
+    "cloud_writes_performed": false,
+    "cloud_deletes_performed": false,
+    "private_object_names_and_credentials_omitted": true
+  },
+  "limitations": [
+    "An S3 parquet example returned HTTP 403 and is not counted as a passed S3 read; an HTTPS comparison is not counted as S3.",
+    "HTTPFS explicit credentials were qualified. AWS IAM credential_chain needs the additional AWS extension.",
+    "Public access rules disable external file and network SQL; configure trusted local object-storage ingestion separately."
+  ]
+}

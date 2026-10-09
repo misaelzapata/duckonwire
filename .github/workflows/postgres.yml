@@ -1,0 +1,129 @@
+name: PostgreSQL driver compatibility
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DUCKONWIRE_TOKEN: ci-local-test-password
+      PGPASSWORD: ci-local-test-password
+      PGPORT: '19496'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Dependencies
+        run: sudo apt-get update && sudo apt-get install -y g++ libpq-dev libcurl4t64 libssl-dev
+      - name: Reuse the qualified pinned engine
+        # The engine pins have not changed. Compile this server and its tests
+        # afresh against the immutable rc.4 library, verifying the whole archive.
+        run: |
+          mkdir -p build/engine build/bin build/test-results
+          cat > build/require-pins.cmake <<'CMAKE'
+          include("${CMAKE_CURRENT_LIST_DIR}/../cmake/Pins.cmake")
+          if(NOT DUCKONWIRE_DUCKDB_COMMIT STREQUAL "848126236a4a8879f232bed7ab5f702683a55300" OR
+             NOT DUCKONWIRE_QUACK_COMMIT STREQUAL "a6e7cb9243ee3d7ec0e5371b720be3292a32061f" OR
+             NOT DUCKONWIRE_HTTPFS_COMMIT STREQUAL "96a2f2e88e5dd075facbc5a65dc3afd67aa2bb44" OR
+             NOT DUCKONWIRE_DUCKDB_SOURCE_MODE STREQUAL "COMMITTED" OR
+             NOT DUCKONWIRE_QUACK_SOURCE_MODE STREQUAL "COMMITTED" OR
+             NOT DUCKONWIRE_HTTPFS_PATCH_SHA256 STREQUAL "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+            message(FATAL_ERROR "Engine pins changed: qualify a fresh engine before reusing a release library")
+          endif()
+          CMAKE
+          cmake -P build/require-pins.cmake
+          git rev-parse HEAD > build/test-results/source-head.txt
+          curl --fail --location --retry 3 https://github.com/misaelzapata/duckonwire/releases/download/v0.2.0-rc.4/duckonwire-0.2.0-rc.4-linux-x86_64-v3.tar.gz -o build/engine.tar.gz
+          echo '42e42aab7eabe64ed7d3d0557dd147163f49313cf62ecd0e652fa7717626a9da  build/engine.tar.gz' | sha256sum --check
+          tar -xzf build/engine.tar.gz -C build/engine --strip-components=1
+          test -f build/engine/include/duckdb.hpp
+          sha256sum src/pgwire.cpp src/server.cpp src/scram.cpp src/access.cpp build/engine/lib/libduckdb.so > build/test-results/provenance.sha256
+      - name: Compile current native server and protocol tests
+        run: |
+          flags=(-std=c++17 -O2 -march=x86-64-v3 -Iinclude -Ibuild/engine/include -Itests/support -Iexamples/demo)
+          libraries=(-Lbuild/engine/lib -lduckdb -pthread -lssl -lcrypto '-Wl,-rpath,$ORIGIN/../engine/lib')
+          g++ "${flags[@]}" src/server.cpp src/pgwire.cpp src/scram.cpp src/access.cpp examples/demo/initialize.cpp "${libraries[@]}" -o build/bin/duckonwire-server
+          g++ "${flags[@]}" src/password.cpp src/scram.cpp -lcrypto -o build/bin/duckonwire-password
+          g++ "${flags[@]}" tests/access_tests.cpp src/access.cpp -o build/bin/access-tests
+          g++ "${flags[@]}" tests/scram_tests.cpp src/scram.cpp -lcrypto -o build/bin/scram-tests
+          g++ "${flags[@]}" tests/pgwire_protocol_tests.cpp "${libraries[@]}" -o build/bin/pgwire-protocol-tests
+          g++ "${flags[@]}" tests/native_tests.cpp "${libraries[@]}" -o build/bin/native-tests
+          g++ "${flags[@]}" examples/transaction_flow.cpp "${libraries[@]}" -o build/bin/transaction-flow
+          cc -I"$(pg_config --includedir)" examples/postgres/c/crud.c -L"$(pg_config --libdir)" -lpq -o build/bin/pg-crud
+      - name: Native acceptance against the fresh server
+        run: |
+          build/bin/access-tests --fixture-parent build/test-results | tee build/test-results/access-rules.json
+          build/bin/scram-tests | tee build/test-results/scram-authentication.json
+          build/bin/pgwire-protocol-tests --server build/bin/duckonwire-server --fixture-parent build/test-results | tee build/test-results/pgwire-protocol.json
+          build/bin/native-tests --server build/bin/duckonwire-server --flow build/bin/transaction-flow --catalog examples/demo | tee build/test-results/native.json
+      - name: Install ordinary drivers
+        run: |
+          npm install --prefix examples/postgres/node --ignore-scripts
+          python3 -m venv build/pg-python
+          build/pg-python/bin/pip install -r examples/postgres/python/requirements.txt
+      - name: Stock drivers and two million rows with complex reads
+        run: |
+          mkdir -p build/pg-fixture
+          build/bin/duckonwire-server --root "$PWD/build/pg-fixture" --port 19495 --pg-port "$PGPORT" > build/test-results/server.log 2>&1 &
+          owner_pid=$!
+          trap 'kill -TERM "$owner_pid" 2>/dev/null || true; wait "$owner_pid" || true' EXIT
+          for attempt in {1..100}; do
+            if test -s build/pg-fixture/.runtime/native.json; then break; fi
+            kill -0 "$owner_pid"
+            sleep 0.1
+          done
+          test -s build/pg-fixture/.runtime/native.json
+          build/bin/pg-crud | tee build/test-results/libpq-crud.json
+          build/pg-python/bin/python examples/postgres/python/crud.py | tee build/test-results/psycopg-crud.json
+          node examples/postgres/node/crud.mjs | tee build/test-results/node-crud.json
+          node examples/postgres/node/bulk.mjs | tee build/test-results/node-bulk.json
+          kill -TERM "$owner_pid"
+          wait "$owner_pid"
+          trap - EXIT
+          test ! -e build/pg-fixture/.runtime/native.json
+      - name: TLS and SCRAM with ordinary drivers
+        run: |
+          mkdir -p build/tls-fixture
+          chmod 700 build/tls-fixture
+          openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 1 -subj '/CN=DuckOnWire isolated test CA' -addext 'basicConstraints=critical,CA:TRUE' -keyout build/tls-fixture/ca-key.pem -out build/tls-fixture/ca.pem 2>build/tls-fixture/cert-generation.log
+          openssl req -new -newkey rsa:2048 -nodes -sha256 -subj /CN=localhost -keyout build/tls-fixture/key.pem -out build/tls-fixture/server.csr 2>>build/tls-fixture/cert-generation.log
+          cat > build/tls-fixture/server.ext <<'CERT'
+          basicConstraints=critical,CA:FALSE
+          keyUsage=critical,digitalSignature,keyEncipherment
+          extendedKeyUsage=serverAuth
+          subjectAltName=DNS:localhost,IP:127.0.0.1
+          CERT
+          openssl x509 -req -sha256 -days 1 -in build/tls-fixture/server.csr -CA build/tls-fixture/ca.pem -CAkey build/tls-fixture/ca-key.pem -CAcreateserial -extfile build/tls-fixture/server.ext -out build/tls-fixture/cert.pem 2>>build/tls-fixture/cert-generation.log
+          chmod 600 build/tls-fixture/key.pem build/tls-fixture/ca-key.pem
+          export PGPASSWORD='isolated-ci-credential-with-at-least-thirty-two-characters'
+          verifier=$(printf '%s\n' "$PGPASSWORD" | build/bin/duckonwire-password)
+          export PGREADER_USER=reader PGREADER_PASSWORD='isolated-ci-reader-with-at-least-thirty-two-characters'
+          reader_verifier=$(printf '%s\n' "$PGREADER_PASSWORD" | build/bin/duckonwire-password)
+          printf 'database\tduckonwire\nuser\tduckonwire\twrite\t%s\nuser\treader\tread\t%s\n' "$verifier" "$reader_verifier" > build/tls-fixture/access.tsv
+          chmod 600 build/tls-fixture/access.tsv
+          build/bin/duckonwire-server --root "$PWD/build/tls-fixture" --port 19495 --pg-port "$PGPORT" --access-file access.tsv --tls-cert cert.pem --tls-key key.pem > build/test-results/tls-server.log 2>&1 &
+          owner_pid=$!
+          trap 'kill -TERM "$owner_pid" 2>/dev/null || true; wait "$owner_pid" || true' EXIT
+          for attempt in {1..100}; do
+            if test -s build/tls-fixture/.runtime/native.json; then break; fi
+            kill -0 "$owner_pid"
+            sleep 0.1
+          done
+          test -s build/tls-fixture/.runtime/native.json
+          export PGSSLMODE=verify-full PGSSLROOTCERT="$PWD/build/tls-fixture/ca.pem"
+          build/bin/pg-crud | tee build/test-results/tls-libpq-crud.json
+          build/pg-python/bin/python examples/postgres/python/crud.py | tee build/test-results/tls-psycopg-crud.json
+          node examples/postgres/node/crud.mjs | tee build/test-results/tls-node-crud.json
+          node examples/postgres/node/bulk.mjs | tee build/test-results/tls-node-bulk.json
+          kill -TERM "$owner_pid"
+          wait "$owner_pid"
+          trap - EXIT
+          test ! -e build/tls-fixture/.runtime/native.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: postgres-linux-results
+          path: build/test-results/

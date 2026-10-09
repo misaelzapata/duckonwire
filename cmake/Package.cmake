@@ -6,7 +6,7 @@ foreach(required SOURCE_DIR BUILD_DIR PLATFORM)
   endif()
 endforeach()
 if(NOT DEFINED VERSION)
-  set(VERSION "0.2.0-rc.4")
+  set(VERSION "0.2.0-rc.5")
 endif()
 if(NOT VERSION MATCHES "^[0-9][A-Za-z0-9_.+-]*$" OR
    NOT PLATFORM MATCHES "^[A-Za-z0-9][A-Za-z0-9_.+-]*$")
@@ -82,14 +82,15 @@ package_run("Native runtime installation" "${SOURCE_DIR}" "${CMAKE_COMMAND}"
   --install "${BUILD_DIR}" --prefix "${bundle}" --config Release)
 package_run("Native test installation" "${SOURCE_DIR}" "${CMAKE_COMMAND}"
   --install "${BUILD_DIR}" --prefix "${bundle}" --config Release --component Tests)
-foreach(program duckonwire-server cpp-crud-client c-crud-client transaction-flow native-tests duckonwire-benchmark)
+foreach(program duckonwire-server duckonwire-password cpp-crud-client c-crud-client transaction-flow native-tests pgwire-protocol-tests access-tests scram-tests duckonwire-benchmark)
   if(NOT EXISTS "${bundle}/bin/${program}")
     package_fail("Required installed native program is missing: ${program}")
   endif()
 endforeach()
 # Clear loader overrides so the installed runtime resolves its paired library.
 set(clean_env "${CMAKE_COMMAND}" -E env --unset=LD_LIBRARY_PATH
-  --unset=DYLD_LIBRARY_PATH --unset=DYLD_FALLBACK_LIBRARY_PATH)
+  --unset=DYLD_LIBRARY_PATH --unset=DYLD_FALLBACK_LIBRARY_PATH "TMPDIR=${staging}/test-fixtures")
+file(MAKE_DIRECTORY "${staging}/test-fixtures")
 package_run("Installed native acceptance" "${bundle}" ${clean_env}
   "${bundle}/bin/native-tests" --server "${bundle}/bin/duckonwire-server"
   --flow "${bundle}/bin/transaction-flow" --catalog "${bundle}/examples/demo")
@@ -99,6 +100,27 @@ if(NOT native_result)
 endif()
 file(MAKE_DIRECTORY "${bundle}/share/duckonwire")
 file(WRITE "${bundle}/share/duckonwire/native-acceptance.json" "${native_result}\n")
+package_run("Installed PostgreSQL protocol acceptance" "${bundle}" ${clean_env}
+  "${bundle}/bin/pgwire-protocol-tests" --server "${bundle}/bin/duckonwire-server"
+  --fixture-parent "${staging}/test-fixtures")
+string(REGEX MATCH "\\{\"passed\":true,[^\r\n]*\\}" pgwire_result "${package_stdout}")
+if(NOT pgwire_result)
+  package_fail("Installed PostgreSQL protocol acceptance did not report success")
+endif()
+file(WRITE "${bundle}/share/duckonwire/pgwire-acceptance.json" "${pgwire_result}\n")
+package_run("Installed access rule acceptance" "${bundle}" ${clean_env}
+  "${bundle}/bin/access-tests" --fixture-parent "${staging}/test-fixtures")
+string(REGEX MATCH "\\{\"passed\":true,[^\r\n]*\\}" access_result "${package_stdout}")
+if(NOT access_result)
+  package_fail("Installed access rule acceptance did not report success")
+endif()
+file(WRITE "${bundle}/share/duckonwire/access-acceptance.json" "${access_result}\n")
+package_run("Installed SCRAM acceptance" "${bundle}" ${clean_env} "${bundle}/bin/scram-tests")
+string(REGEX MATCH "\\{\"passed\":true,[^\r\n]*\\}" scram_result "${package_stdout}")
+if(NOT scram_result)
+  package_fail("Installed SCRAM acceptance did not report success")
+endif()
+file(WRITE "${bundle}/share/duckonwire/scram-acceptance.json" "${scram_result}\n")
 package_run("Installed concurrent smoke" "${bundle}" ${clean_env}
   "${bundle}/bin/duckonwire-benchmark" --mode both --rows 10000 --writers 4 --readers 4
   --batch 250 --server "${bundle}/bin/duckonwire-server" --environment "Relocated native package"
@@ -125,6 +147,9 @@ string(JSON manifest SET "${manifest}" version "\"${VERSION}\"")
 string(JSON manifest SET "${manifest}" platform "\"${PLATFORM}\"")
 string(JSON manifest SET "${manifest}" source_head "\"${head}\"")
 string(JSON manifest SET "${manifest}" native_acceptance "${native_result}")
+string(JSON manifest SET "${manifest}" pgwire_acceptance "${pgwire_result}")
+string(JSON manifest SET "${manifest}" access_acceptance "${access_result}")
+string(JSON manifest SET "${manifest}" scram_acceptance "${scram_result}")
 string(JSON manifest SET "${manifest}" relocation_smoke "${smoke}")
 string(JSON manifest SET "${manifest}" components "{}")
 foreach(component DUCKDB QUACK HTTPFS)

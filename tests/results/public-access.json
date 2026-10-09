@@ -1,0 +1,293 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "name": "writer_parameterized_insert_allowed",
+      "passed": true,
+      "seconds": 0.0028994999593123794,
+      "actual": {
+        "insert_allowed": true
+      }
+    },
+    {
+      "name": "reader_parameterized_select_allowed",
+      "passed": true,
+      "seconds": 0.0016007499070838094,
+      "actual": {
+        "select_allowed": true
+      }
+    },
+    {
+      "name": "reader_insert_rejected_without_mutating_shared_state",
+      "passed": true,
+      "seconds": 0.0011425830889493227,
+      "actual": {
+        "sqlstate": "42501",
+        "shared_state_unchanged": true
+      }
+    },
+    {
+      "name": "reader_sequence_view_rejected_without_advancing_sequence",
+      "passed": true,
+      "seconds": 0.004099917015992105,
+      "actual": {
+        "simple_and_prepared_sqlstate": "42501",
+        "sequence_unchanged": true,
+        "reader_connection_reusable": true
+      }
+    },
+    {
+      "name": "writer_rejects_direct_filename",
+      "passed": true,
+      "seconds": 0.0004125830018892884,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "writer_rejects_cte_filename",
+      "passed": true,
+      "seconds": 0.00040470901876688004,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "writer_rejects_derived_filename",
+      "passed": true,
+      "seconds": 0.0003820420242846012,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "writer_rejects_scalar_subquery_filename",
+      "passed": true,
+      "seconds": 0.0005529159680008888,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "writer_rejects_describe_filename",
+      "passed": true,
+      "seconds": 0.00028899998869746923,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "writer_rejects_describe_query_filename",
+      "passed": true,
+      "seconds": 0.0003020829753950238,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "writer_rejects_create_view_filename",
+      "passed": true,
+      "seconds": 0.00031879195012152195,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "writer_rejects_create_table_as_filename",
+      "passed": true,
+      "seconds": 0.00026112503837794065,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "writer_rejects_direct_read_function",
+      "passed": true,
+      "seconds": 0.00045012496411800385,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "writer_rejects_table_function_subquery_filename",
+      "passed": true,
+      "seconds": 0.0005560829304158688,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "reader_rejects_direct_filename",
+      "passed": true,
+      "seconds": 0.0005698329769074917,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "reader_rejects_cte_filename",
+      "passed": true,
+      "seconds": 0.0004362909821793437,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "reader_rejects_derived_filename",
+      "passed": true,
+      "seconds": 0.0003975420258939266,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "reader_rejects_scalar_subquery_filename",
+      "passed": true,
+      "seconds": 0.0005273750284686685,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "reader_rejects_describe_filename",
+      "passed": true,
+      "seconds": 0.00026350002735853195,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "reader_rejects_describe_query_filename",
+      "passed": true,
+      "seconds": 0.00034799997229129076,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "reader_rejects_create_view_filename",
+      "passed": true,
+      "seconds": 0.00034679099917411804,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "reader_rejects_create_table_as_filename",
+      "passed": true,
+      "seconds": 0.0003204159438610077,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "reader_rejects_direct_read_function",
+      "passed": true,
+      "seconds": 0.0002987920306622982,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "reader_rejects_table_function_subquery_filename",
+      "passed": true,
+      "seconds": 0.000512082944624126,
+      "actual": {
+        "sqlstate": "42501"
+      }
+    },
+    {
+      "name": "file_denials_preserve_connections_and_schema",
+      "passed": true,
+      "seconds": 0.20520737499464303,
+      "actual": {
+        "connections_reusable": true,
+        "rejected_create_had_no_side_effects": true
+      }
+    },
+    {
+      "name": "one_query_capacity_rejects_promptly_and_cancels_long_query",
+      "passed": true,
+      "seconds": 0.256460249889642,
+      "actual": {
+        "capacity_sqlstate": "53300",
+        "capacity_rejection_seconds": 0.0005692919949069619,
+        "timeout_sqlstate": "57014",
+        "simple_cancellation_seconds": 0.25606066710315645
+      }
+    },
+    {
+      "name": "cancelled_connection_and_capacity_slot_are_reusable",
+      "passed": true,
+      "seconds": 0.0010451669804751873,
+      "actual": {
+        "cancelled_connection_reusable": true,
+        "capacity_slot_released": true
+      }
+    },
+    {
+      "name": "prepared_deadline_preserves_failed_transaction_and_close_rollback",
+      "passed": true,
+      "seconds": 0.26238079194445163,
+      "actual": {
+        "prepared_cancellation_seconds": 0.25834541709627956,
+        "failed_transaction_rollback": true,
+        "close_pending_transaction_rollback": true
+      }
+    },
+    {
+      "name": "reviewed_source_and_binary_hashes_stable",
+      "passed": true
+    }
+  ],
+  "versions": {
+    "postgres_protocol": "3.0",
+    "client": "psycopg",
+    "client_version": "3.3.6",
+    "libpq_version": 180006,
+    "platform": "Darwin",
+    "architecture": "arm64",
+    "sslmode": "verify-full",
+    "duckdb_version": "v2.1.0-dev0",
+    "tls_protocol": "TLS verified by libpq"
+  },
+  "hashes": {
+    "sources": {
+      "src/server.cpp": "a20ad52174f0f3e9c30550f610dad456b57ad506003ade6434ea2492a4982148",
+      "src/pgwire.cpp": "33930733e3b37eb431d372fe6751c85c5a4ce600a08376b1639ec9fdc0f46404",
+      "src/scram.cpp": "f2eab5f583e894e418e1563b941458a376693839d918ee931ed47d70f91e053d",
+      "src/access.cpp": "79517dae02865cdebf9698f28e8a754bfab87f488f94d6563842e24508f937ea",
+      "include/duckonwire/pgwire.hpp": "3a90cd6854b322564b565b714fb407c9312126aa1df7ad577afd125dbf824fcc"
+    },
+    "server": "ba9feef20128c77df158607cce1b32b65a21389eb55da24af621d8513f52ca75",
+    "library": "5beb16eb653a59c11a37471da2c4182ffcf882adebb1774e55d6fef2b88b6e39"
+  },
+  "scope": {
+    "endpoint": "local_loopback_only",
+    "owned_temporary_databases_only": true,
+    "native_server": true,
+    "standard_postgresql_driver": true,
+    "python_used_only_as_private_test_harness": true,
+    "external_endpoints_or_credentials_consulted": false,
+    "private_paths_passwords_and_fixture_contents_omitted": true
+  },
+  "permissions": {
+    "reader_select": true,
+    "reader_insert": false,
+    "writer_insert": true,
+    "reader_and_writer_file_references": false
+  },
+  "tested_limits": {
+    "max_active_queries": 1,
+    "query_timeout_ms": 250,
+    "capacity_error_sqlstate": "53300",
+    "deadline_error_sqlstate": "57014",
+    "scope": "native query execution on the PostgreSQL endpoint"
+  },
+  "configured_defaults": {
+    "max_active_queries": 8,
+    "query_timeout_ms": 30000,
+    "verified_by_source_review_only": true
+  },
+  "fixture_removed": true
+}

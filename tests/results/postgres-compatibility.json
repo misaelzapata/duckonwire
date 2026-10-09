@@ -1,0 +1,478 @@
+{
+  "schema_version": 1,
+  "passed": true,
+  "tested_at_utc": "2026-10-09T23:02:23.774968+00:00",
+  "engine": {
+    "version": "v2.1.0-dev0",
+    "source_id": "848126236a"
+  },
+  "native_protocol": {
+    "DuckDB_fork_commit": "848126236a4a8879f232bed7ab5f702683a55300",
+    "Quack_fork_commit": "a6e7cb9243ee3d7ec0e5371b720be3292a32061f",
+    "Quack_protocol": 7,
+    "PostgreSQL_protocol": "3.0",
+    "PostgreSQL_server_version_compatibility_label": "16.0"
+  },
+  "provenance": {
+    "server_sha256": "ba9feef20128c77df158607cce1b32b65a21389eb55da24af621d8513f52ca75",
+    "library_sha256": "5beb16eb653a59c11a37471da2c4182ffcf882adebb1774e55d6fef2b88b6e39",
+    "source_files": {
+      "src/pgwire.cpp": "33930733e3b37eb431d372fe6751c85c5a4ce600a08376b1639ec9fdc0f46404",
+      "src/access.cpp": "79517dae02865cdebf9698f28e8a754bfab87f488f94d6563842e24508f937ea",
+      "src/scram.cpp": "f2eab5f583e894e418e1563b941458a376693839d918ee931ed47d70f91e053d",
+      "src/server.cpp": "a20ad52174f0f3e9c30550f610dad456b57ad506003ade6434ea2492a4982148",
+      "include/duckonwire/pgwire.hpp": "3a90cd6854b322564b565b714fb407c9312126aa1df7ad577afd125dbf824fcc",
+      "include/duckonwire/access.hpp": "f6d0db9d3cb1b96e893bbca4a6b0253b51f6d06f2b619d659e7790d13a3df642",
+      "include/duckonwire/scram.hpp": "fd91339fdfccb7e7d3536e39981050f24f9d5a3ab44b21fa4a648e52c67902a7"
+    },
+    "examples": {
+      "examples/postgres/complex.sql": "73b47c3794887d90c7387d2db1cd304cb4ff828fe1710b33634dc1d3e98ef5ec",
+      "examples/postgres/go/go.mod": "84b1b4415419fd373cdb1e2d2f99bd7126ab55c664bef9ed8bd9fca88eca2d1d",
+      "examples/postgres/go/go.sum": "4e7e05768d607a1cc09d1dbe92d138751e9111200e8eadf2be5d7c99b189e834",
+      "examples/postgres/go/main.go": "2ba9cbc131ba1ff1ec779be408feca00d4b3a840d6ad021c421ea2b1ceb6e6e7",
+      "examples/postgres/python/requirements.txt": "281f4fe5b5deb728449e2e3c762b88249931daebc04f65a098c757ac3f37d80f",
+      "examples/postgres/python/crud.py": "18bef70e5876309e532130d44cc8705eafd2ff405488b6c71488bb5709eef6c6",
+      "examples/postgres/rust/Cargo.toml": "99bf62918e9b65d0bfc3a0324999322be9d80346cb09bae39547209e23813bb3",
+      "examples/postgres/rust/Cargo.lock": "6f74f50500e8ff0df267b245aa4543cb214cdb1305198dce7f7685ae55b35cab",
+      "examples/postgres/java/pom.xml": "33cf6a27a1e881f7c77f5b0c8743415387b5e73dddeae1a37ce386765479dcb6",
+      "examples/postgres/java/Crud.java": "e6824789b49b00b8c7354fae72100fc4a8fd5204b8eef30607037cb212461ed7",
+      "examples/postgres/lua/crud.lua": "0692374faca07995b5dd60ec4a719e23394d33b273a953f1b1cef17b33ae951c",
+      "examples/postgres/cpp/crud.cpp": "6d6245f5590801334b372d39416d3377c16907e1649847c19ddf48391f95a13b",
+      "examples/postgres/swift/Crud.swift": "3bbc5224a947c8e582da25133a0f37a907aa2e4e279c0e68806848184c238e3c",
+      "examples/postgres/csharp/packages.lock.json": "de10eb5131a4dd020c507508247bf7fca64e2841680f5692afee26ac534e924a",
+      "examples/postgres/csharp/Crud.csproj": "a84cce7e0fd6d578e8643392709916c8fbe259ae30c7f0ba28548a9fcc97dac6",
+      "examples/postgres/csharp/Program.cs": "6a24fccce7c6ca572554d968a54484e3b38362e84847c1ff335be488751aec7c",
+      "examples/postgres/node/bulk.mjs": "4915abaffb2a1563afc312a938737da9740c75b1f33d327c691cf989b323db58",
+      "examples/postgres/node/crud.mjs": "34c345146d0d15d76420fc39fd5b9944f91799bfc26f25021343fb0cc497fd92",
+      "examples/postgres/node/package-lock.json": "6af813a91ec3e283811a75b58b6a5fa3f8ae3d43566b0b6a6a06cc2139b226f6",
+      "examples/postgres/node/package.json": "d143059f75c4c5e947f4dce681374787a68fefea2276154e75b7ac6261479a58",
+      "examples/postgres/c/crud.c": "8a1512aa517f41e79daec9a3452b7a19430d6cc557f88af0f9a6d85f4ccae6c7",
+      "examples/postgres/rust/src/main.rs": "42b185f5538a81ee82a63754ea28e0f2afb11cf038c488be79e5e062f6d6167a"
+    }
+  },
+  "transport": {
+    "TLS": "verify-full",
+    "authentication": "SCRAM-SHA-256",
+    "separate_writer_and_reader_accounts": true,
+    "certificate_chain_and_hostname_verified": true
+  },
+  "clients": [
+    {
+      "language": "Node",
+      "package": "pg",
+      "version": "8.16.3",
+      "API": "Client",
+      "stock_driver": true,
+      "DuckDB_client_imported": false,
+      "example": "examples/postgres/node/crud.mjs",
+      "CRUD_runs": 2,
+      "prepared_CRUD": true,
+      "complex_CTE_JOIN_window_aggregate": true,
+      "deep_or_complex_checks": 10,
+      "passed": true
+    },
+    {
+      "language": "Python",
+      "package": "psycopg",
+      "version": "3.3.6",
+      "API": "Connection",
+      "stock_driver": true,
+      "DuckDB_client_imported": false,
+      "example": "examples/postgres/python/crud.py",
+      "CRUD_runs": 2,
+      "prepared_CRUD": true,
+      "complex_CTE_JOIN_window_aggregate": true,
+      "deep_or_complex_checks": 15,
+      "passed": true
+    },
+    {
+      "language": "Java",
+      "package": "PostgreSQL JDBC",
+      "version": "42.7.7",
+      "API": "java.sql.Connection",
+      "stock_driver": true,
+      "DuckDB_client_imported": false,
+      "example": "examples/postgres/java/Crud.java",
+      "CRUD_runs": 2,
+      "prepared_CRUD": true,
+      "complex_CTE_JOIN_window_aggregate": true,
+      "deep_or_complex_checks": 12,
+      "passed": true
+    },
+    {
+      "language": "C",
+      "package": "libpq",
+      "version": "18.3",
+      "API": "PGconn",
+      "stock_driver": true,
+      "DuckDB_client_imported": false,
+      "example": "examples/postgres/c/crud.c",
+      "CRUD_runs": 2,
+      "prepared_CRUD": true,
+      "complex_CTE_JOIN_window_aggregate": true,
+      "deep_or_complex_checks": 117,
+      "passed": true
+    },
+    {
+      "language": "C++",
+      "package": "libpq",
+      "version": "18.3",
+      "API": "PGconn",
+      "stock_driver": true,
+      "DuckDB_client_imported": false,
+      "example": "examples/postgres/cpp/crud.cpp",
+      "CRUD_runs": 2,
+      "prepared_CRUD": true,
+      "complex_CTE_JOIN_window_aggregate": true,
+      "deep_or_complex_checks": 1,
+      "passed": true
+    },
+    {
+      "language": "Go",
+      "package": "pgx/v5",
+      "version": "5.7.6",
+      "API": "pgx.Conn",
+      "stock_driver": true,
+      "DuckDB_client_imported": false,
+      "example": "examples/postgres/go/main.go",
+      "CRUD_runs": 2,
+      "prepared_CRUD": true,
+      "complex_CTE_JOIN_window_aggregate": true,
+      "deep_or_complex_checks": 5,
+      "passed": true
+    },
+    {
+      "language": "Rust",
+      "package": "tokio-postgres",
+      "version": "0.7.15",
+      "API": "Client",
+      "stock_driver": true,
+      "DuckDB_client_imported": false,
+      "example": "examples/postgres/rust/src/main.rs",
+      "CRUD_runs": 2,
+      "prepared_CRUD": true,
+      "complex_CTE_JOIN_window_aggregate": true,
+      "deep_or_complex_checks": 5,
+      "passed": true
+    },
+    {
+      "language": "C#",
+      "package": "Npgsql",
+      "version": "8.0.8",
+      "API": "NpgsqlConnection",
+      "stock_driver": true,
+      "DuckDB_client_imported": false,
+      "example": "examples/postgres/csharp/Program.cs",
+      "CRUD_runs": 2,
+      "prepared_CRUD": true,
+      "complex_CTE_JOIN_window_aggregate": true,
+      "deep_or_complex_checks": 13,
+      "passed": true
+    },
+    {
+      "language": "Swift",
+      "package": "libpq",
+      "version": "18.3",
+      "API": "PGconn C interop",
+      "stock_driver": true,
+      "DuckDB_client_imported": false,
+      "example": "examples/postgres/swift/Crud.swift",
+      "CRUD_runs": 2,
+      "prepared_CRUD": true,
+      "complex_CTE_JOIN_window_aggregate": true,
+      "deep_or_complex_checks": 1,
+      "passed": true
+    },
+    {
+      "language": "Lua",
+      "package": "libpq",
+      "version": "18.3",
+      "API": "PGconn LuaJIT FFI",
+      "stock_driver": true,
+      "DuckDB_client_imported": false,
+      "example": "examples/postgres/lua/crud.lua",
+      "CRUD_runs": 2,
+      "prepared_CRUD": true,
+      "complex_CTE_JOIN_window_aggregate": true,
+      "deep_or_complex_checks": 1,
+      "passed": true
+    }
+  ],
+  "normal_CRUD": {
+    "languages": 10,
+    "runs": 20,
+    "persistent_rows": 10,
+    "other_clients_preserved_after_each_run": true
+  },
+  "security": {
+    "passed": true,
+    "checks": 44,
+    "ten_driver_negatives": {
+      "reader_write_denied": 10,
+      "wrong_password_denied": 10,
+      "wrong_database_denied": 10,
+      "untrusted_certificate_denied": 10
+    },
+    "reader_SQLSTATE": "42501",
+    "reader_committed_SELECT_passed": true,
+    "hostname_mismatch_rejected": true,
+    "negative_attempts_left_rows_unchanged": true
+  },
+  "psql": {
+    "version": "18.3",
+    "simple_query_complex_select_passed": true
+  },
+  "original_DuckDB_clients": {
+    "existing_assets_SHA_unchanged": 18,
+    "installations_replaced": false,
+    "scope": "The eighteen retained DuckDB native driver/library assets were rehashed before and after these stock PostgreSQL client tests."
+  },
+  "bulk": {
+    "psycopg": {
+      "driver_version": "3.3.6",
+      "rows": 2000000,
+      "writer_count": 4,
+      "reader_count": 4,
+      "commits": 80,
+      "write_seconds": 0.4819180000340566,
+      "rows_per_second": 4150083.6238917457,
+      "read_latency": {
+        "samples": 322,
+        "mean_ms": 6.052543588853239,
+        "p50_ms": 3.898374969139695,
+        "p95_ms": 15.396457980386913,
+        "max_ms": 24.244750034995377
+      },
+      "engine_config": {
+        "threads": 2,
+        "memory_limit": "1.0 GiB"
+      },
+      "separate_read_only_role": true,
+      "readers": [
+        {
+          "reader": 0,
+          "queries": 86,
+          "overlapping_queries": 85,
+          "by_query": {
+            "point_join": {
+              "samples": 22,
+              "mean_ms": 3.4616648335941136
+            },
+            "group_join": {
+              "samples": 22,
+              "mean_ms": 11.78930877623233
+            },
+            "CTE_window": {
+              "samples": 21,
+              "mean_ms": 4.310063474501173
+            },
+            "count_checksum": {
+              "samples": 21,
+              "mean_ms": 3.1822977221703956
+            }
+          }
+        },
+        {
+          "reader": 1,
+          "queries": 78,
+          "overlapping_queries": 77,
+          "by_query": {
+            "point_join": {
+              "samples": 20,
+              "mean_ms": 3.177147946553305
+            },
+            "group_join": {
+              "samples": 20,
+              "mean_ms": 12.426883389707655
+            },
+            "CTE_window": {
+              "samples": 19,
+              "mean_ms": 5.439815656772177
+            },
+            "count_checksum": {
+              "samples": 19,
+              "mean_ms": 3.4712345069764474
+            }
+          }
+        },
+        {
+          "reader": 2,
+          "queries": 78,
+          "overlapping_queries": 77,
+          "by_query": {
+            "point_join": {
+              "samples": 20,
+              "mean_ms": 3.677820786833763
+            },
+            "group_join": {
+              "samples": 20,
+              "mean_ms": 13.218927109846845
+            },
+            "CTE_window": {
+              "samples": 19,
+              "mean_ms": 5.034857313148677
+            },
+            "count_checksum": {
+              "samples": 19,
+              "mean_ms": 3.1097827442480543
+            }
+          }
+        },
+        {
+          "reader": 3,
+          "queries": 80,
+          "overlapping_queries": 79,
+          "by_query": {
+            "point_join": {
+              "samples": 20,
+              "mean_ms": 3.7853104469832033
+            },
+            "group_join": {
+              "samples": 20,
+              "mean_ms": 13.086893712170422
+            },
+            "CTE_window": {
+              "samples": 20,
+              "mean_ms": 4.176370793720707
+            },
+            "count_checksum": {
+              "samples": 20,
+              "mean_ms": 3.05064165731892
+            }
+          }
+        }
+      ],
+      "integrity_before_restart": {
+        "actual": [
+          2000000,
+          2000000,
+          0,
+          1999999,
+          1999999000000,
+          19999000000,
+          5999997000000
+        ],
+        "expected": [
+          2000000,
+          2000000,
+          0,
+          1999999,
+          1999999000000,
+          19999000000,
+          5999997000000
+        ],
+        "passed": true
+      },
+      "integrity_after_restart": {
+        "passed": true,
+        "actual": [
+          2000000,
+          2000000,
+          0,
+          1999999,
+          1999999000000,
+          19999000000,
+          5999997000000
+        ],
+        "expected": [
+          2000000,
+          2000000,
+          0,
+          1999999,
+          1999999000000,
+          19999000000,
+          5999997000000
+        ]
+      },
+      "complex_result_checks": {
+        "group_join_exact": true,
+        "window_CTE_exact": true,
+        "group_rows": 20,
+        "window_actual": [
+          256,
+          1520737920
+        ],
+        "window_expected": [
+          256,
+          1520737920
+        ]
+      },
+      "graceful_shutdown_before_reopen": true,
+      "graceful_shutdown_after_reopen": true,
+      "scope": "One stock Python driver process/eight worker threads/eight independent network connections; actual writer commits and completed reader overlap, setup excluded from timing; native DuckDB owner separate process"
+    },
+    "Node": {
+      "driver_version": "8.16.3",
+      "rows": 2000000,
+      "writers": 4,
+      "readers": 4,
+      "commits": 80,
+      "writeSeconds": 0.48378758400000005,
+      "rowsPerSecond": 4134045.738552893,
+      "readerProgress": [
+        {
+          "queries": 99,
+          "overlappingQueries": 98
+        },
+        {
+          "queries": 105,
+          "overlappingQueries": 104
+        },
+        {
+          "queries": 104,
+          "overlappingQueries": 103
+        },
+        {
+          "queries": 101,
+          "overlappingQueries": 100
+        }
+      ],
+      "readLatency": {
+        "samples": 409,
+        "meanMs": 4.776180095354528,
+        "p50Ms": 3.898124999999993,
+        "p95Ms": 10.78004100000004
+      },
+      "integrity": {
+        "n": "2000000",
+        "distinct_ids": "2000000",
+        "minimum": "0",
+        "maximum": "1999999",
+        "ids": "1999999000000",
+        "amounts": "5999997000000"
+      },
+      "complexResultsVerified": true,
+      "separateReadOnlyRole": true,
+      "engineConfig": {
+        "threads": "2",
+        "memory_limit": "1.0 GiB"
+      },
+      "scope": "Client connections and table setup excluded; one stock Node process and eight independent network connections; completed writes and in-session integrity, no server restart."
+    }
+  },
+  "limits": [
+    "SQL is executed by DuckDB; this does not implement the PostgreSQL engine, full catalogs, ORM compatibility, replication or COPY protocol.",
+    "The listed exact stock driver versions passed; other versions have not been qualified.",
+    "PostgreSQL READ COMMITTED/READ UNCOMMITTED transaction defaults use native DuckDB snapshot isolation; SERIALIZABLE and unsupported transaction options are rejected.",
+    "Quack CONNECT requires a DuckDB engine with remote CONNECT support and compatible Quack protocol; existing stock DuckDB installations are not replaced by PostgreSQL client use.",
+    "Protected mode disables external SQL file/network access; use native local mode for explicitly authorized external data access."
+  ],
+  "environment": {
+    "platform": "macOS",
+    "architecture": "arm64",
+    "OS_version": "26.6.2",
+    "hardware": "Apple M1 Pro",
+    "network": "Loopback TCP, TLS verify-full",
+    "client_processes_per_bulk_run": 1,
+    "connections_per_bulk_run": 8,
+    "native_server_processes_per_bulk_run": 1,
+    "engine_threads": 2,
+    "engine_memory_limit": "1.0 GiB",
+    "batch_rows": 25000,
+    "committed_batches_per_bulk_run": 80,
+    "total_rows_per_bulk_run": 2000000,
+    "row_generation": "Bound INSERT SELECT range batches generated by DuckDB",
+    "timing_scope": "Client connections, table setup, final integrity queries and durable server reopen excluded from the measured writer commit window",
+    "existing_DuckDB_assets_SHA_unchanged": 18
+  }
+}

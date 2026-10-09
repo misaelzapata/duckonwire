@@ -132,7 +132,7 @@ public:
 		if (pipe(pipes) != 0) throw std::runtime_error("Cannot create native server readiness pipe");
 		for (int fd : pipes) fcntl(fd, F_SETFD, FD_CLOEXEC);
 		std::vector<std::string> words {executable_.string(), "--root", root_.string(),
-		    "--database", database_.string(), "--state", state_.string(), "--port", std::to_string(selected_port)};
+		    "--database", database_.string(), "--state", state_.string(), "--port", std::to_string(selected_port), "--pg-port", "0"};
 		if (init_demo) words.push_back("--init-demo");
 		std::vector<char *> arguments;
 		for (auto &word : words) arguments.push_back(word.data());
@@ -170,6 +170,7 @@ public:
 	NativeServer &operator=(const NativeServer &) = delete;
 	~NativeServer() { stop(); }
 	const std::string &endpoint() const { return endpoint_; }
+	int pg_port() const { return pg_port_; }
 	const std::string &token() const { return token_; }
 	pid_t pid() const { return child_; }
 	const fs::path &state() const { return state_; }
@@ -243,19 +244,21 @@ private:
 		config.SetOptionByName("threads", duckdb::Value::BIGINT(2));
 		duckdb::DuckDB database(nullptr, &config);
 		duckdb::Connection reader(database);
-		auto result = reader.Query("SELECT endpoint,token,pid FROM read_json_auto(?)", duckdb::Value(state_.string()));
+		auto result = reader.Query("SELECT endpoint,token,pid,pg_port FROM read_json_auto(?)", duckdb::Value(state_.string()));
 		Check(result);
 		const auto rows = FetchRows(*result);
 		Require(rows.size() == 1, "Native descriptor must contain one server");
 		Require(rows[0][0].GetValue<std::string>() == endpoint_ &&
 		        rows[0][2].GetValue<int64_t>() == child_, "Native descriptor differs from our child");
 		token_ = rows[0][1].GetValue<std::string>();
+		pg_port_ = rows[0][3].GetValue<int>();
+		Require(pg_port_ > 0 && pg_port_ <= 65535, "Native fixture PostgreSQL port is invalid");
 		Require(!token_.empty(), "Native fixture server token is empty");
 	}
 	fs::path root_, database_, executable_, state_;
 	std::string endpoint_, token_, messages_;
 	pid_t child_ = -1;
-	int output_ = -1, status_ = 0;
+	int output_ = -1, status_ = 0, pg_port_ = 0;
 	bool descriptor_owned_ = false, forced_stop_ = false;
 	struct stat descriptor_ {};
 };

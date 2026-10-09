@@ -1,10 +1,12 @@
 DUCKONWIRE THIRD-PARTY NOTICES
-Release 0.2.0-rc.4
+Native notices retained for the 0.2.0-rc.5 source candidate
 
 Duckonwire is MIT licensed. Dependencies retain their own upstream licenses.
 The following complete license texts are collected from pinned source archives
 and package dependencies used by the native and language builds.
 No user database, authentication token, or runtime cache is distributed.
+PostgreSQL example drivers are installed separately, retain their upstream
+licenses, and are not bundled into the native server archive.
 
 
 ==============================================================================
