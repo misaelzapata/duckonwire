@@ -1,0 +1,114 @@
+{
+  "passed": true,
+  "native_used": true,
+  "example_checks_per_run": 8,
+  "example_runs": 2,
+  "checks": [
+    {
+      "name": "missing_token_fails_before_remote_mutation",
+      "passed": true
+    },
+    {
+      "name": "actual_attach_example_run_1",
+      "passed": true
+    },
+    {
+      "name": "owned_remote_fixture_removed_after_run_1",
+      "passed": true
+    },
+    {
+      "name": "actual_attach_example_run_2",
+      "passed": true
+    },
+    {
+      "name": "owned_remote_fixture_removed_after_run_2",
+      "passed": true
+    },
+    {
+      "name": "preexisting_remote_data_preserved",
+      "passed": true
+    },
+    {
+      "name": "attach_unbound_parameter_fails_closed",
+      "passed": true
+    },
+    {
+      "name": "connect_bound_string_with_apostrophe",
+      "passed": true
+    },
+    {
+      "name": "connect_alias_sessions_are_independent",
+      "passed": true
+    },
+    {
+      "name": "connect_alias_reader_retains_snapshot",
+      "passed": true
+    },
+    {
+      "name": "connect_alias_close_rolls_back_pending_write",
+      "passed": true
+    },
+    {
+      "name": "owned_server_graceful_shutdown",
+      "passed": true
+    }
+  ],
+  "schema_version": 1,
+  "platform": {
+    "system": "Darwin",
+    "architecture": "arm64",
+    "os_version": "26.6.2"
+  },
+  "engine_version": "v2.1.0-dev0",
+  "quack_protocol": 7,
+  "dependencies": {
+    "duckdb": "848126236a4a8879f232bed7ab5f702683a55300",
+    "quack": "a6e7cb9243ee3d7ec0e5371b720be3292a32061f",
+    "httpfs": "96a2f2e88e5dd075facbc5a65dc3afd67aa2bb44"
+  },
+  "source_sha256": {
+    "examples/attach.cpp": "2ed539a32b9dc51cc5e0a165f5e7f4085c5b8fd2f9e71ad6fe327a84d17d295f",
+    "tests/attach_tests.cpp": "a6e9cb9be10c43c8e496c3593f3f28099d2df06e356f3f985b87fa61e8bc3d8b",
+    "CMakeLists.txt": "558633baed3c697d3f65a14a3ea1ed38a89654544b80dadfe05fdc404c35d123",
+    "cmake/Package.cmake": "6e664d2e7ecbf7d0492d1038a9d801509cc5160ed18e6e46d042100991bbe69e",
+    "README.md": "654f21734cea1e79445d5654004166d439d1f412f9bca0cc0c47c2d86710881a",
+    "AGENTS.md": "e47362bbf3fd3f07c65add5eedf72e00cbb9d6e8fda9fd100e648ee6e8a4cf08",
+    ".github/workflows/postgres.yml": "6122e0c7554c2ae62ae93eb90a824eff4e9155e5224beb64f59408ef349d34ce",
+    ".github/workflows/docker.yml": "ac038ccf60002bbc1bbd7546860f2c580e1de1371ada189c04de88e7d1f39dca"
+  },
+  "runtime_sha256": {
+    "attach-client": "78aa71e85aaf13d9b132f6832aaebe316a081403c2e746e99d23f733a623e947",
+    "attach-tests": "7b15215591d3c6115855e741306fba049af24a94fcba9b149415b61545254a8a",
+    "duckonwire-server": "ba9feef20128c77df158607cce1b32b65a21389eb55da24af621d8513f52ca75",
+    "libduckdb.dylib": "5beb16eb653a59c11a37471da2c4182ffcf882adebb1774e55d6fef2b88b6e39"
+  },
+  "scope": "Actual native ATTACH reads and local/remote join; CONNECT alias parameterized CRUD and independent transactions against an owned temporary C++ server",
+  "checks_command": "ctest --test-dir build -R native-attach --output-on-failure",
+  "plain_attach_parameter_read_supported": false,
+  "plain_attach_full_crud_qualified": false,
+  "new_example_in_rc5_downloads": false,
+  "limits": [
+    "Use CONNECT for bound parameters, general CRUD and transaction control.",
+    "The tested plain ATTACH prepared read fails because remote pushdown does not supply parameter values.",
+    "The new executables are built from current main; existing rc.5 downloads remain unchanged.",
+    "This is functional acceptance, not a throughput or WAN benchmark."
+  ],
+  "checked_at_utc": "2026-10-10T06:39:06.628597+00:00",
+  "installation": {
+    "passed": true,
+    "installed_sha256": {
+      "bin/attach-client": "0e2f304baea1cff1116f7636322e6e16127f497dead208bbfd4ac33237031907",
+      "bin/attach-tests": "8a6a88b9276918ec78ff1e5461b32cb98a9ccb884bb0021f766b444ae8447a7b",
+      "bin/duckonwire-server": "31bf59fae033347c9df525b84d314323a6b6e96f9becbe2482ad414a22ea2e6f",
+      "lib/libduckdb.dylib": "5beb16eb653a59c11a37471da2c4182ffcf882adebb1774e55d6fef2b88b6e39"
+    },
+    "loader_overrides_unset": true,
+    "attach_client_uses_relative_library_rpath": true,
+    "paired_engine_library_sha_matches_build": true,
+    "owned_fixture_directory_empty_after_test": true,
+    "temporary_install_tree_removed_after_validation": true,
+    "checks": 12,
+    "example_runs": 2,
+    "scope": "Installed native executables and their paired library; no loader overrides"
+  }
+}

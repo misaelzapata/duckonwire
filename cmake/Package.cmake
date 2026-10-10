@@ -99,7 +99,7 @@ package_run("Native runtime installation" "${SOURCE_DIR}" "${CMAKE_COMMAND}"
   --install "${BUILD_DIR}" --prefix "${bundle}" --config Release)
 package_run("Native test installation" "${SOURCE_DIR}" "${CMAKE_COMMAND}"
   --install "${BUILD_DIR}" --prefix "${bundle}" --config Release --component Tests)
-foreach(program duckonwire-server duckonwire-password cpp-crud-client c-crud-client transaction-flow native-tests pgwire-protocol-tests access-tests scram-tests duckonwire-benchmark)
+foreach(program duckonwire-server duckonwire-password cpp-crud-client c-crud-client transaction-flow attach-client native-tests attach-tests pgwire-protocol-tests access-tests scram-tests duckonwire-benchmark)
   if(NOT EXISTS "${bundle}/bin/${program}")
     package_fail("Required installed native program is missing: ${program}")
   endif()
@@ -117,6 +117,12 @@ if(NOT native_result)
 endif()
 file(MAKE_DIRECTORY "${bundle}/share/duckonwire")
 file(WRITE "${bundle}/share/duckonwire/native-acceptance.json" "${native_result}\n")
+package_run("Installed native ATTACH acceptance" "${bundle}" ${clean_env}
+  "${bundle}/bin/attach-tests" --server "${bundle}/bin/duckonwire-server"
+  --client "${bundle}/bin/attach-client" --fixture-parent "${staging}/test-fixtures")
+string(STRIP "${package_stdout}" attach_result)
+package_require_checks("${attach_result}" 12 "Installed native ATTACH acceptance")
+file(WRITE "${bundle}/share/duckonwire/attach-acceptance.json" "${attach_result}\n")
 package_run("Installed PostgreSQL protocol acceptance" "${bundle}" ${clean_env}
   "${bundle}/bin/pgwire-protocol-tests" --server "${bundle}/bin/duckonwire-server"
   --fixture-parent "${staging}/test-fixtures")
@@ -158,6 +164,7 @@ string(JSON manifest SET "${manifest}" version "\"${VERSION}\"")
 string(JSON manifest SET "${manifest}" platform "\"${PLATFORM}\"")
 string(JSON manifest SET "${manifest}" source_head "\"${head}\"")
 string(JSON manifest SET "${manifest}" native_acceptance "${native_result}")
+string(JSON manifest SET "${manifest}" native_attach_acceptance "${attach_result}")
 string(JSON manifest SET "${manifest}" pgwire_acceptance "${pgwire_result}")
 string(JSON manifest SET "${manifest}" access_acceptance "${access_result}")
 string(JSON manifest SET "${manifest}" scram_acceptance "${scram_result}")

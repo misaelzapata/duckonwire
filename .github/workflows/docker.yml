@@ -50,6 +50,9 @@ jobs:
           docker compose exec -T duckonwire /opt/duckonwire/bin/native-tests \
             --server /opt/duckonwire/bin/duckonwire-server --flow /opt/duckonwire/bin/transaction-flow \
             --catalog /opt/duckonwire/examples/demo | tee test-results/native.json
+          docker compose exec -T duckonwire /opt/duckonwire/bin/attach-tests \
+            --server /opt/duckonwire/bin/duckonwire-server --client /opt/duckonwire/bin/attach-client \
+            --fixture-parent /tmp | tee test-results/attach.json
           docker compose exec -T duckonwire /opt/duckonwire/bin/pgwire-protocol-tests \
             --server /opt/duckonwire/bin/duckonwire-server | tee test-results/pgwire.json
           docker compose exec -T duckonwire /opt/duckonwire/bin/access-tests | tee test-results/access.json

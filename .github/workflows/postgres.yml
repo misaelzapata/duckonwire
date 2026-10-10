@@ -53,6 +53,9 @@ jobs:
           g++ "${flags[@]}" tests/pgwire_protocol_tests.cpp "${libraries[@]}" -o build/bin/pgwire-protocol-tests
           g++ "${flags[@]}" tests/native_tests.cpp "${libraries[@]}" -o build/bin/native-tests
           g++ "${flags[@]}" examples/transaction_flow.cpp "${libraries[@]}" -o build/bin/transaction-flow
+          g++ "${flags[@]}" examples/attach.cpp "${libraries[@]}" -o build/bin/attach-client
+          g++ "${flags[@]}" tests/attach_tests.cpp "${libraries[@]}" -o build/bin/attach-tests
+          sha256sum examples/attach.cpp tests/attach_tests.cpp README.md AGENTS.md >> build/test-results/provenance.sha256
           cc -I"$(pg_config --includedir)" examples/postgres/c/crud.c -L"$(pg_config --libdir)" -lpq -o build/bin/pg-crud
       - name: Verify the guide against the fresh server help
         run: cmake -DSOURCE_DIR="$PWD" -DSERVER_BINARY="$PWD/build/bin/duckonwire-server" -DREPORT_FILE="$PWD/build/test-results/documentation.json" -P cmake/DocumentationTests.cmake
@@ -62,6 +65,7 @@ jobs:
           build/bin/scram-tests | tee build/test-results/scram-authentication.json
           build/bin/pgwire-protocol-tests --server build/bin/duckonwire-server --fixture-parent build/test-results | tee build/test-results/pgwire-protocol.json
           build/bin/native-tests --server build/bin/duckonwire-server --flow build/bin/transaction-flow --catalog examples/demo | tee build/test-results/native.json
+          build/bin/attach-tests --server build/bin/duckonwire-server --client build/bin/attach-client --fixture-parent build/test-results | tee build/test-results/attach.json
       - name: Install ordinary drivers
         run: |
           npm install --prefix examples/postgres/node --ignore-scripts

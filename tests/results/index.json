@@ -37,6 +37,10 @@
     {
       "path": "benchmark-aws.json",
       "sha256": "5e0869542c3fd16b87c86ce0c3b5b739c0e191671c6c6abaca5f068a33a44a76"
+    },
+    {
+      "path": "native-attach.json",
+      "sha256": "2bccc82cbf46cddaaba26860d796b7588962fba347d415583b22ea4e89621ccf"
     }
   ],
   "benchmark_runs": [
@@ -427,5 +431,27 @@
     "version": "0.2.0-rc.4",
     "download_page": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.4",
     "scope": "Quack-only native bundles; immutable assets remain unchanged"
+  },
+  "native_attach": {
+    "result": "native-attach.json",
+    "passed": true,
+    "platform": "macOS ARM64",
+    "acceptance_checks": 12,
+    "example_checks_per_run": 8,
+    "example_runs": 2,
+    "plain_attach_reads_and_local_remote_join": true,
+    "connect_alias_parameterized_crud_and_transactions": true,
+    "plain_attach_parameter_read_supported": false,
+    "plain_attach_full_crud_qualified": false,
+    "new_executables_in_rc5_downloads": false,
+    "example": "examples/attach.cpp",
+    "ctest": "native-attach",
+    "ci_workflows": [
+      ".github/workflows/documentation.yml",
+      ".github/workflows/docker.yml",
+      ".github/workflows/verify.yml"
+    ],
+    "installed_runtime_checks": 12,
+    "installed_runtime_passed": true
   }
 }

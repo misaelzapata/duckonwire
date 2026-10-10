@@ -1,6 +1,6 @@
 # Working on DuckOnWire
 
-DuckOnWire is a native C++ server: one `duckdb::DuckDB` owns one persistent file, with an independent native connection per client session. Read [README.md](README.md) for user setup and [tests/results/index.json](tests/results/index.json) for recorded qualifications.
+DuckOnWire shares a DuckDB file through a C++ server. The server opens the file once; each client gets its own native connection and transaction. Start with [README.md](README.md), and use [tests/results/index.json](tests/results/index.json) to check what has actually been tested.
 
 ## Connections and login
 
@@ -8,9 +8,11 @@ DuckOnWire is a native C++ server: one `duckdb::DuckDB` owns one persistent file
 | --- | --- |
 | Local PostgreSQL, `127.0.0.1:9496` | Stock PostgreSQL driver. `PGPASSWORD` is the server's shared `DUCKONWIRE_TOKEN`; `PGUSER` is a label, not an account or permission boundary. Local examples default to `PGSSLMODE=disable`. Use an encrypted SSH tunnel for remote access. |
 | Protected PostgreSQL | Stock driver with real `PGUSER`, `PGPASSWORD` and the configured `PGDATABASE`. Requires TLS certificate/hostname verification (`PGSSLMODE=verify-full`, `PGSSLROOTCERT`) and SCRAM-SHA-256. Server options: `--access-file`, `--tls-cert`, `--tls-key`, optionally `--pg-host`. Rules grant database-wide `read` or `write` access. |
-| Native Quack, `127.0.0.1:9495` | Real DuckDB connection using `CONNECT`, the paired native engine and Quack protocol 7. HTTPFS/Quack are built in; no `LOAD` or custom connection wrapper. Quack uses the local token and stays on loopback, including in protected mode. |
+| Native Quack, `127.0.0.1:9495` | A DuckDB connection using `ATTACH` or `CONNECT`, the paired native engine and Quack protocol 7. HTTPFS/Quack are built in. Quack uses the local token and stays on loopback, including in protected mode. |
 
-PostgreSQL clients do not import, replace or change an existing client DuckDB installation. SQL still runs in DuckDB; do not promise full PostgreSQL SQL, catalogs, ORM or `COPY` compatibility. Published bundle capabilities and historical binding results must be checked separately from current source.
+PostgreSQL clients use their usual driver and leave an existing DuckDB installation alone. Queries still use DuckDB SQL; full PostgreSQL catalogs, ORMs and network `COPY` are not supported. Check the version in each result before applying it to a different release.
+
+`ATTACH 'quack:127.0.0.1:9495' AS remote (TOKEN '...')` makes remote tables available as `remote.main.table_name`, so a client can join them with local tables. `CONNECT remote` sends subsequent SQL and transactions to the server. Use that route for parameterized SQL and general CRUD: plain `ATTACH` does not transport bound parameters in the tested remote-read path, has incomplete UPDATE/DELETE fallback paths and can cache schema metadata. Do not turn an ATTACH read test into a claim of full CRUD compatibility. The [ATTACH example](examples/attach.cpp) uses synthetic rows and removes its own table when finished.
 
 Quack is trusted local access: PostgreSQL's per-user read/write rules and query limits do not apply to that endpoint.
 
@@ -44,6 +46,8 @@ cmake -DSOURCE_DIR=. -DSERVER_BINARY=build/bin/duckonwire-server -P cmake/Docume
 ```
 
 CTest covers native sessions/transactions, PostgreSQL protocol, access rules, SCRAM, concurrent smoke and bootstrap regressions. The [CI workflow](.github/workflows/verify.yml) adds the two-million-row native benchmark and installed-package relocation checks. Run relevant checks after changes; do not repeat expensive workloads without a material reason or measure performance while another build/load is running.
+
+The `native-attach` CTest runs the actual `attach-client` against its own temporary server. It checks remote reads, a join with local data, `CONNECT remote`, parameterized changes, transactions and cleanup. To run just this example's checks, build `attach-client` and `attach-tests`, then use `ctest --test-dir build -R native-attach --output-on-failure`. This executable is added on main; the existing rc.5 downloads predate it.
 
 The [documentation workflow](.github/workflows/documentation.yml) checks guide links and actual server options, then runs native transactions, local/protected stock-driver login and concurrent client ingestion with complex reads. External S3/R2 credentials are not required by this workflow; consult the separately recorded cloud evidence.
 
