@@ -12,7 +12,7 @@ Share one persistent DuckDB database through a C++ server. Connect with a normal
 - **Read while writers work:** independent sessions and snapshot isolation.
 - **Keep your data:** commits persist; disconnecting rolls back pending writes.
 
-[Download rc.5](https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.5) · [Tutorial](#tutorial) · [Examples](#examples-and-tests) · [MIT](LICENSE)
+[Download rc.5](https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.5) · [Docker](#try-with-docker) · [Tutorial](#tutorial) · [Examples](#examples-and-tests) · [MIT](LICENSE)
 
 ## Tutorial
 
@@ -20,6 +20,7 @@ Choose the connection that fits your application:
 
 | I want to… | Choose | What I configure |
 | --- | --- | --- |
+| Try it with Docker | [Docker demo](#try-with-docker) | Docker Compose; accounts and local TLS are created automatically |
 | Try it on my computer | [Local PostgreSQL connection](#connect) | A shared password; your normal PostgreSQL driver |
 | Give people access over a network | [Protected PostgreSQL connection](#public-access) | A username, password and a trusted server certificate |
 | Use DuckDB's native connection API | [Quack connection](#native-connections-clear-transactions) | The paired DuckDB engine, endpoint and local token |
@@ -27,6 +28,29 @@ Choose the connection that fits your application:
 | Read objects from S3 or R2 | [Object storage](#s3-and-cloudflare-r2) | Trusted local access and, for private objects, your own cloud credentials |
 
 Start with the local example. The protected option uses the same ordinary **username-and-password login**; TLS and SCRAM are handled by the driver. You do not build a separate login screen or call a project-specific client API.
+
+## Try with Docker
+
+Clone this repository and run these commands from its folder. The first build compiles the native engine for your machine and takes several minutes:
+
+```sh
+docker compose up --build -d
+docker compose exec -T duckonwire psql -X -v ON_ERROR_STOP=1 <<'SQL'
+CREATE TABLE IF NOT EXISTS inventory(id INTEGER PRIMARY KEY, name VARCHAR, stock INTEGER);
+INSERT INTO inventory VALUES(1, 'Coffee', 3) ON CONFLICT DO NOTHING;
+UPDATE inventory SET stock = stock + 1 WHERE id = 1;
+SELECT name, stock FROM inventory;
+SQL
+```
+
+Docker creates separate `writer` and `reader` accounts with private random passwords and verified local TLS. The included `psql` reads its saved login automatically. Try the reader:
+
+```sh
+docker compose exec -e PGUSER=reader duckonwire psql -X -c 'SELECT name, stock FROM inventory'
+docker compose stop
+```
+
+The named volume preserves your database across stops and restarts. The published port is local only (`127.0.0.1:9496`); use the [public-access setup](#public-access) for your own network deployment. The [Docker workflow](.github/workflows/docker.yml) checks native AMD64 and ARM64 containers, transactions, permissions, persistence and concurrent client inserts. Docker files are available on the main branch; the frozen rc.5 bundles use the setup below.
 
 ## Connect
 
@@ -385,6 +409,8 @@ The native server, examples and tests live here; engine changes live in the [Duc
 
 DuckOnWire permite compartir una base DuckDB mediante un servidor C++. Puedes usar tu driver PostgreSQL habitual sin cambiar DuckDB en los clientes, o Quack con el motor nativo compatible. El [tutorial](#tutorial) recorre estas opciones:
 
+Para probar con Docker, clona el repositorio y ejecuta `docker compose up --build -d`. El [ejemplo](#try-with-docker) inserta, actualiza y lee con `psql`; las cuentas y TLS se configuran automáticamente y la base persiste en un volumen.
+
 1. **Probar en tu máquina:** inicia el servidor y ejecuta un ejemplo con la misma contraseña. En este modo la contraseña es compartida; el nombre de usuario no crea permisos separados.
 2. **Dar acceso por red:** configura cuentas reales de lectura o escritura y un certificado. El login sigue siendo **usuario y contraseña**. TLS cifra la conexión y verifica el servidor; SCRAM comprueba la contraseña sin enviarla. El driver se encarga de ambos.
 3. **Usar Quack nativo:** ejecuta los clientes incluidos con el endpoint y token local. No necesitas cargar extensiones manualmente, pero sí un motor compatible.
@@ -395,4 +421,4 @@ Todas las opciones del servidor están en la [referencia desplegable](#server-op
 
 ## 中文
 
-DuckOnWire 通过原生 C++ 服务器共享 DuckDB。普通 PostgreSQL 驱动无需更换客户端 DuckDB；Quack 原生连接需要匹配的引擎与协议 7。两种连接共享数据库，各自保持独立事务。兼容表区分实测版本与历史结果。rc.5 下载包包含 PostgreSQL 和 Quack，无需自行编译。公开接口使用 TLS 与 SCRAM，并提供数据库读写权限和查询限制。SQL 与存储仍使用 DuckDB。实验项目，MIT 许可。
+DuckOnWire 通过原生 C++ 服务器共享 DuckDB。普通 PostgreSQL 驱动无需更换客户端 DuckDB；Quack 原生连接需要匹配的引擎与协议 7。两种连接共享数据库，各自保持独立事务。兼容表区分实测版本与历史结果。rc.5 下载包包含 PostgreSQL 和 Quack，无需自行编译。也可克隆仓库后运行 `docker compose up --build -d`，自动配置本地账号与 TLS，数据库保存在持久卷中。公开接口使用 TLS 与 SCRAM，并提供数据库读写权限和查询限制。SQL 与存储仍使用 DuckDB。实验项目，MIT 许可。

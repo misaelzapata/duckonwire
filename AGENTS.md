@@ -29,6 +29,8 @@ Set passwords through environment variables or protected input. Never put creden
 
 Public build tooling is CMake/C++; ordinary Python/Lua client examples remain welcome. Do not introduce a custom SDK or Python build orchestration.
 
+For the [Docker demo](README.md#try-with-docker), use `docker compose up --build -d` and `docker compose exec duckonwire psql -X -c 'SELECT 42'`. The image builds for its native host architecture; check the [Docker workflow](.github/workflows/docker.yml) before claiming AMD64/ARM64 runtime acceptance. The named volume has one native owner, private generated accounts and local verified TLS. `docker compose stop` preserves its database. Never log the volume's passwords or private keys, and remove only task-owned test volumes.
+
 From the repository root, with CMake 3.24+, Ninja, C++17, Git and OpenSSL/libcurl development files:
 
 ```sh

@@ -1,0 +1,26 @@
+services:
+  duckonwire:
+    image: duckonwire-local:latest
+    build:
+      context: .
+      args:
+        BUILD_JOBS: ${DUCKONWIRE_BUILD_JOBS:-2}
+    ports:
+      - "127.0.0.1:${DUCKONWIRE_PORT:-9496}:9496"
+    environment:
+      # Empty values generate private random passwords on the first start.
+      DUCKONWIRE_PASSWORD: ${DUCKONWIRE_PASSWORD:-}
+      DUCKONWIRE_READER_PASSWORD: ${DUCKONWIRE_READER_PASSWORD:-}
+    volumes:
+      - duckonwire-data:/var/lib/duckonwire
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=128m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 40s
+volumes:
+  duckonwire-data:
