@@ -1,0 +1,46 @@
+{
+  "passed": true,
+  "checked_at": "2026-10-10T20:55:36.836046+00:00",
+  "source_sha256": {
+    "scripts/install.sh": "b0912c76f82b0ebfafd2794125575f10f5c062846076346dd3697487a8fadd60",
+    "tests/install_smoke.sh": "bb8876565e06fc823cef34f059d8724c882c047f1b9c9fe283eb102e93d28557"
+  },
+  "smoke": {
+    "passed": true,
+    "checks": 19,
+    "real_native_bundle_prepared": true,
+    "native_Linux_execution_tested": false
+  },
+  "verified_cases": [
+    "POSIX shell syntax/help",
+    "Full install at a new prefix containing spaces",
+    "Existing populated and empty directories preserved",
+    "Existing symlink preserved",
+    "Archive and manifest hash failures",
+    "Unknown/duplicate checksum paths rejected without opening them",
+    "Archive symlink/repeated path/wrong root rejected before extraction",
+    "Missing library rejected without creating target",
+    "Unsupported target and version/option rejected",
+    "Download failure cleanup",
+    "Published archive installed from empty folder; server bytes and manifest match",
+    "Automatic mode rejects actual macOS without creating a destination"
+  ],
+  "fixture_cleanup_complete": true,
+  "limitations": [
+    "Explicit --platform is preparation-only and never executes foreign binaries.",
+    "Published Ubuntu24/x86-64-v3 bundle installed as files on macOS; no Linux ELF runtime qualification claimed.",
+    "Automatic Linux installation checks CPU flags/glibc then invokes the actual verified native server --help; real Linux execution remains to be checked by the parent after its isolated CPU lane.",
+    "No global PATH modification, root requirement, existing-directory upgrade or overwrite."
+  ],
+  "published_asset": {
+    "version": "0.3.0",
+    "tag": "v0.3.0",
+    "source_head": "806c500f963bff258fc04677e9bafe98c65cdc0a",
+    "archive": "duckonwire-0.3.0-linux-x86_64-v3.tar.gz",
+    "archive_sha256": "50f43d9dd4154ec206c500ac560190e78fc4f9472048a03850dd2228367c94f7",
+    "manifest_sha256": "e73b1e7bb5829e8a076a44e81da73706811fe307040206c4b5bf37373aef4ad2"
+  },
+  "scope": "POSIX installer fixture checks and exact published0.3.0 bundle prepared from an empty folder on macOS. Foreign ELF execution is excluded; current native CI separately runs automatic Linux installation and real server --help.",
+  "CI_fixture_checks": 18,
+  "CI_native_checks_counted": false
+}

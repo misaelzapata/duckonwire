@@ -127,7 +127,7 @@ package_run("Installed PostgreSQL protocol acceptance" "${bundle}" ${clean_env}
   "${bundle}/bin/pgwire-protocol-tests" --server "${bundle}/bin/duckonwire-server"
   --fixture-parent "${staging}/test-fixtures")
 string(REGEX MATCH "\\{\"passed\":true,[^\r\n]*\\}" pgwire_result "${package_stdout}")
-package_require_checks("${pgwire_result}" 37 "Installed PostgreSQL protocol acceptance")
+package_require_checks("${pgwire_result}" 40 "Installed PostgreSQL protocol acceptance")
 file(WRITE "${bundle}/share/duckonwire/pgwire-acceptance.json" "${pgwire_result}\n")
 package_run("Installed access rule acceptance" "${bundle}" ${clean_env}
   "${bundle}/bin/access-tests" --fixture-parent "${staging}/test-fixtures")

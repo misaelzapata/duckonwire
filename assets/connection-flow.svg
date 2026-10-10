@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="470" viewBox="0 0 960 470" role="img" aria-labelledby="title description">
+  <title id="title">How applications connect to DuckOnWire</title>
+  <desc id="description">Applications use standard PostgreSQL drivers. Neon uses read-only foreign tables. Compatible native DuckDB clients use the separate loopback Quack endpoint. All connect to one DuckOnWire server, which owns the DuckDB file and gives clients separate sessions.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 8 4 0 8Z" fill="#1678ba"/></marker>
+  </defs>
+  <rect width="960" height="470" rx="24" fill="#f6f9fc"/>
+  <g font-family="Arial, Helvetica, sans-serif" fill="#16364d">
+    <text x="30" y="48" font-size="27" font-weight="700">Connect your apps. Keep the file in DuckDB.</text>
+    <text x="30" y="80" font-size="17" fill="#526878">Choose a standard PostgreSQL driver, or DuckDB's compatible native API.</text>
+    <g fill="#fff" stroke="#c4d8e6" stroke-width="2">
+      <rect x="30" y="125" width="224" height="91" rx="16"/>
+      <rect x="30" y="237" width="224" height="91" rx="16"/>
+      <rect x="30" y="349" width="224" height="70" rx="16"/>
+      <rect x="344" y="124" width="300" height="241" rx="20" fill="#e5f1fa" stroke="#1678ba"/>
+    </g>
+    <text x="48" y="156" font-size="21" font-weight="700">Your application</text>
+    <text x="48" y="183" font-size="16">A stock PostgreSQL driver</text>
+    <text x="48" y="204" font-size="15" fill="#526878">Read, write, transact</text>
+    <text x="48" y="268" font-size="21" font-weight="700">Neon</text>
+    <text x="48" y="295" font-size="16">postgres_fdw</text>
+    <text x="48" y="316" font-size="15" fill="#526878">Read-only foreign tables</text>
+    <text x="48" y="379" font-size="20" font-weight="700">DuckDB's native API</text>
+    <text x="48" y="403" font-size="15" fill="#526878">Compatible engine required</text>
+    <text x="367" y="155" font-size="23" font-weight="700">DoW server</text>
+    <g transform="translate(590 144)">
+      <ellipse cx="0" cy="2" rx="13" ry="10" fill="#f6cf3b"/>
+      <circle cx="7" cy="-7" r="8" fill="#f6cf3b"/>
+      <path d="M13-8 23-5 13-2Z" fill="#d88b22"/>
+      <circle cx="9" cy="-9" r="1.5" fill="#16364d"/>
+    </g>
+    <rect x="367" y="174" width="254" height="82" rx="12" fill="#fff"/>
+    <text x="383" y="201" font-size="19" font-weight="700">PostgreSQL · 9496</text>
+    <text x="383" y="225" font-size="15">Local shared password, or</text>
+    <text x="383" y="246" font-size="15">verified TLS + user accounts</text>
+    <rect x="367" y="278" width="254" height="66" rx="12" fill="#fff"/>
+    <text x="383" y="305" font-size="19" font-weight="700">Native Quack · 9495</text>
+    <text x="383" y="329" font-size="15">Loopback + local token</text>
+    <g fill="none" stroke="#1678ba" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)">
+      <path d="M254 171H367"/>
+      <path d="M254 283H299V230H367"/>
+      <path d="M254 385H318V310H367"/>
+      <path d="M644 245H748"/>
+    </g>
+    <g stroke="#1678ba" stroke-width="2">
+      <path d="M748 205V286C748 311 920 311 920 286V205Z" fill="#fff"/>
+      <ellipse cx="834" cy="205" rx="86" ry="23" fill="#e5f1fa"/>
+    </g>
+    <text x="834" y="251" text-anchor="middle" font-size="23" font-weight="700">DuckDB file</text>
+    <text x="834" y="278" text-anchor="middle" font-size="16">.duckdb</text>
+    <text x="834" y="333" text-anchor="middle" font-size="16">Only the server</text>
+    <text x="834" y="355" text-anchor="middle" font-size="16">opens this file.</text>
+    <text x="494" y="391" text-anchor="middle" font-size="16">One owner, separate sessions</text>
+    <text x="480" y="447" text-anchor="middle" font-size="16" fill="#526878">Applications connect to the owner instead of opening its database file.</text>
+  </g>
+</svg>

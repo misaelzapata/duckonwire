@@ -19,10 +19,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Check guide links, anchors and code fences
         run: cmake -DSOURCE_DIR="$PWD" -DREPORT_FILE="$PWD/build/documentation.json" -P cmake/DocumentationTests.cmake
+      - name: Check the shell installer
+        run: sh tests/install_smoke.sh > build/installer.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: documentation-structure
-          path: build/documentation.json
+          path: |
+            build/documentation.json
+            build/installer.json
           if-no-files-found: error
   executable-tutorial:
     needs: guide

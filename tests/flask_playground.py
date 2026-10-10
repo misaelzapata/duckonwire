@@ -282,6 +282,21 @@ def run():
         check("brand movement matches ordered history for " + name,
               answer(prefix + complex_presets["brand_movement"].removeprefix("WITH ")) ==
               answer(prefix + movement_reference.removeprefix("WITH ")))
+    nullable_history = (
+        "WITH products(id,name,brand,country_code) AS (VALUES "
+        "(1,'First missing','A','AR'),(2,'Last missing','B','ES'),(3,'All missing','C','ES')), "
+        "prices(id,product_id,price,day) AS (VALUES "
+        "(1,1,CAST(NULL AS DECIMAL(18,2)),DATE '2026-01-01'),(2,1,10.00,DATE '2026-01-02'),"
+        "(3,2,10.00,DATE '2026-01-01'),(4,2,NULL,DATE '2026-01-02'),"
+        "(5,3,NULL,DATE '2026-01-01'),(6,3,NULL,DATE '2026-01-02')), "
+    )
+    for name, prefix in (("NULL first, last and all prices", nullable_history),
+                         ("NULL prices with tied missing dates", nullable_history
+                          .replace("DATE '2026-01-01'", "CAST(NULL AS DATE)")
+                          .replace("DATE '2026-01-02'", "CAST(NULL AS DATE)"))):
+        check("brand movement preserves selected " + name,
+              answer(prefix + complex_presets["brand_movement"].removeprefix("WITH ")) ==
+              answer(prefix + movement_reference.removeprefix("WITH ")))
     response = client.post("/query", json={"sql": "SELECT i FROM range(10000) t(i)", "limit": 200})
     body = response.get_json()
     check("database-side cap preserves exactly 200 requested rows", response.status_code == 200

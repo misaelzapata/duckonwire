@@ -45,6 +45,10 @@
     {
       "path": "neon-integration.json",
       "sha256": "3c085d84623e6d8302bb1bfe819a2aa16b0d02a537faaa2068da405103f24370"
+    },
+    {
+      "path": "installer.json",
+      "sha256": "9b0fd48d0257f126de5bce4047d57856e7335cba0eca2179163ee6ab30688505"
     }
   ],
   "benchmark_runs": [
@@ -701,14 +705,14 @@
   },
   "updated_utc": "2026-10-10T16:46:50.422901+00:00",
   "performance_20261010": {
-    "status": "in progress",
+    "status": "Final source locally passed; fresh current Linux CI and deployment pending",
     "duckdb_fork_commit": "0cfb63a5f712fadf06a0de33217b7b03666ae66b",
     "canonical_patch_sha256": "62f0ad0faf0543d7e8c30591a6e5b0cb8e72398bc34fa8ef177b16df685de7d4",
     "native_tree_from_patch_verified": true,
     "local_engine_differential_checks": 248,
     "all_native_timing_evaluations_equal": 700,
     "local_combined_server_checks": {
-      "Flask": 89,
+      "Flask": 91,
       "stock_Node_complex_queries": 10,
       "client_insert_rows": 2000000,
       "bound_values": 6000000,
@@ -718,12 +722,25 @@
       "all_four_readers_overlapped": true,
       "all_ten_complex_queries_overlapped": true,
       "in_session_integrity_passed": true,
-      "two_million_durable_reopen_tested": false
+      "two_million_durable_reopen_tested": false,
+      "native_protocol_functional": 40,
+      "actual_native_owner_loads_verified": 3
     },
-    "scope": "Apple M1 Pro, macOS ARM64, private incremental engine builds. The server used verified TLS and a read-only account. Fresh CI/current source and small-memory AWS mixed workload are pending. The protected parse-admission/template change is not covered yet.",
+    "scope": "Exact adopted public source on Apple M1 Pro/macOSARM64 with private incremental engine848+two-site grammar changes. Library metadata retains848; fresh source0cf Linux CI is a separate gate. Loopback verifiedTLS, stockNodepg8.16.3, engine2workers/1GiB.",
     "all_queries_under_10ms": false,
     "deployed": false,
     "result_file": "performance.json",
-    "result_sha256": "4e2470bd479ce28a88125027f2f3bb86b8d19dd9250b9ae5896099a1007e1606"
+    "result_sha256": "02e13e02c131f351fd6a7a56b5b2e6f67469a239ba7430de7b54cfaa4753d53a",
+    "current_source_sha256": "557f8ddacc6cc0c48e649aeb950d1ba6eba07e3b929419644019e378f054f278",
+    "current_local_receipt_sha256": "3ac627d0d772c14f6626e8e274c425307cdde8e2b01587139da6c414da673203",
+    "private_AWS_candidate": {
+      "actual_resource_checks": 55,
+      "independent_review_checks": 80,
+      "owner_memory_MiB": 384,
+      "peak_memory_bytes": 272687104,
+      "all_ten_complex_queries_overlapped": true,
+      "rows": 2000000,
+      "full_Linux_protocol40_qualified": false
+    }
   }
 }

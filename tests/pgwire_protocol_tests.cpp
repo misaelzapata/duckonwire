@@ -862,6 +862,48 @@ int main(int argc, char **argv) {
 			}
 			Require(interrupted > 0, "Cold parse cancellation did not reach an active request");
 		});
+
+		test("protected_select_template_uses_current_catalog_and_parameter_types", [&] {
+			auto writer=protected_fixture.Client(); const std::string sql="SELECT id FROM select_template_later";
+			Require(HasError(writer->Query(sql),"42P01"),"Unbound SELECT should fail before table creation");
+			Require(!Contains(writer->Query("CREATE TABLE select_template_later(id INTEGER)"),'E') &&
+			        !Contains(writer->Query("INSERT INTO select_template_later VALUES(7)"),'E'),"SELECT catalog fixture failed");
+			Require(Scalar(*writer,sql)==7,"Cached syntax retained missing-table failure");
+			Require(!Contains(writer->Query("ALTER TABLE select_template_later ALTER COLUMN id TYPE VARCHAR"),'E'),"SELECT schema alteration failed");
+			const auto changed=writer->Query(sql);Require(!Contains(changed,'E') && Description(changed).size()==1 && Description(changed)[0].second==25 && Rows(changed)[0][0]=="7","Cached SELECT retained old result type");
+			const std::string typed="SELECT $1 AS value,$2::VARCHAR AS label";
+			for(auto oid:{23U,20U,25U}) {
+				writer->Parse("",typed,{oid,25});writer->Bind("","",{oid==23?std::optional<std::string>("42"):oid==20?std::optional<std::string>("1234567890123"):std::nullopt,std::string("Coffee '日本'")});
+				writer->Describe('P',"");writer->Execute("");writer->Message('S');const auto replies=writer->Until("Z");
+				const auto rows=Rows(replies);const auto desc=Description(replies);
+				Require(!Contains(replies,'E') && rows.size()==1 && rows[0][1]=="Coffee '日本'" && desc.size()==2 && desc[0].second==oid,"SELECT syntax cache reused bound values or OIDs");
+				Require(oid==25?!rows[0][0]:rows[0][0]==(oid==23?"42":"1234567890123"),"SELECT parameters changed across private copies");
+			}
+		});
+		test("protected_select_template_preserves_session_snapshot_and_authority", [&] {
+			auto writer=protected_fixture.Client();auto other=protected_fixture.Client();auto reader=protected_fixture.Client("reader");
+			for(auto *session:{writer.get(),other.get()})Require(!Contains(session->Query("CREATE TEMP TABLE select_context(id INTEGER)"),'E'),"Per-session temp fixture failed");
+			Require(!Contains(writer->Query("INSERT INTO select_context VALUES(11)"),'E') && !Contains(other->Query("INSERT INTO select_context VALUES(22)"),'E'),"Temp fixture insert failed");
+			Require(Scalar(*writer,"SELECT id FROM select_context")==11 && Scalar(*other,"SELECT id FROM select_context")==22 && Scalar(*writer,"SELECT id FROM select_context")==11,"Syntax template shared session catalog or values");
+			writer->Query("CREATE TABLE select_snapshot(id INTEGER PRIMARY KEY,value INTEGER)");writer->Query("INSERT INTO select_snapshot VALUES(1,3)");
+			const std::string snapshot="SELECT value FROM select_snapshot WHERE id=1";
+			reader->Query("BEGIN");Require(Scalar(*reader,snapshot)==3,"SELECT reader initial snapshot failed");
+			Require(!Contains(writer->Query("UPDATE select_snapshot SET value=4 WHERE id=1"),'E') && Scalar(*reader,snapshot)==3,"Cached SELECT lost its transaction snapshot");
+			reader->Query("COMMIT");Require(Scalar(*reader,snapshot)==4,"SELECT template kept prior transaction snapshot");
+			writer->Query("CREATE SEQUENCE select_guard_sequence");const std::string effect="SELECT nextval('select_guard_sequence')";
+			Require(Scalar(*writer,effect)==1,"Writer side-effect fixture failed");
+			reader->Parse("deny_cached",effect);reader->Bind("","deny_cached");reader->Execute("");reader->Message('S');
+			Require(HasError(reader->Until("Z"),"42501") && Scalar(*writer,effect)==2 && Scalar(*reader,"SELECT 44")==44,"Copied SELECT syntax bypassed read-only binding or mutated sequence");
+		});
+		test("protected_select_template_eviction_and_uncached_shapes_preserve_results", [&] {
+			auto reader=protected_fixture.Client("reader");
+			for(int round=0;round<2;++round)for(int i=0;i<24;++i)Require(Scalar(*reader,"SELECT "+std::to_string(100+i)+" AS cached_value")==100+i,"SELECT template eviction changed its SQL key");
+			Require(Scalar(*reader,"SELECT (SELECT 17) AS scalar_subquery")==17,"Uncached scalar subquery changed native behavior");
+			const auto grouped=Rows(reader->Query("SELECT a,count(*) FROM (VALUES (1),(1),(2)) t(a) GROUP BY CUBE(a) ORDER BY a NULLS LAST"));
+			Require(grouped.size()==3 && grouped[0][0]=="1" && grouped[0][1]=="2" && grouped[2][1]=="3","Uncached grouping containers changed native behavior");
+			Require(Scalar(*reader,"SELECT 18 /*"+std::string(8500,'x')+"*/")==18,"Oversized SQL bypass changed native result");
+			Require(HasError(reader->Query("SELECT missing_column FROM select_template_later"),"42703") && Scalar(*reader,"SELECT 19")==19,"SELECT cache error failed reusable autocommit recovery");
+		});
 		test("protected_shutdown_releases_parse_waiters", [&] {
 			std::vector<std::unique_ptr<Wire>> clients;
 			for (unsigned i = 0; i < 3; ++i) clients.push_back(protected_fixture.Client());

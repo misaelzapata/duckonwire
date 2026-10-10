@@ -16,13 +16,13 @@ WITH keyed AS (
  FROM prices
 ), samples AS (
  SELECT product_id,
-   arg_min(struct_pack(price:=price),first_key) AS first_sample,
-   arg_max(struct_pack(price:=price),last_key) AS last_sample
+   arg_min_null(price,first_key) AS first_sample,
+   arg_max_null(price,last_key) AS last_sample
  FROM keyed GROUP BY product_id
 )
 SELECT p.country_code,p.brand,count(*) AS products_with_history,
-       round(avg(s.last_sample.price-s.first_sample.price),2) AS average_change,
-       count_if(s.last_sample.price>s.first_sample.price) AS products_increased
+       round(avg(s.last_sample-s.first_sample),2) AS average_change,
+       count_if(s.last_sample>s.first_sample) AS products_increased
 FROM samples s JOIN products p ON p.id=s.product_id
 GROUP BY p.country_code,p.brand
 ORDER BY average_change DESC NULLS LAST,p.country_code ASC NULLS LAST,p.brand ASC NULLS LAST;

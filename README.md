@@ -6,7 +6,36 @@
 
 **DuckDB, connected.**
 
-[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-112-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
+## Install and try it
+
+On compatible Linux x86_64 machines, install the ready-to-run package and start the server:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/misaelzapata/duckonwire/main/scripts/install.sh | sh -s -- --prefix ./duckonwire
+export DUCKONWIRE_TOKEN='your-local-password'
+./duckonwire/bin/duckonwire-server --root ./duckonwire
+```
+
+Leave that terminal running. In another terminal, use the same password with your installed `psql` client:
+
+```sh
+export PGPASSWORD='your-local-password'
+export PGHOST=127.0.0.1 PGPORT=9496 PGUSER=duckonwire PGDATABASE=duckonwire PGSSLMODE=disable
+psql -X -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+CREATE TABLE IF NOT EXISTS inventory(id INTEGER PRIMARY KEY, name VARCHAR, stock INTEGER);
+INSERT INTO inventory VALUES(1, 'Coffee', 3), (2, 'Rice', 10) ON CONFLICT DO NOTHING;
+SELECT name, stock FROM inventory ORDER BY id;
+UPDATE inventory SET stock = stock + 1 WHERE id = 1;
+DELETE FROM inventory WHERE id = 2;
+COMMIT;
+SELECT name, stock FROM inventory ORDER BY id;
+SQL
+```
+
+On the first run, the last query returns Coffee with stock 4. This is one ordinary connection reading and writing DuckDB. The local server listens on your machine and shares one password; [remote accounts use verified TLS](#public-access). On Mac or ARM, start with [Docker](#try-with-docker) or [build from source](#build-from-source). Ctrl+C stops the server; its database stays in `duckonwire/data`.
+
+[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-115-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
 
 DoW turns your DuckDB database into a shared data service. Connect apps in your favorite language, read and write through the same connection, and let readers keep working while new data arrives. Your data stays in DuckDB.
 
@@ -14,9 +43,22 @@ DoW turns your DuckDB database into a shared data service. Connect apps in your 
 
 ## Tutorial
 
-Start with Docker to try a few queries. For an application, use the [PostgreSQL connection](#connect); it does not install or replace DuckDB on your client. [Native Quack](#native-connections-clear-transactions) is available when you want DuckDB's own API and can use the compatible engine.
+Here's a path from your first query to a small application:
+
+1. **Start one server.** Choose [Docker](#try-with-docker) or a [downloaded package](#connect). The server owns the database file; your clients connect to it.
+2. **Log in with your usual driver.** Local connections share a password. For a remote server, use a [username, password and verified TLS](#public-access). Your client does not need a new DuckDB installation.
+3. **Read and change data on the same connection.** The [Node example](examples/postgres/node/crud.mjs) inserts two products, updates one, deletes the other and reads the committed result. There are [examples for ten languages](#examples-and-tests).
+4. **Give each worker its own connection.** A reader can keep its snapshot while a writer commits new data. Try the [transaction example](#transactions) to see when those changes become visible.
+5. **Read a page at a time.** Use a stable order and a row limit; [continue from the last ID](#read-in-pages) for deeper pages.
+6. **Measure your workload.** Try [concurrent inserts](#try-concurrent-inserts), then compare query timings with the same data, returned rows and hardware.
 
 **One connection can read and write.** Use `SELECT`, `INSERT`, `UPDATE` and `DELETE` on the same connection, with `BEGIN`, `COMMIT` and `ROLLBACK` when you need a transaction. A `write` account allows both reading and writing; a `read` account allows only reading. The [Neon example](#query-from-neon) separately provides read-only foreign tables.
+
+<p align="center">
+  <img src="assets/connection-flow.svg" width="840" alt="Apps use stock PostgreSQL drivers, Neon uses read-only foreign tables, and compatible native clients use Quack; one DoW server owns the DuckDB file">
+</p>
+
+Use [native Quack](#native-connections-clear-transactions) when you want DuckDB's own API with the compatible engine. For most apps, start with the PostgreSQL route above.
 
 ## Try with Docker
 
@@ -39,6 +81,11 @@ On the first run, stock changes from 3 to 4. The first build takes several minut
 
 ```sh
 docker compose exec -e PGUSER=reader duckonwire psql -X -c 'SELECT name, stock FROM inventory'
+```
+
+When you're finished:
+
+```sh
 docker compose stop
 ```
 
@@ -48,23 +95,9 @@ Stopping preserves the database in its named volume. Port `9496` is published on
 
 DoW is experimental. Clients use PostgreSQL drivers, and queries run in DuckDB SQL.
 
-[Download a native package](https://github.com/misaelzapata/duckonwire/releases), extract it and open its folder. Packages include the server and its native engine. The repository contains the newest examples; [building from source](#build-from-source) is optional.
-
-**Start the server.** Generate a password and use it in both terminals:
+Keep the local server above running. From the repository or installed package folder, use the same `PG*` settings with the [Node example](examples/postgres/node/crud.mjs):
 
 ```sh
-openssl rand -hex 32
-export DUCKONWIRE_TOKEN='paste-the-generated-value'
-./bin/duckonwire-server --init-demo
-```
-
-`--init-demo` imports the public product sample into an empty database. Use it once; omit it when restarting or when you want an empty database. It refuses to import over existing tables.
-
-**Run a client.** In another terminal, from the same installed folder:
-
-```sh
-export PGPASSWORD='paste-the-same-generated-value'
-export PGHOST=127.0.0.1 PGPORT=9496 PGUSER=duckonwire PGDATABASE=duckonwire
 npm install --prefix examples/postgres/node
 node examples/postgres/node/crud.mjs
 ```
@@ -196,36 +229,38 @@ Use one connection per concurrent worker. Statements commit automatically unless
 
 Readers keep their view until the transaction ends. Two writers changing the same row can conflict: roll back and re-read before retrying. If a connection breaks during `COMMIT`, check the outcome before repeating the write.
 
-<details>
-<summary>See a reader's snapshot before and after a commit</summary>
+<p align="center">
+  <img src="assets/transaction-snapshot.svg" width="840" alt="A reader sees stock 3 before and after a writer commits stock 4; it sees 4 after starting a new transaction">
+</p>
 
-```mermaid
-sequenceDiagram
-    participant R as Reader
-    participant S as Native DuckDB owner
-    participant W as Writer
-    R->>S: Begin transaction
-    R->>S: Read stock
-    S-->>R: 3
-    W->>S: Begin transaction
-    W->>S: Write stock 4
-    W->>S: Commit
-    R->>S: Read stock
-    S-->>R: 3 in the same snapshot
-    R->>S: Commit
-    R->>S: Begin transaction
-    R->>S: Read stock
-    S-->>R: 4 in the new snapshot
-    R->>S: Commit
+<details>
+<summary>Run the snapshot example or try a rollback</summary>
+
+With the native server running and its `DUCKONWIRE_TOKEN` set, run the [transaction example](examples/transaction_flow.cpp):
+
+```sh
+./bin/transaction-flow
 ```
 
-The [transaction example](examples/transaction_flow.cpp) checks snapshots, rollback and conflicts. A requested PostgreSQL `READ COMMITTED` transaction retains DuckDB's snapshot; `SERIALIZABLE` is rejected. The server owns the database file once and gives clients separate native connections.
+It creates its own table with stock 3, checks the snapshot shown above, then tests rollback and write conflicts. It removes that table when finished. Use `./build/bin/transaction-flow` after building source. Quack is a local connection, so this command connects to a server running on your machine, rather than the unpublished Quack port inside Docker.
+
+For the Docker inventory, open `docker compose exec duckonwire psql -X` and try:
+
+```sql
+BEGIN;
+UPDATE inventory SET stock = 999 WHERE id = 1;
+SELECT stock FROM inventory WHERE id = 1;
+ROLLBACK;
+SELECT stock FROM inventory WHERE id = 1;
+```
+
+The first read shows your pending change. The last read shows the stock before the transaction. A requested PostgreSQL `READ COMMITTED` transaction keeps DuckDB's snapshot until it ends; `SERIALIZABLE` is rejected.
 
 </details>
 
 ## Examples and tests
 
-CI verifies **112 checks** across seven native test suites, plus **20 PostgreSQL integration checks**, ordinary-driver examples and concurrent reads during million-row inserts. The [release workflow](.github/workflows/release.yml) builds a fresh package and publishes it only after tests, the tutorial and Docker pass. [See the results](tests/results/index.json).
+CI verifies **115 checks** across seven native test suites, plus **20 PostgreSQL integration checks**, ordinary-driver examples and concurrent reads during million-row inserts. The [release workflow](.github/workflows/release.yml) builds a fresh package and publishes it only after tests, the tutorial and Docker pass. [See the results](tests/results/index.json).
 
 Ordinary PostgreSQL drivers, using standard `PG*` settings:
 
@@ -261,13 +296,13 @@ The second command sends two million rows. Use a test database and run one copy 
 
 With the public demo loaded, add `PG_DEMO_READS=1` to also run its ten queries while inserts arrive. These reads check the unchanged demo tables; inserts go into separate test tables in the same database. The output reports each query's latency and verifies its results.
 
-With a million-price demo loaded, one local Apple M1 Pro run sent **two million client rows at 283,365 rows/s** while running all ten demo queries. Reads averaged **18.85 ms**. Timing included row creation, transport and 2,000 confirmed commits; login, setup and final checks were excluded. Counts, checksums and query results passed in-session. These are local measurements; several complex queries still exceed 10 ms. [Measured conditions](tests/results/performance.json).
+With a million-price demo loaded, one local Apple M1 Pro run sent **two million client rows at 280,300 rows/s** while running all ten demo queries. Reads averaged **17.97 ms**. Timing included row creation, transport and 2,000 confirmed commits; login, setup and final checks were excluded. Counts, checksums and query results passed in-session. These are local measurements; several complex queries still exceed 10 ms. [Measured conditions](tests/results/performance.json).
 
 `bulk.mjs` and the native benchmark generate rows inside DuckDB with `INSERT SELECT range`. Those results measure database-side generation and writes, not client-data transport. See their distinct conditions in the [result index](tests/results/index.json).
 
 ## Public demo
 
-The sample contains **46,462 manufacturer-brand products** from Argentina and Spain, with **synthetic prices**. It has no stores, private-label brands or private identifiers. [CSV](examples/demo/products.csv) and [schema](examples/demo/schema.sql) are included for `--init-demo`. Benchmarks use separate tables. Own code is MIT; see [third-party notices](THIRD_PARTY_NOTICES.txt).
+The sample contains **46,462 manufacturer-brand products** from Argentina and Spain, with **synthetic prices**. It has no stores, private-label brands or private identifiers. [CSV](examples/demo/products.csv) and [schema](examples/demo/schema.sql) are included for `--init-demo`. Add that option when first starting an empty database from the package folder; it refuses to import over existing tables. Omit it on restart. Benchmarks use separate tables. Own code is MIT; see [third-party notices](THIRD_PARTY_NOTICES.txt).
 
 Current source builds can also create **one million price observations over 30 days**. Start with an empty demo database:
 
@@ -277,8 +312,12 @@ Current source builds can also create **one million price observations over 30 d
 
 The data is repeatable and generated inside DuckDB; there is no large CSV to download. Try [price history](examples/postgres/queries/product-history.sql), [seven-day trends](examples/postgres/queries/seven-day-average.sql) or [changes by brand](examples/postgres/queries/brand-movement.sql). The default sample still has one price per product.
 
+### Read in pages
+
+Start with a small result, then ask for the next page. The web playground does this through its page-size control and Previous/Next buttons. In an app, bind the limit and offset with your driver's parameter API, as the [query example](examples/postgres/node/latency.mjs) does.
+
 <details>
-<summary>Paging and measuring queries</summary>
+<summary>Paging SQL and query timings</summary>
 
 Use a stable order when requesting pages:
 
@@ -302,7 +341,9 @@ With the same `PG*` connection settings as other examples, measure all ten [demo
 PG_LATENCY_SAMPLES=30 node examples/postgres/node/latency.mjs
 ```
 
-The JSON records averages, median, 95th percentile, row checksums and database settings. It measures complete client query round trips after warmup, including returned rows. Run it without other builds or writes; the default pause between queries avoids a continuous load. Set `PG_LATENCY_OFFSET` to compare pages, or `PG_LATENCY_PAUSE_MS=0` to measure sustained traffic. DoW uses up to two engine workers, based on the CPU capacity DuckDB detects. Use `--threads` to override this and measure on your hardware.
+The JSON records averages, median, 95th percentile, row checksums and database settings. It measures the full client round trip after warmup, including returned rows. This differs from the web playground's server-side elapsed time: Internet travel and browser work add to what you wait for.
+
+Run it without other builds or writes; the default pause between queries avoids a continuous load. Set `PG_LATENCY_OFFSET` to compare pages, or `PG_LATENCY_PAUSE_MS=0` to measure sustained traffic. DoW uses up to two engine workers, based on the CPU capacity DuckDB detects. Use `--threads` to override this and measure on your hardware.
 
 </details>
 
@@ -396,7 +437,9 @@ Run installed examples from `dist`. Exact prerequisites and platform limits are 
 
 ## Español
 
-DoW conecta tu base DuckDB con tus aplicaciones. Usa el driver habitual de tu lenguaje y sigue leyendo mientras llegan nuevos datos. **Una misma conexión permite leer y escribir:** puedes hacer `SELECT`, `INSERT`, `UPDATE` y `DELETE`, además de `BEGIN`, `COMMIT` y `ROLLBACK`. Una cuenta `write` permite ambas cosas; una cuenta `read`, solo consultar. La base permanece en DuckDB. Para probarlo, ejecuta `docker compose up --build -d`; las cuentas y TLS se preparan automáticamente, y `docker compose stop` conserva la base.
+DoW conecta tu base DuckDB con tus aplicaciones. Usa el driver habitual de tu lenguaje y sigue leyendo mientras llegan nuevos datos. **Una misma conexión permite leer y escribir:** puedes hacer `SELECT`, `INSERT`, `UPDATE` y `DELETE`, además de `BEGIN`, `COMMIT` y `ROLLBACK`. Una cuenta `write` permite ambas cosas; una cuenta `read`, solo consultar. La base permanece en DuckDB. [Instala y prueba](#install-and-try-it) el paquete en Linux compatible, o ejecuta `docker compose up --build -d`; Docker prepara las cuentas y TLS, y `docker compose stop` conserva la base.
+
+El [tutorial](#tutorial) sigue un recorrido sencillo: iniciar el servidor, entrar con tu driver, cambiar datos, probar un lector y un escritor, pedir páginas y medir. El gráfico de transacciones muestra cuándo un lector ve los cambios confirmados; hasta terminar su transacción conserva la vista anterior.
 
 Desde [Neon](#query-from-neon), `postgres_fdw` presenta las tablas remotas para consultarlas y unirlas con datos locales. El ejemplo usa una cuenta de solo lectura y TLS verificado; los datos permanecen en DuckDB.
 
@@ -404,8 +447,12 @@ En local se comparte una contraseña. Por red puedes configurar usuarios reales 
 
 `COMMIT` confirma cambios, `ROLLBACK` los descarta y cerrar revierte lo pendiente. Cada trabajador usa su conexión. Hay [diez ejemplos](#examples-and-tests), una [página Flask](#flask-playground) y una [guía para agentes](AGENTS.md); los detalles de configuración y compilación están en apartados desplegables.
 
+Para comparar tiempos, usa la misma consulta, cantidad de filas y equipo. El tiempo de la página mide trabajo en el servidor; tu conexión a Internet añade demora. El ejemplo de Node mide el viaje completo de la consulta.
+
 ## 中文
 
 DuckOnWire（DoW）让应用连接 DuckDB，在新数据写入时继续读取。普通 PostgreSQL 驱动无需更换客户端 DuckDB；Docker 自动配置本地账号与 TLS，Neon 可通过只读 `postgres_fdw` 和验证 TLS 查询远程表。
 
 原生 Quack 需要匹配的引擎：`ATTACH` 用于读取和连接远程表，参数查询、写入及事务使用 `CONNECT remote`。项目提供十种语言示例，MIT 许可。
+
+教程展示启动、登录、同一连接读写、事务快照、分页与测量。读者在事务结束后才看到新提交的数据；网页的服务器耗时不等于完整网络等待时间。

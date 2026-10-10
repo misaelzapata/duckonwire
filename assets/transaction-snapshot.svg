@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" role="img" aria-labelledby="title description">
+  <title id="title">A reader keeps its snapshot until the transaction ends</title>
+  <desc id="description">A reader begins and sees stock three. A writer changes stock to four and commits. The reader still sees three inside its original transaction. After the reader commits and starts a new transaction, it sees four.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 8 4 0 8Z" fill="#1678ba"/></marker>
+  </defs>
+  <rect width="960" height="420" rx="24" fill="#f6f9fc"/>
+  <g font-family="Arial, Helvetica, sans-serif" fill="#16364d">
+    <text x="30" y="48" font-size="27" font-weight="700">Readers keep their snapshot.</text>
+    <text x="30" y="80" font-size="17" fill="#526878">A writer's commit becomes visible in the reader's next transaction.</text>
+    <g stroke-width="2">
+      <rect x="30" y="116" width="280" height="184" rx="18" fill="#fff9dc" stroke="#e1c342"/>
+      <rect x="340" y="116" width="280" height="184" rx="18" fill="#e5f1fa" stroke="#1678ba"/>
+      <rect x="650" y="116" width="280" height="184" rx="18" fill="#fff9dc" stroke="#e1c342"/>
+    </g>
+    <text x="50" y="149" font-size="19" font-weight="700">1 · Reader begins</text>
+    <text x="170" y="217" text-anchor="middle" font-size="61" font-weight="700">3</text>
+    <text x="170" y="254" text-anchor="middle" font-size="18">SELECT stock → 3</text>
+    <text x="170" y="280" text-anchor="middle" font-size="15" fill="#526878">Its transaction stays open</text>
+    <text x="360" y="149" font-size="19" font-weight="700">2 · Writer commits</text>
+    <text x="480" y="217" text-anchor="middle" font-size="61" font-weight="700" fill="#1678ba">4</text>
+    <text x="480" y="254" text-anchor="middle" font-size="18">Write stock 4, then COMMIT</text>
+    <text x="480" y="280" text-anchor="middle" font-size="15" fill="#526878">Saved in DuckDB</text>
+    <text x="670" y="149" font-size="19" font-weight="700">3 · Reader reads again</text>
+    <text x="790" y="217" text-anchor="middle" font-size="61" font-weight="700">3</text>
+    <text x="790" y="254" text-anchor="middle" font-size="18">SELECT stock → 3</text>
+    <text x="790" y="280" text-anchor="middle" font-size="15" fill="#526878">Same transaction, same snapshot</text>
+    <g fill="none" stroke="#1678ba" stroke-width="3" marker-end="url(#arrow)">
+      <path d="M310 207H336"/>
+      <path d="M620 207H646"/>
+      <path d="M790 300V330"/>
+    </g>
+    <rect x="206" y="333" width="670" height="61" rx="15" fill="#fff" stroke="#1678ba" stroke-width="2"/>
+    <text x="230" y="371" font-size="19">Reader: COMMIT → BEGIN → SELECT stock</text>
+    <text x="823" y="375" text-anchor="middle" font-size="34" font-weight="700" fill="#1678ba">4</text>
+  </g>
+</svg>

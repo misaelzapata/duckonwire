@@ -13,6 +13,14 @@
 #include "duckdb/transaction/transaction.hpp"
 #include "duckdb/parser/parser.hpp"
 #include "duckdb/parser/expression/parameter_expression.hpp"
+#include "duckdb/parser/expression/constant_expression.hpp"
+#include "duckdb/parser/expression/columnref_expression.hpp"
+#include "duckdb/parser/expression/function_expression.hpp"
+#include "duckdb/parser/expression/window_expression.hpp"
+#include "duckdb/parser/expression/cast_expression.hpp"
+#include "duckdb/parser/expression/type_expression.hpp"
+#include "duckdb/parser/tableref/joinref.hpp"
+#include "duckdb/parser/tableref/subqueryref.hpp"
 #include "duckdb/parser/expression/star_expression.hpp"
 #include "duckdb/parser/tableref/expressionlistref.hpp"
 #include "duckdb/parser/query_node/insert_query_node.hpp"
@@ -879,6 +887,33 @@ struct PgWireServer::Impl {
         duckdb::unique_ptr<duckdb::SQLStatement> statement;
     };
     std::unique_ptr<InsertTemplate> insert_template;
+    struct SelectTemplate : InsertTemplate {
+        std::size_t nodes = 0, strings = 0;
+        std::uint64_t touched = 0;
+    };
+    std::array<std::unique_ptr<SelectTemplate>,16> select_templates;
+    std::size_t select_nodes = 0, select_strings = 0;
+    std::uint64_t select_clock = 0;
+    // All template access is under the existing owner-wide parse admission.
+    void PublishSelect(std::unique_ptr<SelectTemplate> next) {
+        if (next->nodes > 4096 || next->strings > 128*1024) return;
+        std::size_t slot = select_templates.size();
+        while (slot == select_templates.size()) {
+            for (std::size_t i=0;i<select_templates.size();++i)
+                if (!select_templates[i] && select_nodes+next->nodes<=4096 && select_strings+next->strings<=128*1024) { slot=i; break; }
+            if (slot != select_templates.size()) break;
+            std::size_t oldest = select_templates.size();
+            for (std::size_t i=0;i<select_templates.size();++i)
+                if (select_templates[i] && (oldest==select_templates.size() || select_templates[i]->touched<select_templates[oldest]->touched)) oldest=i;
+            if (oldest == select_templates.size()) return;
+            select_nodes-=select_templates[oldest]->nodes; select_strings-=select_templates[oldest]->strings;
+            select_templates[oldest].reset();
+        }
+        // Every potentially throwing allocation happened before publication.
+        next->touched=++select_clock;
+        select_nodes+=next->nodes; select_strings+=next->strings;
+        select_templates[slot]=std::move(next);
+    }
     std::atomic<std::uint16_t> bound_port {0};
     std::atomic<bool> stopping {true};
     int listener = -1;
@@ -1386,6 +1421,135 @@ bool TemplateParser(const duckdb::ParserOptions &options, const duckdb::ClientCo
     return options.parser_override_setting == duckdb::AllowParserOverride::DEFAULT_OVERRIDE &&
            options.compiled_grammar && !client.cached_grammar && client.active_grammar_extensions.empty();
 }
+// Logical retention bounds include all accepted SELECT
+// AST children/containers/strings; these are not a hard process-RSS guarantee.
+struct SelectTemplateBudget {
+    std::size_t nodes=0, strings=0;
+    bool AddNode(std::size_t depth) { return depth<=32 && ++nodes<=512; }
+    bool Text(const std::string &text) { if(text.size()>8192 || strings>64*1024-text.size())return false; strings+=text.size();return true; }
+    bool Name(const duckdb::Identifier &name) { return Text(name.GetIdentifierName()); }
+    bool Qualified(const duckdb::QualifiedName &name) {
+        if(name.Path().size()>4)return false;
+        for(auto &part:name.Path())if(!Name(part))return false;
+        return true;
+    }
+    bool Expression(const duckdb::ParsedExpression &expr,std::size_t depth) {
+        if(!AddNode(depth) || !Name(expr.GetAlias()))return false;
+        using C=duckdb::ExpressionClass;
+        switch(expr.GetExpressionClass()) {
+        case C::CONSTANT: {
+            const auto &literal=expr.Cast<duckdb::ConstantExpression>().GetLiteral();
+            if(literal.kind==duckdb::LiteralKind::POINTER || literal.kind==duckdb::LiteralKind::INVALID || !Text(literal.text))return false;
+            break;
+        }
+        case C::COLUMN_REF:
+            if(expr.Cast<duckdb::ColumnRefExpression>().ColumnNames().size()>4)return false;
+            for(auto &name:expr.Cast<duckdb::ColumnRefExpression>().ColumnNames())if(!Name(name))return false;
+            break;
+        case C::PARAMETER: if(!Name(expr.Cast<duckdb::ParameterExpression>().Identifier()))return false; break;
+        case C::TYPE: if(!Qualified(expr.Cast<duckdb::TypeExpression>().GetQualifiedName()))return false;break;
+        case C::FUNCTION: {
+            const auto &function=expr.Cast<duckdb::FunctionExpression>();
+            if(!Qualified(function.GetQualifiedName()) || function.GetArguments().size()>64)return false;
+            for(auto &arg:function.GetArguments())if(!Name(arg.GetName()))return false;
+            break;
+        }
+        case C::WINDOW: {
+            const auto &window=expr.Cast<duckdb::WindowExpression>();
+            if(!Qualified(window.GetQualifiedName()) || window.GetArguments().size()>64 || window.Partitions().size()>64 ||
+               window.OrderBy().size()>64 || window.ArgOrders().size()>64)return false;
+            for(auto &arg:window.GetArguments())if(!Name(arg.GetName()))return false;
+            // Native Children includes partitions, ordering, filter, frame bounds,
+            // argument ordering and all arguments in this exact engine pin.
+            break;
+        }
+        case C::STAR: {
+            const auto &star=expr.Cast<duckdb::StarExpression>();
+            if(!star.RelationName().empty() || !star.ExcludeList().empty() || !star.ReplaceList().empty() ||
+               !star.RenameList().empty() || star.Expression() || star.IsColumns())return false;
+            break;
+        }
+        case C::CAST:
+            // Native Children omits the unbound cast target; explicitly charge it.
+            if(!Expression(expr.Cast<duckdb::CastExpression>().TargetType(),depth+1))return false;
+            break;
+        case C::CASE: case C::COMPARISON: case C::CONJUNCTION: case C::OPERATOR: case C::BETWEEN: break;
+        // Conservatively bypass scalar subqueries, lambdas/collations,
+        // complex stars and every extension/bound expression instead of guessing
+        // about auxiliary ownership. Ordinary derived tables/CTEs are covered.
+        default:return false;
+        }
+        for(auto &child:expr.Children())if(!Expression(child,depth+1))return false;
+        return true;
+    }
+    bool Reference(const duckdb::TableRef &ref,std::size_t depth) {
+        if(!AddNode(depth) || ref.sample || ref.external_dependency || !Name(ref.alias) || ref.column_name_alias.size()>64)return false;
+        for(auto &name:ref.column_name_alias)if(!Name(name))return false;
+        using R=duckdb::TableReferenceType;
+        switch(ref.type) {
+        case R::EMPTY_FROM:return true;
+        case R::BASE_TABLE: {
+            const auto &base=ref.Cast<duckdb::BaseTableRef>();
+            return !base.at_clause && Qualified(base.GetQualifiedName());
+        }
+        case R::SUBQUERY: {
+            auto &sub=ref.Cast<duckdb::SubqueryRef>().subquery;
+            return sub && sub->named_param_map.empty() && Text(sub->query) && Query(*sub->node,depth+1);
+        }
+        case R::JOIN: {
+            auto &join=ref.Cast<duckdb::JoinRef>();
+            if(!join.left || !join.right || !join.duplicate_eliminated_columns.empty() || join.ranking_expression || join.using_columns.size()>64)return false;
+            for(auto &name:join.using_columns)if(!Name(name))return false;
+            return Reference(*join.left,depth+1) && Reference(*join.right,depth+1) && (!join.condition || Expression(*join.condition,depth+1));
+        }
+        default:return false;
+        }
+    }
+    bool Query(const duckdb::QueryNode &node,std::size_t depth) {
+        if(!AddNode(depth) || node.type!=duckdb::QueryNodeType::SELECT_NODE || node.cte_map.map.size()>32 || node.modifiers.size()>8)return false;
+        for(auto &cte:node.cte_map.map) {
+            auto &info=*cte.second;
+            if(!Name(cte.first) || info.is_trigger_generated || !info.query_node || !info.key_targets.empty() ||
+               !info.payload_aggregates.empty() || info.aliases.size()>64)return false;
+            for(auto &name:info.aliases)if(!Name(name))return false;
+            if(!Query(*info.query_node,depth+1))return false;
+        }
+        auto &select=node.Cast<duckdb::SelectNode>();
+        // Native CUBE/ROLLUP can expand grouping-set containers independently
+        // of expressions. Only a single ordinary grouping set is admitted.
+        if(select.sample || select.select_list.size()>64 || select.groups.group_expressions.size()>64 || select.groups.grouping_sets.size()>1)return false;
+        for(auto &set:select.groups.grouping_sets)if(set.size()>64)return false;
+        for(auto &expr:select.select_list)if(!Expression(*expr,depth+1))return false;
+        for(auto &expr:select.groups.group_expressions)if(!Expression(*expr,depth+1))return false;
+        if((select.where_clause && !Expression(*select.where_clause,depth+1)) ||
+           (select.having && !Expression(*select.having,depth+1)) ||
+           (select.qualify && !Expression(*select.qualify,depth+1)) ||
+           !select.from_table || !Reference(*select.from_table,depth+1))return false;
+        for(auto &mod:node.modifiers) {
+            if(!AddNode(depth+1))return false;
+            using M=duckdb::ResultModifierType;
+            if(mod->type==M::LIMIT_MODIFIER) {
+                auto &limit=mod->Cast<duckdb::LimitModifier>();
+                if((limit.limit && !Expression(*limit.limit,depth+1)) || (limit.offset && !Expression(*limit.offset,depth+1)))return false;
+            }else if(mod->type==M::ORDER_MODIFIER) {
+                auto &order=mod->Cast<duckdb::OrderModifier>();if(order.orders.size()>64)return false;
+                for(auto &entry:order.orders)if(!Expression(*entry.expression,depth+1))return false;
+            }else if(mod->type==M::DISTINCT_MODIFIER) {
+                auto &distinct=mod->Cast<duckdb::DistinctModifier>();if(distinct.distinct_on_targets.size()>64)return false;
+                for(auto &expr:distinct.distinct_on_targets)if(!Expression(*expr,depth+1))return false;
+            }else return false;
+        }
+        return true;
+    }
+};
+bool BoundedSelectTemplate(const duckdb::SQLStatement &statement,const std::string &sql,SelectTemplateBudget &budget) {
+    const auto word=FirstWord(sql);
+    if((word!="SELECT" && word!="WITH") || sql.size()>8192 || statement.type!=duckdb::StatementType::SELECT_STATEMENT || statement.named_param_map.size()>64)return false;
+    if(!budget.Text(sql) || !budget.Text(statement.query))return false;
+    for(auto &param:statement.named_param_map)if(!budget.Name(param.first))return false;
+    return budget.Query(*statement.Cast<duckdb::SelectStatement>().node,0);
+}
+
 bool PositionalValuesTemplate(const duckdb::SQLStatement &statement, const std::string &sql) {
     // Bound the retained shape, not just the SQL length. Every retained data cell
     // is one parameter node; literals, expressions and catalog-derived trees stay
@@ -1440,6 +1604,15 @@ PgWireServer::Impl::Session::Extract(const std::string &sql, ParseAdmission *adm
     const auto parser_options = connection.context->GetParserOptions();
     const bool template_parser = TemplateParser(parser_options, duckdb::ClientConfig::GetConfig(*connection.context));
     duckdb::vector<duckdb::unique_ptr<duckdb::SQLStatement>> result;
+    if (template_parser) {
+        for (auto &entry:server.select_templates) {
+            if (entry && sql==entry->sql && SameParserOptions(parser_options,entry->options)) {
+                result.push_back(entry->statement->Copy());
+                entry->touched=++server.select_clock;
+                admission->Check(); return result;
+            }
+        }
+    }
     if (server.insert_template && sql == server.insert_template->sql && template_parser &&
         SameParserOptions(parser_options, server.insert_template->options)) {
         // No shared prepared/bound state: each caller owns its copy and is still
@@ -1456,6 +1629,13 @@ PgWireServer::Impl::Session::Extract(const std::string &sql, ParseAdmission *adm
             auto next = std::make_unique<Impl::InsertTemplate>();
             next->sql = sql; next->options = parser_options; next->statement = result[0]->Copy();
             server.insert_template = std::move(next);
+        }
+        SelectTemplateBudget budget;
+        if(result.size()==1 && template_parser && BoundedSelectTemplate(*result[0],sql,budget)) {
+            auto next=std::make_unique<Impl::SelectTemplate>();
+            next->sql=sql; next->options=parser_options; next->statement=result[0]->Copy();
+            next->nodes=budget.nodes; next->strings=budget.strings;
+            server.PublishSelect(std::move(next));
         }
     }
     admission->Check();
@@ -2200,6 +2380,8 @@ void PgWireServer::Impl::Stop() noexcept {
     for (auto &job : jobs) if (job.thread.joinable()) job.thread.join();
     jobs.clear();
     insert_template.reset();
+    for(auto &entry:select_templates)entry.reset();
+    select_nodes=select_strings=0;
     if (listener >= 0) { close(listener); listener = -1; }
     bound_port.store(0);
 }

@@ -1,8 +1,7 @@
 {
   "project": "DuckOnWire",
-  "status": "Local native-engine performance candidate; protected parse admission and fresh Linux build acceptance pending",
   "date": "2026-10-10",
-  "platform": "macOS ARM64, Apple M1 Pro",
+  "status": "Final development source locally passed; exact current Linux CI and deployment pending. No universal sub10ms claim.",
   "dataset": {
     "products": 46462,
     "synthetic_prices": 1000000,
@@ -12,468 +11,1779 @@
       "Spain"
     ]
   },
-  "resources": {
-    "threads": "2",
-    "memory_limit": "1.0 GiB"
-  },
-  "driver": "pg",
-  "engine": {
-    "library_version": "v2.1.0-dev0",
-    "source_id": "848126236a"
-  },
-  "candidate_engine": {
-    "source_commit": "0cfb63a5f712fadf06a0de33217b7b03666ae66b",
-    "method": "Two native C++ objects recompiled and shared library relinked with unchanged flags. Runtime metadata retains the848 baseline ID; fresh pinned-source CI is separate.",
-    "baseline_library_sha256": "5beb16eb653a59c11a37471da2c4182ffcf882adebb1774e55d6fef2b88b6e39",
-    "candidate_library_sha256": "fbce1d4d9568a74c52de2869828869a3f909be37387acc01794f09f7e228992e",
-    "wrapper_sha256": "bd7538c05862c7e8cc0cd7f3d8c6a636fdeb5970c4cacea182deddc7b22927ed",
-    "pg_source_sha256": "30ad03b2195b79aecd32fafc3c1cb3540a238ceb0aead931ee51018b17d7bb5b",
-    "actual_native_owner_loads_verified": 3
-  },
-  "functional_checks": {
-    "native": 21,
-    "embedded_transaction_flow": 14,
-    "native_engine_differential": 248,
-    "flask": 89,
-    "distinct_Node_complex_queries": 10
-  },
-  "measurement": {
-    "reused_verified_TLS": true,
-    "bound_limit": 101,
-    "bound_offset": 0,
-    "samples_per_query": 12,
-    "warmups": 3,
-    "pause_ms": 200,
-    "full_web_samples_include": "Flask test-client request through transaction cleanup and actual JSON encoding; loopback, not Internet",
+  "current_local_source": {
+    "scope": "Exact adopted public source on Apple M1 Pro/macOSARM64 with private incremental engine848+two-site grammar changes. Library metadata retains848; fresh source0cf Linux CI is a separate gate. Loopback verifiedTLS, stockNodepg8.16.3, engine2workers/1GiB.",
+    "functional_passed": true,
+    "Flask_checks": 91,
+    "server_sha256": "f378519380a5b22a0cde7ad802de882e70140ad88d0e8a1ca1dd617b99672785",
+    "pg_source_sha256": "557f8ddacc6cc0c48e649aeb950d1ba6eba07e3b929419644019e378f054f278",
+    "source_hashes": {
+      "src/server.cpp": "aa61f6e028bad820c1a84740c5c57deb0fd4211e192d7b8cab777a4f334c6575",
+      "src/pgwire.cpp": "557f8ddacc6cc0c48e649aeb950d1ba6eba07e3b929419644019e378f054f278",
+      "tests/flask_playground.py": "b1d3cca08ad4edfd049fa24c4d9e66350435248f7bcc85e5da48414d4e3dd691",
+      "examples/postgres/flask/app.py": "088562b92910e613b4947195994e2774533a6d6a6e26759db0bfed5690d326cc",
+      "examples/postgres/queries/brand-movement.sql": "ccde8d4f69b193ef1baca87ea0e20b0ba0a079d1921afcdf4e342f627b48b7af",
+      "examples/postgres/queries/brands.sql": "d2827209f17f5ec0425555d8e217d7863e5bd7f859ed5868950791cc00de7c4d",
+      "examples/postgres/queries/countries.sql": "0141859a3bdebe023b162a82dd3cbc4b6a14d641267fe93e8bb566675a1b475d",
+      "examples/postgres/queries/latest-prices.sql": "de5a4ac3f0915854f28ad68d8c7a568a8336ad4508de4af4b6eb4462d53ebb1d",
+      "examples/postgres/queries/market-comparison.sql": "efd19eabb42ef8ccea7e433818c6b71ff08cc1bb49b298445de4f6935c813219",
+      "examples/postgres/queries/prices.sql": "c384afd0a2503aaa173315a887880bf3101aefa7028b26802fc8bd443076a42e",
+      "examples/postgres/queries/product-history.sql": "467f89c4a32260b7f1cfd7a09905952b9f0686a06f1ab4c4f1568c8efc3c257e",
+      "examples/postgres/queries/products.sql": "9fbffe64d79de104a33d2348a9bc582102c7b9481663af5c0ebee45e4b58f4a0",
+      "examples/postgres/queries/seven-day-average.sql": "32041c8b1fd7f3ed3858b678c469ff07949ac1e0e5d8fce421275168ca3654c3",
+      "examples/postgres/queries/top-prices.sql": "dc34645eacd20bc77ba1fb8b3ce5552a5081eda9e07d5b30939dd4dcc91f4cbe"
+    },
+    "engine_sha256": "fbce1d4d9568a74c52de2869828869a3f909be37387acc01794f09f7e228992e",
+    "actual_native_owner_loads_verified": 3,
+    "Node_latency": {
+      "passed": true,
+      "driver": "pg",
+      "engine": {
+        "library_version": "v2.1.0-dev0",
+        "source_id": "848126236a"
+      },
+      "engineConfig": {
+        "threads": "2",
+        "memory_limit": "1.0 GiB"
+      },
+      "data": {
+        "products": "46462",
+        "prices": "1000000"
+      },
+      "client": {
+        "node": "v24.9.0",
+        "platform": "darwin",
+        "architecture": "arm64"
+      },
+      "verifiedTLS": true,
+      "warmups": 3,
+      "pauseMs": 200,
+      "limit": 100,
+      "offset": 0,
+      "results": [
+        {
+          "query": "brand-movement.sql",
+          "samples": 12,
+          "returnedRows": 101,
+          "resultSha256": "6e536c39d53a9dfc9b5dd566936745b6922cac8eb78292e90249b674b2f347ee",
+          "meanMs": 44.85434724999993,
+          "p50Ms": 46.082792000000154,
+          "p95Ms": 55.343875000000025,
+          "minimumMs": 29.440958000000137,
+          "maximumMs": 55.343875000000025
+        },
+        {
+          "query": "brands.sql",
+          "samples": 12,
+          "returnedRows": 101,
+          "resultSha256": "1b47970ae70f2ac8094052141885b76f1a8064d05cadf52ff66413a169a8f220",
+          "meanMs": 24.525510416666823,
+          "p50Ms": 26.862042000000656,
+          "p95Ms": 32.979707999999846,
+          "minimumMs": 12.763833000000886,
+          "maximumMs": 32.979707999999846
+        },
+        {
+          "query": "countries.sql",
+          "samples": 12,
+          "returnedRows": 2,
+          "resultSha256": "49b85de53b33b2cd177b3be1f0afd8dd452a2d309333776e0f517f0979661d27",
+          "meanMs": 4.522086833333408,
+          "p50Ms": 4.356416999999055,
+          "p95Ms": 6.702207999998791,
+          "minimumMs": 2.315999999998894,
+          "maximumMs": 6.702207999998791
+        },
+        {
+          "query": "latest-prices.sql",
+          "samples": 12,
+          "returnedRows": 101,
+          "resultSha256": "b71e41f849f5d5822c60f4a0c4d2c923c3c45f94bb6b9831ef6da7bf320e7332",
+          "meanMs": 12.984423500000048,
+          "p50Ms": 12.870375000000422,
+          "p95Ms": 18.147624999999607,
+          "minimumMs": 7.123166999999739,
+          "maximumMs": 18.147624999999607
+        },
+        {
+          "query": "market-comparison.sql",
+          "samples": 12,
+          "returnedRows": 101,
+          "resultSha256": "263fa79ac0451206f0ba25a31ac212cbce065783ab65839abd4ac8fce2fd70e6",
+          "meanMs": 34.76117366666707,
+          "p50Ms": 32.73079200000211,
+          "p95Ms": 59.77362499999981,
+          "minimumMs": 20.66270799999984,
+          "maximumMs": 59.77362499999981
+        },
+        {
+          "query": "prices.sql",
+          "samples": 12,
+          "returnedRows": 101,
+          "resultSha256": "fe29a4f91098194cb7326717b16d264f787a7935aec00bc9c13839134479af6e",
+          "meanMs": 21.30452766666743,
+          "p50Ms": 23.06354100000317,
+          "p95Ms": 34.171291000002384,
+          "minimumMs": 10.334415999997873,
+          "maximumMs": 34.171291000002384
+        },
+        {
+          "query": "product-history.sql",
+          "samples": 12,
+          "returnedRows": 22,
+          "resultSha256": "de9d1b6c77f93db0617e36051ddec766f0982ccf94c30a6439bddc7a4f182c81",
+          "meanMs": 9.731263916666345,
+          "p50Ms": 8.961999999999534,
+          "p95Ms": 15.93949999999677,
+          "minimumMs": 5.111291000001074,
+          "maximumMs": 15.93949999999677
+        },
+        {
+          "query": "products.sql",
+          "samples": 12,
+          "returnedRows": 101,
+          "resultSha256": "b83a1a13d7b5341c95b587983f30fae85b4e589b72838b45f6c7e7cdc73d1c44",
+          "meanMs": 12.9577671666666,
+          "p50Ms": 11.944208000000799,
+          "p95Ms": 20.94000000000233,
+          "minimumMs": 8.71900000000096,
+          "maximumMs": 20.94000000000233
+        },
+        {
+          "query": "seven-day-average.sql",
+          "samples": 12,
+          "returnedRows": 60,
+          "resultSha256": "789d36f5afe44f273818232ce52215938c6fa237a6f1ee8ff49f88725a214f59",
+          "meanMs": 18.248920083333058,
+          "p50Ms": 14.313582999999198,
+          "p95Ms": 29.154833000000508,
+          "minimumMs": 12.42450000000099,
+          "maximumMs": 29.154833000000508
+        },
+        {
+          "query": "top-prices.sql",
+          "samples": 12,
+          "returnedRows": 6,
+          "resultSha256": "bb76673472e9fd8281281b71ec57efdc9c14786b345b09f1bf074f7ad385bafd",
+          "meanMs": 37.00641308333343,
+          "p50Ms": 38.81262499999866,
+          "p95Ms": 46.819917000000714,
+          "minimumMs": 22.821250000000873,
+          "maximumMs": 46.819917000000714
+        }
+      ],
+      "scope": "Complete client query round trips on one reused connection, including bound parameter transport and decoded rows. Connection setup, pauses and SHA-256 checks excluded. Reads are uncached at the application layer; engine buffers may be warm. No concurrent writes."
+    },
+    "Flask_latency": {
+      "passed": true,
+      "scope": "actual Flask test-client full response on local loopback; not Internet latency",
+      "warmups": 3,
+      "samples": 12,
+      "pause_ms": 200,
+      "page": {
+        "limit": 100,
+        "offset": 0
+      },
+      "queries": [
+        {
+          "preset": "products",
+          "samples": 12,
+          "mean_ms": 11.60828825,
+          "p50_ms": 12.4302295,
+          "p95_ms": 16.425667,
+          "displayed_server_mean_ms": 10.109166666666667,
+          "row_sha256": "dff98ae0fa2e881145478253aa4af5a54e1160281821d23da35428878b403780",
+          "samples_raw": [
+            {
+              "total_ms": 16.425667,
+              "server_ms": 13.37,
+              "bytes": 7593
+            },
+            {
+              "total_ms": 13.093,
+              "server_ms": 11.85,
+              "bytes": 7593
+            },
+            {
+              "total_ms": 13.541959,
+              "server_ms": 11.78,
+              "bytes": 7593
+            },
+            {
+              "total_ms": 12.289209,
+              "server_ms": 11.11,
+              "bytes": 7593
+            },
+            {
+              "total_ms": 6.905625,
+              "server_ms": 6.19,
+              "bytes": 7592
+            },
+            {
+              "total_ms": 8.622042,
+              "server_ms": 7.81,
+              "bytes": 7592
+            },
+            {
+              "total_ms": 10.489791,
+              "server_ms": 7.99,
+              "bytes": 7592
+            },
+            {
+              "total_ms": 14.765708,
+              "server_ms": 12.5,
+              "bytes": 7592
+            },
+            {
+              "total_ms": 12.57125,
+              "server_ms": 11.29,
+              "bytes": 7593
+            },
+            {
+              "total_ms": 11.314833,
+              "server_ms": 10.16,
+              "bytes": 7593
+            },
+            {
+              "total_ms": 13.6125,
+              "server_ms": 12.11,
+              "bytes": 7593
+            },
+            {
+              "total_ms": 5.667875,
+              "server_ms": 5.15,
+              "bytes": 7592
+            }
+          ]
+        },
+        {
+          "preset": "prices",
+          "samples": 12,
+          "mean_ms": 22.764413083333334,
+          "p50_ms": 23.579354,
+          "p95_ms": 28.724333,
+          "displayed_server_mean_ms": 21.471666666666668,
+          "row_sha256": "fae09dc239f337b55e6b7ca2acf1569ab7d83455c5791dd4fc51f439ac14be0c",
+          "samples_raw": [
+            {
+              "total_ms": 18.254708,
+              "server_ms": 17.5,
+              "bytes": 7585
+            },
+            {
+              "total_ms": 28.239,
+              "server_ms": 26.27,
+              "bytes": 7586
+            },
+            {
+              "total_ms": 22.830417,
+              "server_ms": 21.94,
+              "bytes": 7586
+            },
+            {
+              "total_ms": 25.267458,
+              "server_ms": 23.21,
+              "bytes": 7586
+            },
+            {
+              "total_ms": 23.736375,
+              "server_ms": 22.72,
+              "bytes": 7586
+            },
+            {
+              "total_ms": 14.363625,
+              "server_ms": 13.77,
+              "bytes": 7586
+            },
+            {
+              "total_ms": 23.852541,
+              "server_ms": 22.86,
+              "bytes": 7586
+            },
+            {
+              "total_ms": 27.167583,
+              "server_ms": 25.38,
+              "bytes": 7586
+            },
+            {
+              "total_ms": 19.883334,
+              "server_ms": 19.07,
+              "bytes": 7586
+            },
+            {
+              "total_ms": 28.724333,
+              "server_ms": 25.93,
+              "bytes": 7586
+            },
+            {
+              "total_ms": 23.422333,
+              "server_ms": 22.34,
+              "bytes": 7586
+            },
+            {
+              "total_ms": 17.43125,
+              "server_ms": 16.67,
+              "bytes": 7586
+            }
+          ]
+        },
+        {
+          "preset": "brands",
+          "samples": 12,
+          "mean_ms": 27.71263875,
+          "p50_ms": 26.529666499999998,
+          "p95_ms": 32.392542,
+          "displayed_server_mean_ms": 26.128333333333334,
+          "row_sha256": "917f04964012feb0491e1d1de92ade49ed48be9531760c896a02dc2bf7f7416b",
+          "samples_raw": [
+            {
+              "total_ms": 31.6325,
+              "server_ms": 27.72,
+              "bytes": 3093
+            },
+            {
+              "total_ms": 28.684208,
+              "server_ms": 27.54,
+              "bytes": 3093
+            },
+            {
+              "total_ms": 31.841625,
+              "server_ms": 29.11,
+              "bytes": 3093
+            },
+            {
+              "total_ms": 26.711958,
+              "server_ms": 25.74,
+              "bytes": 3093
+            },
+            {
+              "total_ms": 25.956916,
+              "server_ms": 24.12,
+              "bytes": 3093
+            },
+            {
+              "total_ms": 23.717375,
+              "server_ms": 22.83,
+              "bytes": 3093
+            },
+            {
+              "total_ms": 26.142083,
+              "server_ms": 25.15,
+              "bytes": 3093
+            },
+            {
+              "total_ms": 26.347375,
+              "server_ms": 25.29,
+              "bytes": 3093
+            },
+            {
+              "total_ms": 32.1835,
+              "server_ms": 30.72,
+              "bytes": 3093
+            },
+            {
+              "total_ms": 20.818,
+              "server_ms": 20.06,
+              "bytes": 3093
+            },
+            {
+              "total_ms": 26.123583,
+              "server_ms": 25.14,
+              "bytes": 3093
+            },
+            {
+              "total_ms": 32.392542,
+              "server_ms": 30.12,
+              "bytes": 3093
+            }
+          ]
+        },
+        {
+          "preset": "window",
+          "samples": 12,
+          "mean_ms": 34.50137158333333,
+          "p50_ms": 35.542104,
+          "p95_ms": 41.331042,
+          "displayed_server_mean_ms": 33.215,
+          "row_sha256": "f41d8b96900b3b8a2394e7af5726c7befc84e162bfad99e9ee963df6597102de",
+          "samples_raw": [
+            {
+              "total_ms": 37.859916,
+              "server_ms": 36.06,
+              "bytes": 6997
+            },
+            {
+              "total_ms": 25.013625,
+              "server_ms": 24.19,
+              "bytes": 6997
+            },
+            {
+              "total_ms": 35.903125,
+              "server_ms": 35.01,
+              "bytes": 6997
+            },
+            {
+              "total_ms": 24.547417,
+              "server_ms": 23.95,
+              "bytes": 6997
+            },
+            {
+              "total_ms": 39.068208,
+              "server_ms": 36.87,
+              "bytes": 6997
+            },
+            {
+              "total_ms": 33.783292,
+              "server_ms": 32.84,
+              "bytes": 6997
+            },
+            {
+              "total_ms": 33.751834,
+              "server_ms": 32.71,
+              "bytes": 6997
+            },
+            {
+              "total_ms": 41.331042,
+              "server_ms": 39.59,
+              "bytes": 6997
+            },
+            {
+              "total_ms": 39.808875,
+              "server_ms": 38.32,
+              "bytes": 6997
+            },
+            {
+              "total_ms": 38.434875,
+              "server_ms": 37.41,
+              "bytes": 6997
+            },
+            {
+              "total_ms": 29.333167,
+              "server_ms": 28.44,
+              "bytes": 6997
+            },
+            {
+              "total_ms": 35.181083,
+              "server_ms": 33.19,
+              "bytes": 6997
+            }
+          ]
+        },
+        {
+          "preset": "latest",
+          "samples": 12,
+          "mean_ms": 16.543496416666667,
+          "p50_ms": 15.368771,
+          "p95_ms": 36.448166,
+          "displayed_server_mean_ms": 15.064166666666667,
+          "row_sha256": "1fa1c61b1b78c47537ee4d3d835f0f249b59195505d5905a5de6b37887ba2daf",
+          "samples_raw": [
+            {
+              "total_ms": 17.761792,
+              "server_ms": 16.61,
+              "bytes": 8206
+            },
+            {
+              "total_ms": 13.220541,
+              "server_ms": 12.24,
+              "bytes": 8206
+            },
+            {
+              "total_ms": 19.875625,
+              "server_ms": 17.15,
+              "bytes": 8206
+            },
+            {
+              "total_ms": 7.326042,
+              "server_ms": 6.72,
+              "bytes": 8205
+            },
+            {
+              "total_ms": 16.068708,
+              "server_ms": 14.11,
+              "bytes": 8206
+            },
+            {
+              "total_ms": 14.49625,
+              "server_ms": 13.46,
+              "bytes": 8206
+            },
+            {
+              "total_ms": 17.835375,
+              "server_ms": 15.88,
+              "bytes": 8206
+            },
+            {
+              "total_ms": 18.3455,
+              "server_ms": 15.36,
+              "bytes": 8206
+            },
+            {
+              "total_ms": 11.585583,
+              "server_ms": 10.89,
+              "bytes": 8206
+            },
+            {
+              "total_ms": 10.889541,
+              "server_ms": 10.15,
+              "bytes": 8206
+            },
+            {
+              "total_ms": 14.668834,
+              "server_ms": 13.55,
+              "bytes": 8206
+            },
+            {
+              "total_ms": 36.448166,
+              "server_ms": 34.65,
+              "bytes": 8206
+            }
+          ]
+        },
+        {
+          "preset": "countries",
+          "samples": 12,
+          "mean_ms": 7.6997013333333335,
+          "p50_ms": 5.914645999999999,
+          "p95_ms": 17.937083,
+          "displayed_server_mean_ms": 6.0424999999999995,
+          "row_sha256": "b774f4164b47279702481f2f2dea868ed6474eceadd69b152d11b570a10d0fe3",
+          "samples_raw": [
+            {
+              "total_ms": 5.37,
+              "server_ms": 4.86,
+              "bytes": 184
+            },
+            {
+              "total_ms": 7.199959,
+              "server_ms": 5.59,
+              "bytes": 184
+            },
+            {
+              "total_ms": 11.338791,
+              "server_ms": 9.04,
+              "bytes": 184
+            },
+            {
+              "total_ms": 5.452583,
+              "server_ms": 4.59,
+              "bytes": 184
+            },
+            {
+              "total_ms": 5.333833,
+              "server_ms": 4.55,
+              "bytes": 184
+            },
+            {
+              "total_ms": 4.222041,
+              "server_ms": 3.58,
+              "bytes": 184
+            },
+            {
+              "total_ms": 5.515458,
+              "server_ms": 4.6,
+              "bytes": 183
+            },
+            {
+              "total_ms": 9.942167,
+              "server_ms": 7.5,
+              "bytes": 183
+            },
+            {
+              "total_ms": 5.004125,
+              "server_ms": 4.51,
+              "bytes": 184
+            },
+            {
+              "total_ms": 8.766542,
+              "server_ms": 5.62,
+              "bytes": 184
+            },
+            {
+              "total_ms": 6.313834,
+              "server_ms": 5.33,
+              "bytes": 184
+            },
+            {
+              "total_ms": 17.937083,
+              "server_ms": 12.74,
+              "bytes": 185
+            }
+          ]
+        },
+        {
+          "preset": "top",
+          "samples": 12,
+          "mean_ms": 42.57152766666667,
+          "p50_ms": 43.104208,
+          "p95_ms": 63.459875,
+          "displayed_server_mean_ms": 41.04833333333333,
+          "row_sha256": "9a1e9812d14d7427c086fd128546248a2a50550c8a83f213e56d8a47e748f302",
+          "samples_raw": [
+            {
+              "total_ms": 47.724875,
+              "server_ms": 45.34,
+              "bytes": 551
+            },
+            {
+              "total_ms": 39.360375,
+              "server_ms": 38.41,
+              "bytes": 551
+            },
+            {
+              "total_ms": 45.421459,
+              "server_ms": 43.93,
+              "bytes": 551
+            },
+            {
+              "total_ms": 63.459875,
+              "server_ms": 59.9,
+              "bytes": 550
+            },
+            {
+              "total_ms": 36.465416,
+              "server_ms": 35.67,
+              "bytes": 551
+            },
+            {
+              "total_ms": 43.853,
+              "server_ms": 41.31,
+              "bytes": 551
+            },
+            {
+              "total_ms": 26.372291,
+              "server_ms": 25.68,
+              "bytes": 551
+            },
+            {
+              "total_ms": 45.700417,
+              "server_ms": 43.9,
+              "bytes": 550
+            },
+            {
+              "total_ms": 31.819875,
+              "server_ms": 31.16,
+              "bytes": 551
+            },
+            {
+              "total_ms": 48.475458,
+              "server_ms": 46.81,
+              "bytes": 551
+            },
+            {
+              "total_ms": 42.355416,
+              "server_ms": 41.38,
+              "bytes": 551
+            },
+            {
+              "total_ms": 39.849875,
+              "server_ms": 39.09,
+              "bytes": 551
+            }
+          ]
+        },
+        {
+          "preset": "history_lag",
+          "samples": 12,
+          "mean_ms": 9.584538166666666,
+          "p50_ms": 9.419896000000001,
+          "p95_ms": 15.144667,
+          "displayed_server_mean_ms": 8.548333333333334,
+          "row_sha256": "cf720310895f052f07694af0b3a47abf222b3024e9e86910efecb3e861aca061",
+          "samples_raw": [
+            {
+              "total_ms": 15.144667,
+              "server_ms": 13.03,
+              "bytes": 1975
+            },
+            {
+              "total_ms": 12.56475,
+              "server_ms": 12.02,
+              "bytes": 1975
+            },
+            {
+              "total_ms": 12.233417,
+              "server_ms": 10.25,
+              "bytes": 1975
+            },
+            {
+              "total_ms": 6.085291,
+              "server_ms": 5.49,
+              "bytes": 1974
+            },
+            {
+              "total_ms": 8.794,
+              "server_ms": 7.87,
+              "bytes": 1974
+            },
+            {
+              "total_ms": 13.859083,
+              "server_ms": 12.71,
+              "bytes": 1975
+            },
+            {
+              "total_ms": 4.660542,
+              "server_ms": 4.18,
+              "bytes": 1974
+            },
+            {
+              "total_ms": 6.541041,
+              "server_ms": 5.62,
+              "bytes": 1974
+            },
+            {
+              "total_ms": 7.727541,
+              "server_ms": 6.99,
+              "bytes": 1974
+            },
+            {
+              "total_ms": 10.661334,
+              "server_ms": 9.54,
+              "bytes": 1974
+            },
+            {
+              "total_ms": 6.697,
+              "server_ms": 5.88,
+              "bytes": 1974
+            },
+            {
+              "total_ms": 10.045792,
+              "server_ms": 9.0,
+              "bytes": 1973
+            }
+          ]
+        },
+        {
+          "preset": "seven_day_average",
+          "samples": 12,
+          "mean_ms": 25.895184083333334,
+          "p50_ms": 26.398041499999998,
+          "p95_ms": 46.411125,
+          "displayed_server_mean_ms": 24.928333333333335,
+          "row_sha256": "bf994214ab389b88b3c4ab1862cb3b4ffc81541aa2877a811358abb87eabe3a4",
+          "samples_raw": [
+            {
+              "total_ms": 26.016541,
+              "server_ms": 24.93,
+              "bytes": 2595
+            },
+            {
+              "total_ms": 27.482209,
+              "server_ms": 26.37,
+              "bytes": 2595
+            },
+            {
+              "total_ms": 24.1925,
+              "server_ms": 23.36,
+              "bytes": 2595
+            },
+            {
+              "total_ms": 27.86475,
+              "server_ms": 26.78,
+              "bytes": 2595
+            },
+            {
+              "total_ms": 14.681917,
+              "server_ms": 14.09,
+              "bytes": 2595
+            },
+            {
+              "total_ms": 26.779542,
+              "server_ms": 26.1,
+              "bytes": 2594
+            },
+            {
+              "total_ms": 46.411125,
+              "server_ms": 45.86,
+              "bytes": 2595
+            },
+            {
+              "total_ms": 15.087875,
+              "server_ms": 14.48,
+              "bytes": 2595
+            },
+            {
+              "total_ms": 14.978334,
+              "server_ms": 14.41,
+              "bytes": 2595
+            },
+            {
+              "total_ms": 31.425875,
+              "server_ms": 29.41,
+              "bytes": 2595
+            },
+            {
+              "total_ms": 20.937,
+              "server_ms": 20.13,
+              "bytes": 2595
+            },
+            {
+              "total_ms": 34.884541,
+              "server_ms": 33.22,
+              "bytes": 2595
+            }
+          ]
+        },
+        {
+          "preset": "brand_movement",
+          "samples": 12,
+          "mean_ms": 45.609638833333335,
+          "p50_ms": 46.085958500000004,
+          "p95_ms": 56.130667,
+          "displayed_server_mean_ms": 44.553333333333335,
+          "row_sha256": "8e4fc06fe2428c241cfd33c28b2ab895d3f1464e2beed0953aa9b37255cac33e",
+          "samples_raw": [
+            {
+              "total_ms": 47.253625,
+              "server_ms": 46.31,
+              "bytes": 3285
+            },
+            {
+              "total_ms": 52.862542,
+              "server_ms": 51.99,
+              "bytes": 3285
+            },
+            {
+              "total_ms": 56.130667,
+              "server_ms": 54.27,
+              "bytes": 3285
+            },
+            {
+              "total_ms": 43.384166,
+              "server_ms": 41.9,
+              "bytes": 3284
+            },
+            {
+              "total_ms": 50.621208,
+              "server_ms": 49.6,
+              "bytes": 3284
+            },
+            {
+              "total_ms": 33.016625,
+              "server_ms": 32.45,
+              "bytes": 3285
+            },
+            {
+              "total_ms": 37.999875,
+              "server_ms": 37.35,
+              "bytes": 3285
+            },
+            {
+              "total_ms": 44.918292,
+              "server_ms": 44.19,
+              "bytes": 3285
+            },
+            {
+              "total_ms": 37.151041,
+              "server_ms": 36.25,
+              "bytes": 3285
+            },
+            {
+              "total_ms": 48.280167,
+              "server_ms": 47.25,
+              "bytes": 3285
+            },
+            {
+              "total_ms": 39.930041,
+              "server_ms": 39.25,
+              "bytes": 3285
+            },
+            {
+              "total_ms": 55.767417,
+              "server_ms": 53.83,
+              "bytes": 3285
+            }
+          ]
+        }
+      ],
+      "all_full_response_means_under_10ms": false
+    },
+    "concurrent_ingestion": {
+      "passed": true,
+      "driver": "pg",
+      "rows": 2000000,
+      "writers": 4,
+      "readers": 4,
+      "commits": 2000,
+      "batchRows": 1000,
+      "boundParametersPerBatch": 3000,
+      "boundParametersSent": 6000000,
+      "writeSeconds": 7.135224582999999,
+      "separateReadOnlyRole": true,
+      "rowsPerSecond": 280299.51639715617,
+      "readerProgress": [
+        {
+          "queries": 405,
+          "overlappingQueries": 404
+        },
+        {
+          "queries": 407,
+          "overlappingQueries": 406
+        },
+        {
+          "queries": 390,
+          "overlappingQueries": 389
+        },
+        {
+          "queries": 381,
+          "overlappingQueries": 380
+        }
+      ],
+      "integrity": {
+        "n": "2000000",
+        "distinct_ids": "2000000",
+        "minimum": "0",
+        "maximum": "1999999",
+        "ids": "1999999000000",
+        "amounts": "5999997000000"
+      },
+      "complexResultsVerified": true,
+      "engine": {
+        "library_version": "v2.1.0-dev0",
+        "source_id": "848126236a"
+      },
+      "engineConfig": {
+        "threads": "2",
+        "memory_limit": "1.0 GiB"
+      },
+      "readLatency": {
+        "samples": 1583,
+        "meanMs": 17.965546466835114,
+        "p50Ms": 12.474040999999943,
+        "p95Ms": 48.97229200000038
+      },
+      "queryLatency": [
+        {
+          "query": "integrity-scan",
+          "samples": 114,
+          "overlappingWrites": 114,
+          "meanMs": 6.617016438596503,
+          "p50Ms": 4.57916700000078,
+          "p95Ms": 12.417000000000371
+        },
+        {
+          "query": "lookup",
+          "samples": 112,
+          "overlappingWrites": 112,
+          "meanMs": 5.28200035714282,
+          "p50Ms": 4.265165999999226,
+          "p95Ms": 12.53583400000025
+        },
+        {
+          "query": "grouped-join",
+          "samples": 113,
+          "overlappingWrites": 112,
+          "meanMs": 13.777182495575223,
+          "p50Ms": 11.613916000000017,
+          "p95Ms": 26.501624999999876
+        },
+        {
+          "query": "latest-window",
+          "samples": 113,
+          "overlappingWrites": 113,
+          "meanMs": 6.007336283185894,
+          "p50Ms": 5.164291000000048,
+          "p95Ms": 11.638084000000163
+        },
+        {
+          "query": "brand-movement.sql",
+          "samples": 114,
+          "overlappingWrites": 114,
+          "meanMs": 50.5881578947368,
+          "p50Ms": 48.47204199999942,
+          "p95Ms": 66.40187500000002
+        },
+        {
+          "query": "brands.sql",
+          "samples": 114,
+          "overlappingWrites": 113,
+          "meanMs": 25.426612535087724,
+          "p50Ms": 24.0364169999998,
+          "p95Ms": 42.81654100000014
+        },
+        {
+          "query": "countries.sql",
+          "samples": 113,
+          "overlappingWrites": 113,
+          "meanMs": 4.781716424778786,
+          "p50Ms": 3.6633750000000873,
+          "p95Ms": 10.684250000000247
+        },
+        {
+          "query": "latest-prices.sql",
+          "samples": 113,
+          "overlappingWrites": 113,
+          "meanMs": 10.872234893805288,
+          "p50Ms": 9.605624999999918,
+          "p95Ms": 20.74733399999991
+        },
+        {
+          "query": "market-comparison.sql",
+          "samples": 113,
+          "overlappingWrites": 113,
+          "meanMs": 31.92732294690267,
+          "p50Ms": 29.32400000000007,
+          "p95Ms": 49.428916999999274
+        },
+        {
+          "query": "prices.sql",
+          "samples": 113,
+          "overlappingWrites": 113,
+          "meanMs": 20.050360964601747,
+          "p50Ms": 18.640416999999616,
+          "p95Ms": 34.7665420000003
+        },
+        {
+          "query": "product-history.sql",
+          "samples": 113,
+          "overlappingWrites": 113,
+          "meanMs": 8.681558654867251,
+          "p50Ms": 7.131583000000319,
+          "p95Ms": 16.74304200000006
+        },
+        {
+          "query": "products.sql",
+          "samples": 113,
+          "overlappingWrites": 113,
+          "meanMs": 7.732349548672598,
+          "p50Ms": 6.57654199999979,
+          "p95Ms": 14.688333000000057
+        },
+        {
+          "query": "seven-day-average.sql",
+          "samples": 113,
+          "overlappingWrites": 112,
+          "meanMs": 21.586241451327446,
+          "p50Ms": 19.733791999999994,
+          "p95Ms": 34.682374999999865
+        },
+        {
+          "query": "top-prices.sql",
+          "samples": 112,
+          "overlappingWrites": 111,
+          "meanMs": 37.998303571428565,
+          "p50Ms": 35.96704200000022,
+          "p95Ms": 60.53908300000012
+        }
+      ],
+      "demoReferenceQueries": 10,
+      "demoQueriesVerified": 10,
+      "demoQueriesOverlappingWrites": 10,
+      "scope": "One stock Node process and eight independent network connections. Timing includes client numeric row construction, bound VALUES transport and confirmed commits; authentication, table creation, demo reference reads and final integrity checks excluded. Optional demo reads query unchanged public tables in the same database while separate ingestion tables grow. In-session integrity; no server restart."
+    },
+    "demo_preserved_after_reopen": true,
+    "owned_processes_stopped": true,
+    "fixture_removed": true,
+    "raw_receipt_sha256": "3ac627d0d772c14f6626e8e274c425307cdde8e2b01587139da6c414da673203",
+    "full_goal_accepted": false,
     "all_queries_under_10ms": false,
-    "production_deployed": false
+    "durability_scope": "1M demo and its ten typed results checked after restart. The2M stock-driver ingestion tables were verified in-session and dropped before restart."
   },
-  "stock_Node_latency": [
-    {
-      "query": "brand-movement.sql",
-      "samples": 12,
-      "returnedRows": 101,
-      "resultSha256": "6e536c39d53a9dfc9b5dd566936745b6922cac8eb78292e90249b674b2f347ee",
-      "meanMs": 60.1039375,
-      "p50Ms": 63.42762499999992,
-      "p95Ms": 68.32408400000031,
-      "minimumMs": 40.33895799999982,
-      "maximumMs": 68.32408400000031,
-      "baselineMeanMs": 62.95341649999994,
-      "resultUnchanged": true
+  "private_Linux_comparison": {
+    "status": "development source; final native40/115 CI pending",
+    "engine_commit": "0cfb63a5f712fadf06a0de33217b7b03666ae66b",
+    "measured_private_pg_source_sha256": "cd47d4cf94399f7a7f0b685f727c6010904576f6083f3781b1c677eaff35a794",
+    "measurement_scope": "Private Linux O2 matched objects: public PG52 control/current CEC ten SQL versus cd47 SELECT AST cache plus scalar brand payload candidate. Protected TLS/SCRAM, CPU1/384MiB/native threads1. Reused same seed1M, stock Node pg8.16.3, decoded typed rows. ABBA quiet timing precedes separate 2M/4W4R pressure. No production changes or WAN time claim.",
+    "source_changed_after_private_measurement": "Public version removes optional diagnostics. Final exact-source functional checks and fresh CI are reported separately.",
+    "resources": {
+      "owner_CPU": 1,
+      "owner_memory_MiB": 384,
+      "engine_threads": 1,
+      "client_memory_MiB": 192
     },
-    {
-      "query": "brands.sql",
-      "samples": 12,
-      "returnedRows": 101,
-      "resultSha256": "1b47970ae70f2ac8094052141885b76f1a8064d05cadf52ff66413a169a8f220",
-      "meanMs": 27.309270999999928,
-      "p50Ms": 29.44841699999961,
-      "p95Ms": 30.998625000000175,
-      "minimumMs": 15.033916999999747,
-      "maximumMs": 30.998625000000175,
-      "baselineMeanMs": 28.681302166666683,
-      "resultUnchanged": true
+    "driver": "Node pg8.16.3, verified TLS and SCRAM",
+    "dataset": {
+      "products": 46462,
+      "synthetic_prices": 1000000
     },
-    {
-      "query": "countries.sql",
-      "samples": 12,
-      "returnedRows": 2,
-      "resultSha256": "49b85de53b33b2cd177b3be1f0afd8dd452a2d309333776e0f517f0979661d27",
-      "meanMs": 6.3115833333332985,
-      "p50Ms": 6.886209000000235,
-      "p95Ms": 8.450124999999389,
-      "minimumMs": 2.7742080000007263,
-      "maximumMs": 8.450124999999389,
-      "baselineMeanMs": 6.962347250000145,
-      "resultUnchanged": true
-    },
-    {
-      "query": "latest-prices.sql",
-      "samples": 12,
-      "returnedRows": 101,
-      "resultSha256": "b71e41f849f5d5822c60f4a0c4d2c923c3c45f94bb6b9831ef6da7bf320e7332",
-      "meanMs": 18.32973275000025,
-      "p50Ms": 18.13666700000067,
-      "p95Ms": 20.437458000000333,
-      "minimumMs": 17.2484170000007,
-      "maximumMs": 20.437458000000333,
-      "baselineMeanMs": 17.32553133333325,
-      "resultUnchanged": true
-    },
-    {
-      "query": "market-comparison.sql",
-      "samples": 12,
-      "returnedRows": 101,
-      "resultSha256": "263fa79ac0451206f0ba25a31ac212cbce065783ab65839abd4ac8fce2fd70e6",
-      "meanMs": 33.419218750000105,
-      "p50Ms": 37.2104589999999,
-      "p95Ms": 39.409458000000086,
-      "minimumMs": 19.773833000001105,
-      "maximumMs": 39.409458000000086,
-      "baselineMeanMs": 37.668419999999664,
-      "resultUnchanged": true
-    },
-    {
-      "query": "prices.sql",
-      "samples": 12,
-      "returnedRows": 101,
-      "resultSha256": "fe29a4f91098194cb7326717b16d264f787a7935aec00bc9c13839134479af6e",
-      "meanMs": 25.141243083333695,
-      "p50Ms": 25.307834000002913,
-      "p95Ms": 27.43537500000093,
-      "minimumMs": 21.90625,
-      "maximumMs": 27.43537500000093,
-      "baselineMeanMs": 21.893093833333904,
-      "resultUnchanged": true
-    },
-    {
-      "query": "product-history.sql",
-      "samples": 12,
-      "returnedRows": 22,
-      "resultSha256": "de9d1b6c77f93db0617e36051ddec766f0982ccf94c30a6439bddc7a4f182c81",
-      "meanMs": 12.087656249999782,
-      "p50Ms": 13.505750000000262,
-      "p95Ms": 16.184917000002315,
-      "minimumMs": 5.700665999997,
-      "maximumMs": 16.184917000002315,
-      "baselineMeanMs": 32.00346183333295,
-      "resultUnchanged": true
-    },
-    {
-      "query": "products.sql",
-      "samples": 12,
-      "returnedRows": 101,
-      "resultSha256": "b83a1a13d7b5341c95b587983f30fae85b4e589b72838b45f6c7e7cdc73d1c44",
-      "meanMs": 11.99445124999996,
-      "p50Ms": 12.478416999998444,
-      "p95Ms": 14.308874999998807,
-      "minimumMs": 4.463749999998981,
-      "maximumMs": 14.308874999998807,
-      "baselineMeanMs": 13.738208333333205,
-      "resultUnchanged": true
-    },
-    {
-      "query": "seven-day-average.sql",
-      "samples": 12,
-      "returnedRows": 60,
-      "resultSha256": "789d36f5afe44f273818232ce52215938c6fa237a6f1ee8ff49f88725a214f59",
-      "meanMs": 29.221774333333695,
-      "p50Ms": 29.13654200000019,
-      "p95Ms": 32.594333000000915,
-      "minimumMs": 24.096541999999317,
-      "maximumMs": 32.594333000000915,
-      "baselineMeanMs": 35.05197558333293,
-      "resultUnchanged": true
-    },
-    {
-      "query": "top-prices.sql",
-      "samples": 12,
-      "returnedRows": 6,
-      "resultSha256": "bb76673472e9fd8281281b71ec57efdc9c14786b345b09f1bf074f7ad385bafd",
-      "meanMs": 36.796882000000245,
-      "p50Ms": 41.772750000003725,
-      "p95Ms": 45.85566699999981,
-      "minimumMs": 24.03099999999904,
-      "maximumMs": 45.85566699999981,
-      "baselineMeanMs": 43.665107500000886,
-      "resultUnchanged": true
-    }
-  ],
-  "full_Flask_latency": [
-    {
-      "preset": "products",
-      "samples": 12,
-      "mean_ms": 14.068017333333334,
-      "p50_ms": 15.718041,
-      "p95_ms": 18.113833,
-      "displayed_server_mean_ms": 12.111666666666666,
-      "row_sha256": "dff98ae0fa2e881145478253aa4af5a54e1160281821d23da35428878b403780",
-      "baseline_mean_ms": 14.143048583333334,
-      "result_unchanged": true
-    },
-    {
-      "preset": "prices",
-      "samples": 12,
-      "mean_ms": 26.810836666666667,
-      "p50_ms": 27.8945,
-      "p95_ms": 30.70575,
-      "displayed_server_mean_ms": 25.061666666666667,
-      "row_sha256": "fae09dc239f337b55e6b7ca2acf1569ab7d83455c5791dd4fc51f439ac14be0c",
-      "baseline_mean_ms": 25.821218916666666,
-      "result_unchanged": true
-    },
-    {
-      "preset": "brands",
-      "samples": 12,
-      "mean_ms": 30.487017416666667,
-      "p50_ms": 31.879624999999997,
-      "p95_ms": 33.646208,
-      "displayed_server_mean_ms": 28.708333333333332,
-      "row_sha256": "917f04964012feb0491e1d1de92ade49ed48be9531760c896a02dc2bf7f7416b",
-      "baseline_mean_ms": 30.820139,
-      "result_unchanged": true
-    },
-    {
-      "preset": "window",
-      "samples": 12,
-      "mean_ms": 38.27596891666666,
-      "p50_ms": 38.9940625,
-      "p95_ms": 43.31475,
-      "displayed_server_mean_ms": 36.678333333333335,
-      "row_sha256": "f41d8b96900b3b8a2394e7af5726c7befc84e162bfad99e9ee963df6597102de",
-      "baseline_mean_ms": 35.91285425,
-      "result_unchanged": true
-    },
-    {
-      "preset": "latest",
-      "samples": 12,
-      "mean_ms": 20.776940916666668,
-      "p50_ms": 20.946937,
-      "p95_ms": 26.889875,
-      "displayed_server_mean_ms": 18.508333333333333,
-      "row_sha256": "1fa1c61b1b78c47537ee4d3d835f0f249b59195505d5905a5de6b37887ba2daf",
-      "baseline_mean_ms": 18.728871416666667,
-      "result_unchanged": true
-    },
-    {
-      "preset": "countries",
-      "samples": 12,
-      "mean_ms": 9.20123975,
-      "p50_ms": 9.3623335,
-      "p95_ms": 14.253417,
-      "displayed_server_mean_ms": 7.845833333333333,
-      "row_sha256": "b774f4164b47279702481f2f2dea868ed6474eceadd69b152d11b570a10d0fe3",
-      "baseline_mean_ms": 8.9427395,
-      "result_unchanged": true
-    },
-    {
-      "preset": "top",
-      "samples": 12,
-      "mean_ms": 41.38066675,
-      "p50_ms": 45.622125,
-      "p95_ms": 50.567916,
-      "displayed_server_mean_ms": 40.22833333333333,
-      "row_sha256": "9a1e9812d14d7427c086fd128546248a2a50550c8a83f213e56d8a47e748f302",
-      "baseline_mean_ms": 45.39619425,
-      "result_unchanged": true
-    },
-    {
-      "preset": "history_lag",
-      "samples": 12,
-      "mean_ms": 14.313347333333333,
-      "p50_ms": 16.986978999999998,
-      "p95_ms": 19.223542,
-      "displayed_server_mean_ms": 12.879999999999999,
-      "row_sha256": "cf720310895f052f07694af0b3a47abf222b3024e9e86910efecb3e861aca061",
-      "baseline_mean_ms": 33.653187583333334,
-      "result_unchanged": true
-    },
-    {
-      "preset": "seven_day_average",
-      "samples": 12,
-      "mean_ms": 27.6204965,
-      "p50_ms": 28.624375,
-      "p95_ms": 39.000833,
-      "displayed_server_mean_ms": 26.318333333333335,
-      "row_sha256": "bf994214ab389b88b3c4ab1862cb3b4ffc81541aa2877a811358abb87eabe3a4",
-      "baseline_mean_ms": 37.05058691666667,
-      "result_unchanged": true
-    },
-    {
-      "preset": "brand_movement",
-      "samples": 12,
-      "mean_ms": 62.54259041666666,
-      "p50_ms": 64.2387295,
-      "p95_ms": 68.380209,
-      "displayed_server_mean_ms": 61.13583333333333,
-      "row_sha256": "8e4fc06fe2428c241cfd33c28b2ab895d3f1464e2beed0953aa9b37255cac33e",
-      "baseline_mean_ms": 59.079489583333334,
-      "result_unchanged": true
-    }
-  ],
-  "concurrent_client_ingestion": {
-    "passed": true,
-    "driver": "pg",
-    "rows": 2000000,
-    "writers": 4,
-    "readers": 4,
-    "commits": 2000,
-    "batchRows": 1000,
-    "boundParametersPerBatch": 3000,
-    "boundParametersSent": 6000000,
-    "writeSeconds": 7.058027041,
-    "separateReadOnlyRole": true,
-    "rowsPerSecond": 283365.30710098194,
-    "readerProgress": [
+    "quiet_queries": [
       {
-        "queries": 374,
-        "overlappingQueries": 373
+        "query": "brand-movement.sql",
+        "control_round_means_ms": [
+          202.06155300000003,
+          202.587073
+        ],
+        "candidate_round_means_ms": [
+          158.78893133333335,
+          158.0163105
+        ],
+        "control_mean_ms": 202.32431300000002,
+        "candidate_mean_ms": 158.40262091666668,
+        "difference_ms": -43.92169208333334,
+        "change_percent": -21.708558616646993,
+        "candidate_below10_ms": false,
+        "scope": "SELECT AST cache plus reviewed scalar aggregate payload"
       },
       {
-        "queries": 372,
-        "overlappingQueries": 371
+        "query": "brands.sql",
+        "control_round_means_ms": [
+          44.223913666666704,
+          45.991152833333295
+        ],
+        "candidate_round_means_ms": [
+          43.238737999999934,
+          42.18648649999992
+        ],
+        "control_mean_ms": 45.10753325,
+        "candidate_mean_ms": 42.71261224999993,
+        "difference_ms": -2.3949210000000747,
+        "change_percent": -5.309359274262851,
+        "candidate_below10_ms": false,
+        "scope": "SELECT AST cache only"
       },
       {
-        "queries": 368,
-        "overlappingQueries": 367
+        "query": "countries.sql",
+        "control_round_means_ms": [
+          7.32302050000006,
+          7.229744999999942
+        ],
+        "candidate_round_means_ms": [
+          6.3117906666667905,
+          5.798812166666721
+        ],
+        "control_mean_ms": 7.276382750000001,
+        "candidate_mean_ms": 6.055301416666756,
+        "difference_ms": -1.2210813333332444,
+        "change_percent": -16.781433512870723,
+        "candidate_below10_ms": true,
+        "scope": "SELECT AST cache only"
       },
       {
-        "queries": 379,
-        "overlappingQueries": 378
+        "query": "latest-prices.sql",
+        "control_round_means_ms": [
+          25.07002050000013,
+          25.15180799999992
+        ],
+        "candidate_round_means_ms": [
+          21.43112533333336,
+          22.073455000000042
+        ],
+        "control_mean_ms": 25.110914250000025,
+        "candidate_mean_ms": 21.7522901666667,
+        "difference_ms": -3.358624083333325,
+        "change_percent": -13.375156515192677,
+        "candidate_below10_ms": false,
+        "scope": "SELECT AST cache only"
+      },
+      {
+        "query": "market-comparison.sql",
+        "control_round_means_ms": [
+          66.12331583333328,
+          65.6058976666668
+        ],
+        "candidate_round_means_ms": [
+          61.84858400000015,
+          61.878057333333196
+        ],
+        "control_mean_ms": 65.86460675000004,
+        "candidate_mean_ms": 61.863320666666674,
+        "difference_ms": -4.001286083333362,
+        "change_percent": -6.075017039911742,
+        "candidate_below10_ms": false,
+        "scope": "SELECT AST cache only"
+      },
+      {
+        "query": "prices.sql",
+        "control_round_means_ms": [
+          38.85103033333371,
+          39.22855216666661
+        ],
+        "candidate_round_means_ms": [
+          37.301771333333214,
+          38.25948133333319
+        ],
+        "control_mean_ms": 39.039791250000164,
+        "candidate_mean_ms": 37.7806263333332,
+        "difference_ms": -1.2591649166669612,
+        "change_percent": -3.2253372171065484,
+        "candidate_below10_ms": false,
+        "scope": "SELECT AST cache only"
+      },
+      {
+        "query": "product-history.sql",
+        "control_round_means_ms": [
+          16.006162833333292,
+          15.503048833332892
+        ],
+        "candidate_round_means_ms": [
+          11.178285833333575,
+          13.505033999999645
+        ],
+        "control_mean_ms": 15.754605833333091,
+        "candidate_mean_ms": 12.341659916666611,
+        "difference_ms": -3.41294591666648,
+        "change_percent": -21.66316284121484,
+        "candidate_below10_ms": false,
+        "scope": "SELECT AST cache only"
+      },
+      {
+        "query": "products.sql",
+        "control_round_means_ms": [
+          13.831629166666668,
+          12.941346499999781
+        ],
+        "candidate_round_means_ms": [
+          11.66619049999978,
+          12.037147333333147
+        ],
+        "control_mean_ms": 13.386487833333224,
+        "candidate_mean_ms": 11.851668916666464,
+        "difference_ms": -1.5348189166667598,
+        "change_percent": -11.465433919455416,
+        "candidate_below10_ms": false,
+        "scope": "SELECT AST cache only"
+      },
+      {
+        "query": "seven-day-average.sql",
+        "control_round_means_ms": [
+          50.00909449999957,
+          48.693633999999896
+        ],
+        "candidate_round_means_ms": [
+          42.22350466666679,
+          43.23816500000036
+        ],
+        "control_mean_ms": 49.35136424999973,
+        "candidate_mean_ms": 42.730834833333574,
+        "difference_ms": -6.620529416666159,
+        "change_percent": -13.41508895909842,
+        "candidate_below10_ms": false,
+        "scope": "SELECT AST cache only"
+      },
+      {
+        "query": "top-prices.sql",
+        "control_round_means_ms": [
+          138.18118316666641,
+          121.32176133333299
+        ],
+        "candidate_round_means_ms": [
+          127.8837228333338,
+          132.51555633333342
+        ],
+        "control_mean_ms": 129.7514722499997,
+        "candidate_mean_ms": 130.1996395833336,
+        "difference_ms": 0.4481673333339131,
+        "change_percent": 0.34540443014812433,
+        "candidate_below10_ms": false,
+        "scope": "SELECT AST cache only"
       }
     ],
-    "integrity": {
-      "n": "2000000",
-      "distinct_ids": "2000000",
-      "minimum": "0",
-      "maximum": "1999999",
-      "ids": "1999999000000",
-      "amounts": "5999997000000"
+    "quiet_method": "ABBA, two6-sample round means per variant (12 timed calls/query/variant), two warmups each,100ms pauses, one reused verified TLS connection. Complete bound query and decoded row roundtrips; engine buffers may be warm. Timing raw contains aggregate percentiles/means rather than each sample. No significance, global10ms, Internet-time, or uniform gain claim. Brand combines two independently reviewed changes; nine other SQL bytes unchanged.",
+    "mixed": {
+      "rows": 2000000,
+      "commits": 2000,
+      "bound_parameters": 6000000,
+      "read_completions": 1185,
+      "overlap_read_completions": 1181,
+      "write_seconds": 147.24556348099998,
+      "rows_per_second": 13582.752191091127,
+      "all_ten_demo_queries_overlap": true
     },
-    "complexResultsVerified": true,
+    "memory": {
+      "samples": 1504,
+      "maximum_current_bytes": 272687104,
+      "cgroup_peak_bytes": 272687104,
+      "last_memory_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      }
+    },
+    "durability_scope": "Stock ingestion verifies 2M rows/checksums in-session and drops owned tables; restart verifies unchanged1M demo and absence of those dropped tables.",
+    "checks_passed": 55,
+    "full_Linux_protocol_checks_pending": true,
+    "all_queries_under_10ms": false,
+    "raw_analysis_sha256": "3344bc9c4b0cea4de4024b8f9f2394862e299cb361554bbb2ddf5cc670cc80db",
+    "qualified_previous_source": {
+      "source_commit": "cec0aeeaf4a2e51a04fadec773af0de67f6e9881",
+      "native_checks": 112,
+      "native_CI": "https://github.com/misaelzapata/duckonwire/actions/runs/38082841558",
+      "documentation_CI": "https://github.com/misaelzapata/duckonwire/actions/runs/38082843914",
+      "Docker_CI": "https://github.com/misaelzapata/duckonwire/actions/runs/38082846366"
+    },
+    "shared_host_functional_limit": "An aggregate container running the unchanged oversized protocol stress and its fixture owners exhausted 640MiB for both control and candidate. This is separate from the passed 384MiB-owner, separate-client ingestion workload; normal CI must pass the complete protocol suite.",
+    "production_deployed": false
+  },
+  "previous_local_grammar_cohort": {
+    "project": "DuckOnWire",
+    "status": "Measured performance cohorts. Final SELECT-template and scalar-aggregate source qualification is pending fresh CI; no production deployment or universal latency target is claimed.",
+    "date": "2026-10-10",
+    "platform": "macOS ARM64, Apple M1 Pro",
+    "dataset": {
+      "products": 46462,
+      "synthetic_prices": 1000000,
+      "history_days": 30,
+      "countries": [
+        "Argentina",
+        "Spain"
+      ]
+    },
+    "resources": {
+      "threads": "2",
+      "memory_limit": "1.0 GiB"
+    },
+    "driver": "pg",
     "engine": {
       "library_version": "v2.1.0-dev0",
       "source_id": "848126236a"
     },
-    "engineConfig": {
-      "threads": "2",
-      "memory_limit": "1.0 GiB"
+    "candidate_engine": {
+      "source_commit": "0cfb63a5f712fadf06a0de33217b7b03666ae66b",
+      "method": "Two native C++ objects recompiled and shared library relinked with unchanged flags. Runtime metadata retains the848 baseline ID; fresh pinned-source CI is separate.",
+      "baseline_library_sha256": "5beb16eb653a59c11a37471da2c4182ffcf882adebb1774e55d6fef2b88b6e39",
+      "candidate_library_sha256": "fbce1d4d9568a74c52de2869828869a3f909be37387acc01794f09f7e228992e",
+      "wrapper_sha256": "bd7538c05862c7e8cc0cd7f3d8c6a636fdeb5970c4cacea182deddc7b22927ed",
+      "pg_source_sha256": "30ad03b2195b79aecd32fafc3c1cb3540a238ceb0aead931ee51018b17d7bb5b",
+      "actual_native_owner_loads_verified": 3
     },
-    "readLatency": {
-      "samples": 1493,
-      "meanMs": 18.850399253851304,
-      "p50Ms": 12.94512500000019,
-      "p95Ms": 55.991291000000274
+    "functional_checks": {
+      "native": 21,
+      "embedded_transaction_flow": 14,
+      "native_engine_differential": 248,
+      "flask": 89,
+      "distinct_Node_complex_queries": 10
     },
-    "queryLatency": [
-      {
-        "query": "lookup",
-        "samples": 106,
-        "overlappingWrites": 106,
-        "meanMs": 5.740636811320754,
-        "p50Ms": 4.75262500000008,
-        "p95Ms": 12.14574999999968
-      },
-      {
-        "query": "integrity-scan",
-        "samples": 109,
-        "overlappingWrites": 108,
-        "meanMs": 5.221939559633023,
-        "p50Ms": 4.6742080000003625,
-        "p95Ms": 9.22316699999999
-      },
-      {
-        "query": "grouped-join",
-        "samples": 107,
-        "overlappingWrites": 107,
-        "meanMs": 11.309200177570087,
-        "p50Ms": 10.833750000000236,
-        "p95Ms": 19.3602920000003
-      },
-      {
-        "query": "latest-window",
-        "samples": 108,
-        "overlappingWrites": 108,
-        "meanMs": 6.629303259259284,
-        "p50Ms": 5.733541999999943,
-        "p95Ms": 14.779833000000508
-      },
+    "measurement": {
+      "reused_verified_TLS": true,
+      "bound_limit": 101,
+      "bound_offset": 0,
+      "samples_per_query": 12,
+      "warmups": 3,
+      "pause_ms": 200,
+      "full_web_samples_include": "Flask test-client request through transaction cleanup and actual JSON encoding; loopback, not Internet",
+      "all_queries_under_10ms": false,
+      "production_deployed": false
+    },
+    "stock_Node_latency": [
       {
         "query": "brand-movement.sql",
-        "samples": 108,
-        "overlappingWrites": 108,
-        "meanMs": 65.25437146296295,
-        "p50Ms": 59.268332999999984,
-        "p95Ms": 126.62116600000002
+        "samples": 12,
+        "returnedRows": 101,
+        "resultSha256": "6e536c39d53a9dfc9b5dd566936745b6922cac8eb78292e90249b674b2f347ee",
+        "meanMs": 60.1039375,
+        "p50Ms": 63.42762499999992,
+        "p95Ms": 68.32408400000031,
+        "minimumMs": 40.33895799999982,
+        "maximumMs": 68.32408400000031,
+        "baselineMeanMs": 62.95341649999994,
+        "resultUnchanged": true
       },
       {
         "query": "brands.sql",
-        "samples": 108,
-        "overlappingWrites": 107,
-        "meanMs": 25.749647703703708,
-        "p50Ms": 23.28475000000003,
-        "p95Ms": 43.040958000000046
+        "samples": 12,
+        "returnedRows": 101,
+        "resultSha256": "1b47970ae70f2ac8094052141885b76f1a8064d05cadf52ff66413a169a8f220",
+        "meanMs": 27.309270999999928,
+        "p50Ms": 29.44841699999961,
+        "p95Ms": 30.998625000000175,
+        "minimumMs": 15.033916999999747,
+        "maximumMs": 30.998625000000175,
+        "baselineMeanMs": 28.681302166666683,
+        "resultUnchanged": true
       },
       {
         "query": "countries.sql",
-        "samples": 107,
-        "overlappingWrites": 107,
-        "meanMs": 5.114126542056043,
-        "p50Ms": 3.86200000000008,
-        "p95Ms": 10.935707999999977
+        "samples": 12,
+        "returnedRows": 2,
+        "resultSha256": "49b85de53b33b2cd177b3be1f0afd8dd452a2d309333776e0f517f0979661d27",
+        "meanMs": 6.3115833333332985,
+        "p50Ms": 6.886209000000235,
+        "p95Ms": 8.450124999999389,
+        "minimumMs": 2.7742080000007263,
+        "maximumMs": 8.450124999999389,
+        "baselineMeanMs": 6.962347250000145,
+        "resultUnchanged": true
       },
       {
         "query": "latest-prices.sql",
-        "samples": 107,
-        "overlappingWrites": 107,
-        "meanMs": 12.372093028037416,
-        "p50Ms": 11.706584000000475,
-        "p95Ms": 17.69058300000006
+        "samples": 12,
+        "returnedRows": 101,
+        "resultSha256": "b71e41f849f5d5822c60f4a0c4d2c923c3c45f94bb6b9831ef6da7bf320e7332",
+        "meanMs": 18.32973275000025,
+        "p50Ms": 18.13666700000067,
+        "p95Ms": 20.437458000000333,
+        "minimumMs": 17.2484170000007,
+        "maximumMs": 20.437458000000333,
+        "baselineMeanMs": 17.32553133333325,
+        "resultUnchanged": true
       },
       {
         "query": "market-comparison.sql",
-        "samples": 107,
-        "overlappingWrites": 106,
-        "meanMs": 30.809464495327102,
-        "p50Ms": 28.974416999999903,
-        "p95Ms": 44.424417000000176
+        "samples": 12,
+        "returnedRows": 101,
+        "resultSha256": "263fa79ac0451206f0ba25a31ac212cbce065783ab65839abd4ac8fce2fd70e6",
+        "meanMs": 33.419218750000105,
+        "p50Ms": 37.2104589999999,
+        "p95Ms": 39.409458000000086,
+        "minimumMs": 19.773833000001105,
+        "maximumMs": 39.409458000000086,
+        "baselineMeanMs": 37.668419999999664,
+        "resultUnchanged": true
       },
       {
         "query": "prices.sql",
-        "samples": 106,
-        "overlappingWrites": 105,
-        "meanMs": 19.389466584905648,
-        "p50Ms": 17.844082999999955,
-        "p95Ms": 31.354999999999563
+        "samples": 12,
+        "returnedRows": 101,
+        "resultSha256": "fe29a4f91098194cb7326717b16d264f787a7935aec00bc9c13839134479af6e",
+        "meanMs": 25.141243083333695,
+        "p50Ms": 25.307834000002913,
+        "p95Ms": 27.43537500000093,
+        "minimumMs": 21.90625,
+        "maximumMs": 27.43537500000093,
+        "baselineMeanMs": 21.893093833333904,
+        "resultUnchanged": true
       },
       {
         "query": "product-history.sql",
-        "samples": 105,
-        "overlappingWrites": 105,
-        "meanMs": 8.976960304761903,
-        "p50Ms": 8.03041700000017,
-        "p95Ms": 14.904667000000245
+        "samples": 12,
+        "returnedRows": 22,
+        "resultSha256": "de9d1b6c77f93db0617e36051ddec766f0982ccf94c30a6439bddc7a4f182c81",
+        "meanMs": 12.087656249999782,
+        "p50Ms": 13.505750000000262,
+        "p95Ms": 16.184917000002315,
+        "minimumMs": 5.700665999997,
+        "maximumMs": 16.184917000002315,
+        "baselineMeanMs": 32.00346183333295,
+        "resultUnchanged": true
       },
       {
         "query": "products.sql",
-        "samples": 105,
-        "overlappingWrites": 105,
-        "meanMs": 7.917342838095286,
-        "p50Ms": 6.9777500000000146,
-        "p95Ms": 14.344375000000582
+        "samples": 12,
+        "returnedRows": 101,
+        "resultSha256": "b83a1a13d7b5341c95b587983f30fae85b4e589b72838b45f6c7e7cdc73d1c44",
+        "meanMs": 11.99445124999996,
+        "p50Ms": 12.478416999998444,
+        "p95Ms": 14.308874999998807,
+        "minimumMs": 4.463749999998981,
+        "maximumMs": 14.308874999998807,
+        "baselineMeanMs": 13.738208333333205,
+        "resultUnchanged": true
       },
       {
         "query": "seven-day-average.sql",
-        "samples": 105,
-        "overlappingWrites": 105,
-        "meanMs": 22.944902723809545,
-        "p50Ms": 21.97204099999999,
-        "p95Ms": 31.03412500000013
+        "samples": 12,
+        "returnedRows": 60,
+        "resultSha256": "789d36f5afe44f273818232ce52215938c6fa237a6f1ee8ff49f88725a214f59",
+        "meanMs": 29.221774333333695,
+        "p50Ms": 29.13654200000019,
+        "p95Ms": 32.594333000000915,
+        "minimumMs": 24.096541999999317,
+        "maximumMs": 32.594333000000915,
+        "baselineMeanMs": 35.05197558333293,
+        "resultUnchanged": true
       },
       {
         "query": "top-prices.sql",
-        "samples": 105,
-        "overlappingWrites": 105,
-        "meanMs": 36.242149161904784,
-        "p50Ms": 33.65449999999987,
-        "p95Ms": 49.53125
+        "samples": 12,
+        "returnedRows": 6,
+        "resultSha256": "bb76673472e9fd8281281b71ec57efdc9c14786b345b09f1bf074f7ad385bafd",
+        "meanMs": 36.796882000000245,
+        "p50Ms": 41.772750000003725,
+        "p95Ms": 45.85566699999981,
+        "minimumMs": 24.03099999999904,
+        "maximumMs": 45.85566699999981,
+        "baselineMeanMs": 43.665107500000886,
+        "resultUnchanged": true
       }
     ],
-    "demoReferenceQueries": 10,
-    "demoQueriesVerified": 10,
-    "demoQueriesOverlappingWrites": 10,
-    "scope": "One stock Node process and eight independent network connections. Timing includes client numeric row construction, bound VALUES transport and confirmed commits; authentication, table creation, demo reference reads and final integrity checks excluded. Optional demo reads query unchanged public tables in the same database while separate ingestion tables grow. In-session integrity; no server restart."
-  },
-  "limits": [
-    "Local engine-only and full-response timings are different scopes.",
-    "The two-million-row client workload verified counts and checksums in-session and removed its own tables; it does not establish durable reopening of those rows.",
-    "All four readers and all ten demo queries overlapped confirmed writes; demo tables were unchanged.",
-    "The same workload still OOMs on the older native library under the owned384MiB/one-CPU Linux container. The new bounded-parser implementation is not yet qualified there.",
-    "No Internet or universal sub10ms response claim."
-  ],
-  "private_evidence_sha256": {
-    "baseline": "c54f23a6c35ac41a0b39a1d2cfdff3e4b8b60ac7a30b80cecef6f66f21e68d44",
-    "candidate": "24623c3ad753cc52c460020b52d286e3c45a016acf886549541fd1c0ae97bab8"
+    "full_Flask_latency": [
+      {
+        "preset": "products",
+        "samples": 12,
+        "mean_ms": 14.068017333333334,
+        "p50_ms": 15.718041,
+        "p95_ms": 18.113833,
+        "displayed_server_mean_ms": 12.111666666666666,
+        "row_sha256": "dff98ae0fa2e881145478253aa4af5a54e1160281821d23da35428878b403780",
+        "baseline_mean_ms": 14.143048583333334,
+        "result_unchanged": true
+      },
+      {
+        "preset": "prices",
+        "samples": 12,
+        "mean_ms": 26.810836666666667,
+        "p50_ms": 27.8945,
+        "p95_ms": 30.70575,
+        "displayed_server_mean_ms": 25.061666666666667,
+        "row_sha256": "fae09dc239f337b55e6b7ca2acf1569ab7d83455c5791dd4fc51f439ac14be0c",
+        "baseline_mean_ms": 25.821218916666666,
+        "result_unchanged": true
+      },
+      {
+        "preset": "brands",
+        "samples": 12,
+        "mean_ms": 30.487017416666667,
+        "p50_ms": 31.879624999999997,
+        "p95_ms": 33.646208,
+        "displayed_server_mean_ms": 28.708333333333332,
+        "row_sha256": "917f04964012feb0491e1d1de92ade49ed48be9531760c896a02dc2bf7f7416b",
+        "baseline_mean_ms": 30.820139,
+        "result_unchanged": true
+      },
+      {
+        "preset": "window",
+        "samples": 12,
+        "mean_ms": 38.27596891666666,
+        "p50_ms": 38.9940625,
+        "p95_ms": 43.31475,
+        "displayed_server_mean_ms": 36.678333333333335,
+        "row_sha256": "f41d8b96900b3b8a2394e7af5726c7befc84e162bfad99e9ee963df6597102de",
+        "baseline_mean_ms": 35.91285425,
+        "result_unchanged": true
+      },
+      {
+        "preset": "latest",
+        "samples": 12,
+        "mean_ms": 20.776940916666668,
+        "p50_ms": 20.946937,
+        "p95_ms": 26.889875,
+        "displayed_server_mean_ms": 18.508333333333333,
+        "row_sha256": "1fa1c61b1b78c47537ee4d3d835f0f249b59195505d5905a5de6b37887ba2daf",
+        "baseline_mean_ms": 18.728871416666667,
+        "result_unchanged": true
+      },
+      {
+        "preset": "countries",
+        "samples": 12,
+        "mean_ms": 9.20123975,
+        "p50_ms": 9.3623335,
+        "p95_ms": 14.253417,
+        "displayed_server_mean_ms": 7.845833333333333,
+        "row_sha256": "b774f4164b47279702481f2f2dea868ed6474eceadd69b152d11b570a10d0fe3",
+        "baseline_mean_ms": 8.9427395,
+        "result_unchanged": true
+      },
+      {
+        "preset": "top",
+        "samples": 12,
+        "mean_ms": 41.38066675,
+        "p50_ms": 45.622125,
+        "p95_ms": 50.567916,
+        "displayed_server_mean_ms": 40.22833333333333,
+        "row_sha256": "9a1e9812d14d7427c086fd128546248a2a50550c8a83f213e56d8a47e748f302",
+        "baseline_mean_ms": 45.39619425,
+        "result_unchanged": true
+      },
+      {
+        "preset": "history_lag",
+        "samples": 12,
+        "mean_ms": 14.313347333333333,
+        "p50_ms": 16.986978999999998,
+        "p95_ms": 19.223542,
+        "displayed_server_mean_ms": 12.879999999999999,
+        "row_sha256": "cf720310895f052f07694af0b3a47abf222b3024e9e86910efecb3e861aca061",
+        "baseline_mean_ms": 33.653187583333334,
+        "result_unchanged": true
+      },
+      {
+        "preset": "seven_day_average",
+        "samples": 12,
+        "mean_ms": 27.6204965,
+        "p50_ms": 28.624375,
+        "p95_ms": 39.000833,
+        "displayed_server_mean_ms": 26.318333333333335,
+        "row_sha256": "bf994214ab389b88b3c4ab1862cb3b4ffc81541aa2877a811358abb87eabe3a4",
+        "baseline_mean_ms": 37.05058691666667,
+        "result_unchanged": true
+      },
+      {
+        "preset": "brand_movement",
+        "samples": 12,
+        "mean_ms": 62.54259041666666,
+        "p50_ms": 64.2387295,
+        "p95_ms": 68.380209,
+        "displayed_server_mean_ms": 61.13583333333333,
+        "row_sha256": "8e4fc06fe2428c241cfd33c28b2ab895d3f1464e2beed0953aa9b37255cac33e",
+        "baseline_mean_ms": 59.079489583333334,
+        "result_unchanged": true
+      }
+    ],
+    "concurrent_client_ingestion": {
+      "passed": true,
+      "driver": "pg",
+      "rows": 2000000,
+      "writers": 4,
+      "readers": 4,
+      "commits": 2000,
+      "batchRows": 1000,
+      "boundParametersPerBatch": 3000,
+      "boundParametersSent": 6000000,
+      "writeSeconds": 7.058027041,
+      "separateReadOnlyRole": true,
+      "rowsPerSecond": 283365.30710098194,
+      "readerProgress": [
+        {
+          "queries": 374,
+          "overlappingQueries": 373
+        },
+        {
+          "queries": 372,
+          "overlappingQueries": 371
+        },
+        {
+          "queries": 368,
+          "overlappingQueries": 367
+        },
+        {
+          "queries": 379,
+          "overlappingQueries": 378
+        }
+      ],
+      "integrity": {
+        "n": "2000000",
+        "distinct_ids": "2000000",
+        "minimum": "0",
+        "maximum": "1999999",
+        "ids": "1999999000000",
+        "amounts": "5999997000000"
+      },
+      "complexResultsVerified": true,
+      "engine": {
+        "library_version": "v2.1.0-dev0",
+        "source_id": "848126236a"
+      },
+      "engineConfig": {
+        "threads": "2",
+        "memory_limit": "1.0 GiB"
+      },
+      "readLatency": {
+        "samples": 1493,
+        "meanMs": 18.850399253851304,
+        "p50Ms": 12.94512500000019,
+        "p95Ms": 55.991291000000274
+      },
+      "queryLatency": [
+        {
+          "query": "lookup",
+          "samples": 106,
+          "overlappingWrites": 106,
+          "meanMs": 5.740636811320754,
+          "p50Ms": 4.75262500000008,
+          "p95Ms": 12.14574999999968
+        },
+        {
+          "query": "integrity-scan",
+          "samples": 109,
+          "overlappingWrites": 108,
+          "meanMs": 5.221939559633023,
+          "p50Ms": 4.6742080000003625,
+          "p95Ms": 9.22316699999999
+        },
+        {
+          "query": "grouped-join",
+          "samples": 107,
+          "overlappingWrites": 107,
+          "meanMs": 11.309200177570087,
+          "p50Ms": 10.833750000000236,
+          "p95Ms": 19.3602920000003
+        },
+        {
+          "query": "latest-window",
+          "samples": 108,
+          "overlappingWrites": 108,
+          "meanMs": 6.629303259259284,
+          "p50Ms": 5.733541999999943,
+          "p95Ms": 14.779833000000508
+        },
+        {
+          "query": "brand-movement.sql",
+          "samples": 108,
+          "overlappingWrites": 108,
+          "meanMs": 65.25437146296295,
+          "p50Ms": 59.268332999999984,
+          "p95Ms": 126.62116600000002
+        },
+        {
+          "query": "brands.sql",
+          "samples": 108,
+          "overlappingWrites": 107,
+          "meanMs": 25.749647703703708,
+          "p50Ms": 23.28475000000003,
+          "p95Ms": 43.040958000000046
+        },
+        {
+          "query": "countries.sql",
+          "samples": 107,
+          "overlappingWrites": 107,
+          "meanMs": 5.114126542056043,
+          "p50Ms": 3.86200000000008,
+          "p95Ms": 10.935707999999977
+        },
+        {
+          "query": "latest-prices.sql",
+          "samples": 107,
+          "overlappingWrites": 107,
+          "meanMs": 12.372093028037416,
+          "p50Ms": 11.706584000000475,
+          "p95Ms": 17.69058300000006
+        },
+        {
+          "query": "market-comparison.sql",
+          "samples": 107,
+          "overlappingWrites": 106,
+          "meanMs": 30.809464495327102,
+          "p50Ms": 28.974416999999903,
+          "p95Ms": 44.424417000000176
+        },
+        {
+          "query": "prices.sql",
+          "samples": 106,
+          "overlappingWrites": 105,
+          "meanMs": 19.389466584905648,
+          "p50Ms": 17.844082999999955,
+          "p95Ms": 31.354999999999563
+        },
+        {
+          "query": "product-history.sql",
+          "samples": 105,
+          "overlappingWrites": 105,
+          "meanMs": 8.976960304761903,
+          "p50Ms": 8.03041700000017,
+          "p95Ms": 14.904667000000245
+        },
+        {
+          "query": "products.sql",
+          "samples": 105,
+          "overlappingWrites": 105,
+          "meanMs": 7.917342838095286,
+          "p50Ms": 6.9777500000000146,
+          "p95Ms": 14.344375000000582
+        },
+        {
+          "query": "seven-day-average.sql",
+          "samples": 105,
+          "overlappingWrites": 105,
+          "meanMs": 22.944902723809545,
+          "p50Ms": 21.97204099999999,
+          "p95Ms": 31.03412500000013
+        },
+        {
+          "query": "top-prices.sql",
+          "samples": 105,
+          "overlappingWrites": 105,
+          "meanMs": 36.242149161904784,
+          "p50Ms": 33.65449999999987,
+          "p95Ms": 49.53125
+        }
+      ],
+      "demoReferenceQueries": 10,
+      "demoQueriesVerified": 10,
+      "demoQueriesOverlappingWrites": 10,
+      "scope": "One stock Node process and eight independent network connections. Timing includes client numeric row construction, bound VALUES transport and confirmed commits; authentication, table creation, demo reference reads and final integrity checks excluded. Optional demo reads query unchanged public tables in the same database while separate ingestion tables grow. In-session integrity; no server restart."
+    },
+    "limits": [
+      "Local engine-only and full-response timings are different scopes.",
+      "The two-million-row client workload verified counts and checksums in-session and removed its own tables; it does not establish durable reopening of those rows.",
+      "All four readers and all ten demo queries overlapped confirmed writes; demo tables were unchanged.",
+      "The same workload still OOMs on the older native library under the owned384MiB/one-CPU Linux container. The new bounded-parser implementation is not yet qualified there.",
+      "No Internet or universal sub10ms response claim."
+    ],
+    "private_evidence_sha256": {
+      "baseline": "c54f23a6c35ac41a0b39a1d2cfdff3e4b8b60ac7a30b80cecef6f66f21e68d44",
+      "candidate": "24623c3ad753cc52c460020b52d286e3c45a016acf886549541fd1c0ae97bab8"
+    }
   }
 }
