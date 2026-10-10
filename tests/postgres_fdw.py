@@ -46,7 +46,8 @@ def main():
     args.server = args.server.resolve()
     args.password_program = args.password_program.resolve()
     args.pg_bin = args.pg_bin.resolve()
-    args.psql = args.psql.resolve()
+    # Debian's pg_wrapper dispatches from argv[0]; keep the psql launcher name.
+    args.psql = args.psql.absolute()
     args.examples = args.examples.resolve()
     if args.rows < 1003:
         parser.error("--rows must be at least 1003 to exercise multiple remote pages")

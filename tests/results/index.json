@@ -44,7 +44,7 @@
     },
     {
       "path": "neon-integration.json",
-      "sha256": "0e9c38d60065ec563fc496d5e7ef7f79bbb629abb3d0ca706eb6fe4726353a32"
+      "sha256": "901045ff6193a47340fef3f3628b621b91c3faa329243fe5c36401211b358238"
     }
   ],
   "benchmark_runs": [
@@ -523,6 +523,15 @@
       "baseline_public_result_sha256": "430268a57d4fa858831d5c3c838e8ff4eae56afa8cb0aaf290ee43a41fd86090",
       "performance_receipt_sha256": "d0d5d7d532c637645f4d5e3240fa4aba39b72e09939a982835404058692706c3",
       "previous_neon_receipt_sha256": "8db68b5be557769c61d9f7cd19e7808fb82367c18e73230b169a02e52d613da1"
+    },
+    "before_psql_launcher_fix": {
+      "test_source_sha256": "472f0b4635e65e63e6b7163c17e0a5c3d92a01a3feb1edb419917453f681947a",
+      "local_postgres_fdw_checks": 20,
+      "local_server_sha256": "e00b783423f517f33b54dfc83c70328e79d2cb4df4fd79589735a16ec4bc32f4",
+      "local_receipt_sha256": "67db8ff6e029e353d3e61e513659099e6c11ab9fe4ae428398de1cebe868899f",
+      "public_result_sha256": "0e9c38d60065ec563fc496d5e7ef7f79bbb629abb3d0ca706eb6fe4726353a32",
+      "source_head": "e1449999eed999d6a9064e636d9f43cdd4b303fa",
+      "ci_scope": "Superseded CI candidate failed while resolving the Debian psql launcher; native engine and transport unchanged"
     }
   },
   "current_source_qualification": {
@@ -532,7 +541,7 @@
     "source_sha256": {
       "src/pgwire.cpp": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
       "tests/pgwire_protocol_tests.cpp": "d1a90c03169aa6652c30e27f54bf31d4c5c83eeb5d37e74d8fcc77b6440848ab",
-      "tests/postgres_fdw.py": "472f0b4635e65e63e6b7163c17e0a5c3d92a01a3feb1edb419917453f681947a",
+      "tests/postgres_fdw.py": "645d482fc057998b5278a39c05d12d5763785be9a70e979d151c3f0b745face2",
       "tests/flask_playground.py": "f4dbb12ed45fb88104b0b669dafbaa2fc654aadb14efd861be08015aef043987",
       "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
       "examples/postgres/flask/gunicorn.conf.py": "8fb7bcd8349046340f40dd0c0c3fe1aa4dc4635615ab5b951c7279a9b7ab4b84",
@@ -549,7 +558,8 @@
     "manual_web_review": "passed",
     "deployed_flask_checks": 42,
     "public_https_checks": 17,
-    "result_sha256": "0e9c38d60065ec563fc496d5e7ef7f79bbb629abb3d0ca706eb6fe4726353a32"
+    "result_sha256": "901045ff6193a47340fef3f3628b621b91c3faa329243fe5c36401211b358238",
+    "postgres_fdw_qualification_receipt_sha256": "c203aa408b3f3d1ac862d64d508f01ca3a614eba69cf1d12235748b33cfadf95"
   },
   "neon": {
     "result": "neon-integration.json",
@@ -587,5 +597,5 @@
     "manual_web_review": "passed",
     "browser_timing_scope": "Single actual browser observations: displayed server elapsed_ms and browser ResourceTiming recorded separately; 32-request HTTPS distributions appear in neon-integration.json"
   },
-  "updated_utc": "2026-10-10T14:47:40.736447+00:00"
+  "updated_utc": "2026-10-10T15:04:59.861340+00:00"
 }
