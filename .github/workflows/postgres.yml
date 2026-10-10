@@ -1,6 +1,11 @@
 name: PostgreSQL driver compatibility
 on:
   workflow_call:
+    inputs:
+      package_artifact:
+        description: Optional fresh native package from this workflow run
+        type: string
+        default: ''
   workflow_dispatch:
 permissions:
   contents: read
@@ -18,8 +23,31 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Dependencies
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ libpq-dev libcurl4t64 libssl-dev python3-venv
-      - name: Reuse the qualified pinned engine
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ libpq-dev libcurl4t64 libssl-dev python3-venv postgresql postgresql-contrib jq
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        if: inputs.package_artifact != ''
+        with:
+          name: ${{ inputs.package_artifact }}
+          path: build/native-input
+      - name: Use the fresh package from this release run
+        if: inputs.package_artifact != ''
+        run: |
+          mkdir -p build/engine build/bin build/test-results
+          archives=(build/native-input/*.tar.gz)
+          manifests=(build/native-input/*.manifest.json)
+          test "${#archives[@]}" = 1
+          test "${#manifests[@]}" = 1
+          (cd build/native-input && sha256sum --check *.sha256)
+          jq -e --arg head "$GITHUB_SHA" '.source_head == $head' "${manifests[0]}"
+          tar -xzf "${archives[0]}" -C build/engine --strip-components=1
+          ln -s engine/lib build/lib
+          for program in duckonwire-server duckonwire-password access-tests scram-tests pgwire-protocol-tests native-tests transaction-flow attach-client attach-tests; do
+            cp "build/engine/bin/$program" build/bin/
+          done
+          git rev-parse HEAD > build/test-results/source-head.txt
+          sha256sum src/pgwire.cpp src/server.cpp src/scram.cpp src/access.cpp build/engine/lib/libduckdb.so > build/test-results/provenance.sha256
+      - name: Reuse the qualified pinned engine for focused guide checks
+        if: inputs.package_artifact == ''
         # The engine pins have not changed. Compile this server and its tests
         # afresh against the immutable rc.4 library, verifying the whole archive.
         run: |
@@ -43,6 +71,7 @@ jobs:
           test -f build/engine/include/duckdb.hpp
           sha256sum src/pgwire.cpp src/server.cpp src/scram.cpp src/access.cpp build/engine/lib/libduckdb.so > build/test-results/provenance.sha256
       - name: Compile current native server and protocol tests
+        if: inputs.package_artifact == ''
         run: |
           flags=(-std=c++17 -O2 -march=x86-64-v3 -Iinclude -Ibuild/engine/include -Itests/support -Iexamples/demo)
           libraries=(-Lbuild/engine/lib -lduckdb -pthread -lssl -lcrypto '-Wl,-rpath,$ORIGIN/../engine/lib')
@@ -56,7 +85,8 @@ jobs:
           g++ "${flags[@]}" examples/attach.cpp "${libraries[@]}" -o build/bin/attach-client
           g++ "${flags[@]}" tests/attach_tests.cpp "${libraries[@]}" -o build/bin/attach-tests
           sha256sum examples/attach.cpp tests/attach_tests.cpp README.md AGENTS.md >> build/test-results/provenance.sha256
-          cc -I"$(pg_config --includedir)" examples/postgres/c/crud.c -L"$(pg_config --libdir)" -lpq -o build/bin/pg-crud
+      - name: Compile the ordinary libpq client
+        run: cc -I"$(pg_config --includedir)" examples/postgres/c/crud.c -L"$(pg_config --libdir)" -lpq -o build/bin/pg-crud
       - name: Verify the guide against the fresh server help
         run: cmake -DSOURCE_DIR="$PWD" -DSERVER_BINARY="$PWD/build/bin/duckonwire-server" -DREPORT_FILE="$PWD/build/test-results/documentation.json" -P cmake/DocumentationTests.cmake
       - name: Native acceptance against the fresh server
@@ -68,11 +98,19 @@ jobs:
           build/bin/attach-tests --server build/bin/duckonwire-server --client build/bin/attach-client --fixture-parent build/test-results | tee build/test-results/attach.json
       - name: Install ordinary drivers
         run: |
-          npm install --prefix examples/postgres/node --ignore-scripts
+          npm ci --prefix examples/postgres/node --ignore-scripts
           python3 -m venv build/pg-python
           build/pg-python/bin/pip install -r examples/postgres/python/requirements.txt
           python3 -m venv build/flask-python
           build/flask-python/bin/pip install -r examples/postgres/flask/requirements.txt
+      - name: Actual postgres_fdw tutorial and read-only transactions
+        run: |
+          build/pg-python/bin/python tests/postgres_fdw.py \
+            --server build/bin/duckonwire-server --password-program build/bin/duckonwire-password \
+            --pg-bin "$(pg_config --bindir)" --psql "$(command -v psql)" \
+            --fixture-parent build/fdw-fixtures | tee build/test-results/postgres-fdw.json
+          jq -e '.passed and .owned_fixture_cleanup_complete and (.checks | length == 20) and all(.checks[]; .passed)' build/test-results/postgres-fdw.json
+          printf '## PostgreSQL FDW\n\n20 actual checks passed using the public setup/query/cleanup SQL, a protected reader and verified TLS. These are separate from the 106 native/bootstrap checks.\n' >> "$GITHUB_STEP_SUMMARY"
       - name: Stock drivers and two million rows with complex reads
         run: |
           mkdir -p build/pg-fixture
@@ -183,4 +221,8 @@ jobs:
         if: always()
         with:
           name: postgres-linux-results
-          path: build/test-results/
+          path: |
+            build/test-results/*.json
+            build/test-results/*.log
+            build/test-results/*.sha256
+            build/test-results/source-head.txt

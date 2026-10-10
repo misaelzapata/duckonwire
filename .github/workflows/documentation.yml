@@ -4,6 +4,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      package_artifact:
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -22,6 +27,8 @@ jobs:
   executable-tutorial:
     needs: guide
     uses: ./.github/workflows/postgres.yml
+    with:
+      package_artifact: ${{ inputs.package_artifact || '' }}
     # Reuses the verified pinned engine, compiles the current C++ server, checks
     # --help, and runs native/protocol tests and C/Python/Node TLS/SCRAM examples.
     # The VALUES smoke sends 100,000 rows with 4 writers and 4 read-only clients.

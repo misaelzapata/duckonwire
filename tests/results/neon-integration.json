@@ -1,0 +1,1115 @@
+{
+  "project": "DuckOnWire",
+  "version": "0.3.0",
+  "status": "Current source functional acceptance passed locally, on the isolated AWS owner and through real Neon; fresh CI and package qualification are reported independently",
+  "source_snapshot": "Current working tree based on f213b6c52d14998fe39c5060fe18546906179772; exact tested file hashes below",
+  "source_sha256": {
+    "src/pgwire.cpp": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
+    "tests/pgwire_protocol_tests.cpp": "d1a90c03169aa6652c30e27f54bf31d4c5c83eeb5d37e74d8fcc77b6440848ab",
+    "tests/postgres_fdw.py": "472f0b4635e65e63e6b7163c17e0a5c3d92a01a3feb1edb419917453f681947a",
+    "tests/flask_playground.py": "f4dbb12ed45fb88104b0b669dafbaa2fc654aadb14efd861be08015aef043987",
+    "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
+    "examples/postgres/flask/gunicorn.conf.py": "8fb7bcd8349046340f40dd0c0c3fe1aa4dc4635615ab5b951c7279a9b7ab4b84",
+    "examples/postgres/flask/requirements.txt": "ecc7f5741f0d3489177e686fd4486f02906b6befe25c7312c22f8f696476f700",
+    "examples/postgres/flask/static/app.css": "8bc906a9e4db602e0e26e36e580090853c4def1f30db12e8eedd1943f08e3551",
+    "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
+    "examples/postgres/flask/static/duckonwire-logo.png": "197ff502adb593bbf825af2b7b1387c31040c6719ac410314b63ac5c3d00d17e",
+    "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1"
+  },
+  "local": {
+    "platform": "macOS ARM64",
+    "native_ctest_suites": 7,
+    "native_unique_checks": 106,
+    "suite_counts": {
+      "native-tests": 21,
+      "native-attach": 12,
+      "pgwire-protocol": 31,
+      "access-rules": 13,
+      "scram-authentication": 12,
+      "bootstrap-regressions": 17
+    },
+    "double_counted_embedded_flow_checks": false,
+    "benchmark_counted_as_unit_checks": false,
+    "server_sha256": "e00b783423f517f33b54dfc83c70328e79d2cb4df4fd79589735a16ec4bc32f4",
+    "library_sha256": "5beb16eb653a59c11a37471da2c4182ffcf882adebb1774e55d6fef2b88b6e39",
+    "postgres_fdw": {
+      "passed": true,
+      "scope": "Owned local PostgreSQL postgres_fdw backend, real protected reader, actual public SQL tutorial",
+      "native_used": true,
+      "remote_neon_accessed": false,
+      "existing_databases_opened": false,
+      "tls": "verify-full with an owned CA visible to the owned PostgreSQL backend",
+      "server_sha256": "e00b783423f517f33b54dfc83c70328e79d2cb4df4fd79589735a16ec4bc32f4",
+      "tutorial_sha256": {
+        "setup.sql": "78e98bea09b0952c71c4f1fda123a970f992fbf74bb9e9d045ba664c65af56cd",
+        "query.sql": "4a583bb164f14ecf38bd4b275a0658b67f6729db9f17132a74b4b0e1815b580a",
+        "cleanup.sql": "2620975fafb894282e45fc60b7e8015f50b2dfe43be939357306c10bcefc4eb0"
+      },
+      "checks": [
+        {
+          "name": "same_connection_reads_and_writes_with_native_transactions",
+          "passed": true,
+          "connection_count": 1,
+          "operations": [
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "COMMIT",
+            "ROLLBACK"
+          ]
+        },
+        {
+          "name": "protected_reader_tls_and_write_denial",
+          "passed": true
+        },
+        {
+          "name": "read_only_savepoint_runtime_error_preserves_snapshot",
+          "passed": true
+        },
+        {
+          "name": "read_only_savepoint_parser_error_preserves_snapshot",
+          "passed": true
+        },
+        {
+          "name": "read_only_savepoint_extended_protocol_preserves_snapshot",
+          "passed": true
+        },
+        {
+          "name": "savepoint_nesting_duplicate_names_and_release",
+          "passed": true
+        },
+        {
+          "name": "savepoint_cursor_lifecycle_and_fetch_position",
+          "passed": true
+        },
+        {
+          "name": "savepoint_recovery_does_not_enable_writes_or_temp_ddl",
+          "passed": true
+        },
+        {
+          "name": "savepoint_cancel_recovery_preserves_snapshot",
+          "passed": true
+        },
+        {
+          "name": "writer_savepoints_rejected_without_fake_rollback",
+          "passed": true
+        },
+        {
+          "name": "actual_neon_setup_sql",
+          "passed": true
+        },
+        {
+          "name": "actual_neon_query_sql",
+          "passed": true
+        },
+        {
+          "name": "postgres_fdw_complete_pagination",
+          "passed": true,
+          "rows": 16003,
+          "foreign_fetch_size": 1000
+        },
+        {
+          "name": "postgres_fdw_typed_null_decimal_date_and_binary",
+          "passed": true
+        },
+        {
+          "name": "postgres_fdw_prepared_parameter_reuse",
+          "passed": true
+        },
+        {
+          "name": "postgres_fdw_local_join_cte_window_aggregate",
+          "passed": true
+        },
+        {
+          "name": "postgres_fdw_real_subtransaction_error_preserves_snapshot",
+          "passed": true
+        },
+        {
+          "name": "postgres_fdw_readonly_option_and_remote_role_denial",
+          "passed": true
+        },
+        {
+          "name": "actual_neon_cleanup_sql",
+          "passed": true
+        },
+        {
+          "name": "tutorial_objects_removed_without_remote_data_changes",
+          "passed": true
+        }
+      ],
+      "postgresql": "initdb (PostgreSQL) 14.19 (Homebrew)",
+      "engine": "v2.1.0-dev0",
+      "controlled_snapshot_mutations_restored": true,
+      "owned_fixture_cleanup_complete": true,
+      "source_test": "tests/postgres_fdw.py"
+    },
+    "flask": {
+      "scope": "Ordinary Flask/psycopg client against an existing TLS/SCRAM reader role; no server orchestration or engine build",
+      "driver": "psycopg",
+      "driver_version": "3.3.6",
+      "pool_driver": "psycopg_pool",
+      "pool_version": "3.3.3",
+      "checks": [
+        {
+          "name": "TLS hostname and certificate verification enabled",
+          "passed": true
+        },
+        {
+          "name": "HTML page renders without backend credentials",
+          "passed": true
+        },
+        {
+          "name": "catalog lists actual protected database tables without credentials",
+          "passed": true
+        },
+        {
+          "name": "table details contain native columns and bounded sample preview",
+          "passed": true
+        },
+        {
+          "name": "table preview uses the same read-only response contract",
+          "passed": true
+        },
+        {
+          "name": "catalog cannot accept backend connection overrides",
+          "passed": true
+        },
+        {
+          "name": "unknown tables have sanitized not-found responses",
+          "passed": true
+        },
+        {
+          "name": "identifier injection does not become executable SQL",
+          "passed": true
+        },
+        {
+          "name": "duplicate identifier query arguments rejected",
+          "passed": true
+        },
+        {
+          "name": "control characters rejected before identifier binding",
+          "passed": true
+        },
+        {
+          "name": "real unusual identifiers are safely quoted for sample previews",
+          "passed": true
+        },
+        {
+          "name": "actual catalog preset products",
+          "passed": true
+        },
+        {
+          "name": "actual catalog preset prices",
+          "passed": true
+        },
+        {
+          "name": "actual catalog preset brands",
+          "passed": true
+        },
+        {
+          "name": "actual catalog preset window",
+          "passed": true
+        },
+        {
+          "name": "actual catalog preset latest",
+          "passed": true
+        },
+        {
+          "name": "actual catalog preset countries",
+          "passed": true
+        },
+        {
+          "name": "database-side cap preserves exactly 200 requested rows",
+          "passed": true
+        },
+        {
+          "name": "invalid row limit rejected 0",
+          "passed": true
+        },
+        {
+          "name": "invalid row limit rejected 201",
+          "passed": true
+        },
+        {
+          "name": "invalid row limit rejected True",
+          "passed": true
+        },
+        {
+          "name": "invalid row limit rejected 200",
+          "passed": true
+        },
+        {
+          "name": "exact decimal, date, boolean, integer, blob and literal HTML output",
+          "passed": true
+        },
+        {
+          "name": "nonfinite native floats produce valid browser JSON",
+          "passed": true
+        },
+        {
+          "name": "native reader rule rejects external file SQL",
+          "passed": true
+        },
+        {
+          "name": "multiple statements cannot escape the derived query",
+          "passed": true
+        },
+        {
+          "name": "SQL errors are sanitized",
+          "passed": true
+        },
+        {
+          "name": "browser cannot replace backend connection settings",
+          "passed": true
+        },
+        {
+          "name": "real reader denies mutation independently of Flask",
+          "passed": true
+        },
+        {
+          "name": "result column count is bounded",
+          "passed": true
+        },
+        {
+          "name": "serialized result bytes are bounded",
+          "passed": true
+        },
+        {
+          "name": "background reset starts before another checkout",
+          "passed": true
+        },
+        {
+          "name": "sessions remain unavailable while their full reset is incomplete",
+          "passed": true
+        },
+        {
+          "name": "completed reset releases the same clean idle session",
+          "passed": true
+        },
+        {
+          "name": "failed background reset retires and replaces the native session",
+          "passed": true
+        },
+        {
+          "name": "bounded pool rejects an exhausted checkout promptly",
+          "passed": true
+        },
+        {
+          "name": "normal requests return idle sessions and disable automatic prepare",
+          "passed": true
+        },
+        {
+          "name": "successive requests reuse one authenticated native session",
+          "passed": true
+        },
+        {
+          "name": "execution errors reset the session before its next request",
+          "passed": true
+        },
+        {
+          "name": "reused connection starts a fresh snapshot for each request",
+          "passed": true
+        },
+        {
+          "name": "native watchdog cancellation retires and replaces the session",
+          "passed": true
+        },
+        {
+          "name": "expensive query is canceled and its native session retired",
+          "passed": true
+        },
+        {
+          "name": "replacement session survives after the completed cancellation timer",
+          "passed": true
+        },
+        {
+          "name": "closed pooled sockets are replaced before executing a new request",
+          "passed": true
+        },
+        {
+          "name": "connection reusable and catalog unchanged after errors and cancellation",
+          "passed": true
+        }
+      ],
+      "passed": true,
+      "native_reader_verified": true,
+      "rows_limit": 200,
+      "source_sha256": {
+        "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
+        "examples/postgres/flask/gunicorn.conf.py": "8fb7bcd8349046340f40dd0c0c3fe1aa4dc4635615ab5b951c7279a9b7ab4b84",
+        "examples/postgres/flask/requirements.txt": "ecc7f5741f0d3489177e686fd4486f02906b6befe25c7312c22f8f696476f700",
+        "examples/postgres/flask/static/app.css": "8bc906a9e4db602e0e26e36e580090853c4def1f30db12e8eedd1943f08e3551",
+        "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
+        "examples/postgres/flask/static/duckonwire-logo.png": "197ff502adb593bbf825af2b7b1387c31040c6719ac410314b63ac5c3d00d17e",
+        "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1"
+      },
+      "test_source_sha256": "f4dbb12ed45fb88104b0b669dafbaa2fc654aadb14efd861be08015aef043987",
+      "checks_count": 45
+    },
+    "paired_engine_unchanged": true,
+    "native_acceptance": {
+      "passed": true,
+      "suites": 7,
+      "checks": 106,
+      "seconds": 18.82,
+      "receipt_sha256": "a20c8ceeb35b84e1e80bd1a863f1bfde85d6d38136c98a99481c9a8e1d84517d",
+      "summary_sha256": "9bf5a27a2bf378ad834deaef127758a87b2b9004cf9821d15e47f7d32edb0026",
+      "embedded_flow_counted_twice": false,
+      "benchmark_counted_as_unit_checks": false
+    }
+  },
+  "aws": {
+    "compiler_scope": "Development server glue built with -O0; optimized pinned engine unchanged; no throughput claim",
+    "runtime": {
+      "source_pgwire_sha256": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
+      "server_sha256": "58422efd92d7dffacda6e7806c0322dfbbbcc2d26f0e0be5d66f147681289d9e",
+      "library_sha256": "09f483318725618bc007352ec7c4cd7ad22f321c53559ba82bf9bcb32d838db3"
+    },
+    "native_checks": 21,
+    "postgres_protocol_checks": 31,
+    "attach_checks": 12,
+    "executed_binary_hash_verified": true,
+    "native_acceptance_sha256": "9be50e5d4635ba7c3c57fb0119b243bce1b641a7d6b3b57aa19eef264362013d",
+    "owner_receipt_sha256": "ecbc196a7a46e244576fe75551297cd52107fdeafdc1f145d5364573dca285c5"
+  },
+  "neon": {
+    "passed": true,
+    "status": "qualified_real_neon_readonly_functional",
+    "real_neon_accessed": true,
+    "scope": "Real Neon postgres_fdw to the isolated protected DuckOnWire owner; public manufacturer demo and fictional prices",
+    "tls": {
+      "neon": "verify-full/channel_binding=require",
+      "foreign_server": "verify-full/system CA",
+      "direct_native": "verify-full/SCRAM-SHA-256; no SCRAM-PLUS claim"
+    },
+    "public_sql_sha256": {
+      "setup.sql": "78e98bea09b0952c71c4f1fda123a970f992fbf74bb9e9d045ba664c65af56cd",
+      "query.sql": "4a583bb164f14ecf38bd4b275a0658b67f6729db9f17132a74b4b0e1815b580a",
+      "cleanup.sql": "2620975fafb894282e45fc60b7e8015f50b2dfe43be939357306c10bcefc4eb0"
+    },
+    "permanent_objects_left_functional": true,
+    "extra_cleanup_complete": true,
+    "original_application_or_database_modified": false,
+    "checks": [
+      {
+        "name": "real_neon_and_native_preflight",
+        "passed": true,
+        "seconds": 0.5136761670000851,
+        "result": {
+          "postgres_fdw_installed": true,
+          "permanent_names_absent": true
+        }
+      },
+      {
+        "name": "actual_public_setup_sql",
+        "passed": true,
+        "seconds": 2.729224166017957,
+        "result": {
+          "exit_code": 0,
+          "stdout_bytes": 0,
+          "source_sha256": "78e98bea09b0952c71c4f1fda123a970f992fbf74bb9e9d045ba664c65af56cd"
+        }
+      },
+      {
+        "name": "actual_public_query_sql",
+        "passed": true,
+        "seconds": 9.214156999951228,
+        "result": {
+          "exit_code": 0,
+          "stdout_bytes": 2023,
+          "source_sha256": "4a583bb164f14ecf38bd4b275a0658b67f6729db9f17132a74b4b0e1815b580a"
+        }
+      },
+      {
+        "name": "complete_46462_ordered_foreign_paging",
+        "passed": true,
+        "seconds": 35.43729316594545,
+        "result": {
+          "rows": 46462,
+          "client_pages": 47,
+          "client_fetchmany": 997,
+          "foreign_fetch_size": 1000,
+          "ordered_ids_sha256": "7dcdbd11151e3ed1de09f63a1770351d6ec4b91605d26074a932ec22166ae307"
+        }
+      },
+      {
+        "name": "neon_local_join_cte_window_aggregate",
+        "passed": true,
+        "seconds": 9.68877100001555,
+        "result": {
+          "bounded_window_groups": 1,
+          "rows_per_group": 10,
+          "country_counts": {
+            "AR": 29274,
+            "ES": 17188
+          }
+        }
+      },
+      {
+        "name": "bound_prepared_parameter_reuse_and_pushdown",
+        "passed": true,
+        "seconds": 15.525665582972579,
+        "result": {
+          "executions": 6,
+          "stock_psycopg_prepare": true,
+          "remote_parameter_pushdown": true
+        }
+      },
+      {
+        "name": "same_writer_connection_crud_and_foreign_types",
+        "passed": true,
+        "seconds": 3.7167128330329433,
+        "result": {
+          "same_writer_connection": true,
+          "crud_commit_rollback": true,
+          "foreign_types": [
+            "integer",
+            "boolean",
+            "date",
+            "bytea",
+            "null",
+            "numeric"
+          ]
+        }
+      },
+      {
+        "name": "actual_neon_fdw_savepoint_error_recovers_same_snapshot",
+        "passed": true,
+        "seconds": 8.087962833000347,
+        "result": {
+          "remote_conversion_sqlstate": "22P02",
+          "aborted_sqlstate": "25P02",
+          "old_snapshot_preserved": true,
+          "new_snapshot_observed": true,
+          "fictional_price_restored": true
+        }
+      },
+      {
+        "name": "real_foreign_and_direct_read_role_write_denial",
+        "passed": true,
+        "seconds": 2.974341499968432,
+        "result": {
+          "permanent_fdw_options_deny": "55000",
+          "actual_remote_reader_deny": "42501",
+          "direct_reader_deny": "42501",
+          "zero_row_write_predicate": true
+        }
+      },
+      {
+        "name": "small_native_bound_values_write_with_neon_foreign_reader_overlap",
+        "passed": true,
+        "seconds": 11.118244749959558,
+        "result": {
+          "commits": 10,
+          "reader_queries": 2,
+          "overlap_queries": 2,
+          "rows": 2000,
+          "rows_per_batch": 200,
+          "values_bound_per_batch": 600,
+          "checksum_equal": true,
+          "seconds_excludes_setup": 10.863370458013378,
+          "scope": "Small WAN fixture only; not a production throughput benchmark"
+        }
+      }
+    ],
+    "neon_postgresql_version": "17.11 (7d7ea2a)",
+    "native_version": "v2.1.0-dev0",
+    "native_source_id": "848126236a",
+    "snapshot_mutation_restored": true,
+    "functional_passed": true,
+    "limitations": [
+      "Manual foreign-table schema; IMPORT FOREIGN SCHEMA not implemented",
+      "Forward non-hold SELECT cursors only",
+      "SAVEPOINT recovery limited to genuine protected read-only sessions and known finalized query errors",
+      "FDW writes/subtransactions for writer roles are unsupported",
+      "Small concurrent WAN fixture is separate from historical throughput/durable-load qualification"
+    ],
+    "extra_neon_objects_removed": true,
+    "extra_native_tables_removed": true,
+    "runtime": {
+      "source_pgwire_sha256": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
+      "server_sha256": "58422efd92d7dffacda6e7806c0322dfbbbcc2d26f0e0be5d66f147681289d9e",
+      "library_sha256": "09f483318725618bc007352ec7c4cd7ad22f321c53559ba82bf9bcb32d838db3"
+    },
+    "reproducible_local_test": "tests/postgres_fdw.py",
+    "receipt_sha256": "f51691be90b633b35339c681ed294ec2b63396a193d62c303ca341c541c48041"
+  },
+  "manual_web_review": {
+    "passed": true,
+    "status": "passed",
+    "public_site": "https://dow.ofertasya.app/",
+    "checked_utc": "2026-10-10T14:45:31.174636+00:00",
+    "scope": "Actual browser SQL editor/button/keyboard interactions after native TCP_NODELAY and fixed warm pooled connections with reset-before-reuse",
+    "source_sha256": {
+      "src/pgwire.cpp": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
+      "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
+      "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
+      "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1"
+    },
+    "evidence_receipt_sha256": "ec27e3864db7de5fc17366dee9070d09f14d57140be3553803aa85c9bce0eaa2",
+    "queries": [
+      {
+        "name": "join",
+        "passed": true,
+        "visible_summary": "5 rows · 18.2 ms",
+        "query_receipt_sha256": "71f42758e15bd3af7b1722a7c02fc4f26f1382e79fd7654f32f019c865113b93",
+        "browser_resource_timing": [
+          {
+            "duration_ms": 80.29999995231628,
+            "transfer_bytes": 829
+          }
+        ]
+      },
+      {
+        "name": "window",
+        "passed": true,
+        "visible_summary": "6 rows · 143.83 ms",
+        "query_receipt_sha256": "89286bee2258637634fd083e75b9a9b1a79a553df7c30a317b92b8183fce274e",
+        "browser_resource_timing": [
+          {
+            "duration_ms": 205.39999997615814,
+            "transfer_bytes": 865
+          }
+        ]
+      },
+      {
+        "name": "aggregate",
+        "passed": true,
+        "visible_summary": "5 rows · 20.05 ms",
+        "query_receipt_sha256": "2c898761052ee143f1820617f6e2fcb5b85e22a2cdcf159a7ace51e2432119ff",
+        "browser_resource_timing": [
+          {
+            "duration_ms": 83.89999997615814,
+            "transfer_bytes": 645
+          }
+        ]
+      },
+      {
+        "name": "bad-sql",
+        "passed": true,
+        "visible_summary": "Query not completed",
+        "query_receipt_sha256": "9e1d5fcdda2d57b94c770bd5f55f66124bfdb02217e29e65dc8b1d65cd45a454",
+        "browser_resource_timing": []
+      },
+      {
+        "name": "recovery",
+        "passed": true,
+        "visible_summary": "1 rows · 13.38 ms",
+        "query_receipt_sha256": "0d066479c1ae1f3741b192edbca960701b5f01801569b3e027fbb27ed61a60ed",
+        "browser_resource_timing": []
+      }
+    ],
+    "catalog": {
+      "products": 46462,
+      "brands": 178,
+      "countries": 2
+    },
+    "desktop": {
+      "viewport": [
+        1440,
+        1000
+      ],
+      "manually_reviewed": true,
+      "screenshot_sha256": "b71b94cebcf7bb9796d219da26def22ce365ff3424b01c94f944dded52a4eed2"
+    },
+    "mobile": {
+      "viewport": [
+        390,
+        844
+      ],
+      "manually_reviewed": true,
+      "document_width": 390,
+      "keyboard_control_enter": 42,
+      "screenshot_sha256": "11391e7e3db18e64f4ce77a4ed1c8c4c386e0f7545919e8d943444ba1c45a49b"
+    },
+    "tables_columns_and_editor_selection_passed": true,
+    "prices": "fictional",
+    "timing_scope": "Single displayed backend timings and separate ResourceTiming request durations; 32-request HTTPS distribution measured independently in performance-after.json",
+    "expected_console_errors": "One expected HTTP400 from intentional invalid SQL; no favicon error"
+  },
+  "ci": {
+    "workflow": ".github/workflows/release.yml",
+    "scope": "Fresh paired engine and package, 106 native checks, 20 real postgres_fdw integration checks, C/Python/Node, AMD64/ARM64 Docker",
+    "results": "https://github.com/misaelzapata/duckonwire/actions",
+    "status": "Current functional checks above passed on the recorded source hashes; fresh package and CI receipts are published separately by Actions and the versioned release manifest",
+    "package_release": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.3.0",
+    "package_manifest": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/release.json"
+  },
+  "limitations": [
+    "Manual foreign-table schema; IMPORT FOREIGN SCHEMA not implemented",
+    "Forward non-hold SELECT cursors only",
+    "SAVEPOINT recovery limited to genuine protected read-only sessions and known finalized query errors",
+    "FDW writes/subtransactions for writer roles are unsupported",
+    "Small concurrent WAN fixture is separate from historical throughput/durable-load qualification"
+  ],
+  "historical_acceptance": {
+    "before_tcp_and_pool": {
+      "status": "Historical functional baseline before TCP_NODELAY and Flask database pooling",
+      "source_sha256": {
+        "src/pgwire.cpp": "c0925594f78ae5307c49dde7d7b92c69d4e18605b86917383eec93e954122100",
+        "tests/pgwire_protocol_tests.cpp": "d1a90c03169aa6652c30e27f54bf31d4c5c83eeb5d37e74d8fcc77b6440848ab",
+        "tests/postgres_fdw.py": "472f0b4635e65e63e6b7163c17e0a5c3d92a01a3feb1edb419917453f681947a",
+        "tests/flask_playground.py": "0965b30c316828a71a1fc662b01839484a4f679b0572ffa669d423ee1c70c263"
+      },
+      "local_server_sha256": "5a63dd791703823de0480652b61f541bfed9dcc7d0a362b4677d16b56f152509",
+      "local_library_sha256": "5beb16eb653a59c11a37471da2c4182ffcf882adebb1774e55d6fef2b88b6e39",
+      "aws_runtime": {
+        "source_pgwire_sha256": "c0925594f78ae5307c49dde7d7b92c69d4e18605b86917383eec93e954122100",
+        "server_sha256": "a07cb8f8879930d001338b039f1b244e62a0c02d07597ed4245110d5eb8b707a",
+        "library_sha256": "09f483318725618bc007352ec7c4cd7ad22f321c53559ba82bf9bcb32d838db3"
+      },
+      "native_unique_checks": 106,
+      "postgres_fdw_checks": 20,
+      "flask_checks": 33,
+      "flask_source_sha256": {
+        "examples/postgres/flask/app.py": "3f021b22338e30022e3c84c102671472e66b95ba67897861a1c216a87ed6997b",
+        "examples/postgres/flask/requirements.txt": "6f0d19cb106cc6e2db17d852f4ba054a1e96dc921cb675d98ac5a6a2f3af858c",
+        "examples/postgres/flask/static/app.css": "8bc906a9e4db602e0e26e36e580090853c4def1f30db12e8eedd1943f08e3551",
+        "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
+        "examples/postgres/flask/static/duckonwire-logo.png": "197ff502adb593bbf825af2b7b1387c31040c6719ac410314b63ac5c3d00d17e",
+        "examples/postgres/flask/templates/index.html": "d98b9445e10b79dd91f1bbddbed98d1a32a8097a8b79749615f69437648a3c6e"
+      },
+      "neon_checks": 10,
+      "baseline_public_result_sha256": "430268a57d4fa858831d5c3c838e8ff4eae56afa8cb0aaf290ee43a41fd86090",
+      "performance_receipt_sha256": "d0d5d7d532c637645f4d5e3240fa4aba39b72e09939a982835404058692706c3",
+      "previous_neon_receipt_sha256": "8db68b5be557769c61d9f7cd19e7808fb82367c18e73230b169a02e52d613da1"
+    }
+  },
+  "flask_pool": {
+    "passed": true,
+    "driver": "psycopg_pool",
+    "version": "3.3.3",
+    "physical_connections_prewarmed_per_worker": 2,
+    "limits": {
+      "connections_per_worker": 2,
+      "gunicorn_workers": 2,
+      "maximum_waiting_per_worker": 2,
+      "checkout_timeout_seconds": 3,
+      "max_lifetime_seconds": 3600,
+      "background_workers_per_pool": 1
+    },
+    "reset": "Synchronous timerjoin and rollback; officialpool background DISCARD and autocommitrestore. Session remains unavailable until reset completes; failed/cancelled/closed sessions retire.",
+    "local_checks": 45,
+    "deployed_checks": 42,
+    "public_https_checks": 17,
+    "backend_tls_verification": "verify-full",
+    "backend_role": "protected read-only",
+    "deployed_source_hashes_verified": true,
+    "source_sha256": {
+      "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
+      "examples/postgres/flask/gunicorn.conf.py": "8fb7bcd8349046340f40dd0c0c3fe1aa4dc4635615ab5b951c7279a9b7ab4b84",
+      "examples/postgres/flask/requirements.txt": "ecc7f5741f0d3489177e686fd4486f02906b6befe25c7312c22f8f696476f700",
+      "examples/postgres/flask/static/app.css": "8bc906a9e4db602e0e26e36e580090853c4def1f30db12e8eedd1943f08e3551",
+      "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
+      "examples/postgres/flask/static/duckonwire-logo.png": "197ff502adb593bbf825af2b7b1387c31040c6719ac410314b63ac5c3d00d17e",
+      "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1"
+    },
+    "test_source_sha256": "f4dbb12ed45fb88104b0b669dafbaa2fc654aadb14efd861be08015aef043987",
+    "local_receipt_sha256": "d019277fa3265fca6ac259800711c355c8508db9c1a3f5df7d7775b5157eb414",
+    "pool_receipt_sha256": "852069b0e7ba03d6b23a777ec7082f3dcb079baf8322b0090cc79c274e2c233e",
+    "deployment_receipt_sha256": "beb710fc5d24832d78469147fadad9882089ad7d3404811a77cb31f049604107",
+    "limitations": [
+      "Initial physical TLS/SCRAM login remains costly; postfork warmup covers both availableconnections",
+      "Tight bursts may wait for the previous asynchronous reset",
+      "API elapsed excludes finalrollback/queue insertion; fullpublicHTTPS wall is measured separately",
+      "Performance combines nativeTCPNODELAY and apppool changes, no standalone engine throughput claim"
+    ]
+  },
+  "documentation": {
+    "passed": true,
+    "server_help_checked": true,
+    "supported_server_options": 13,
+    "documents": 3,
+    "links": 80,
+    "anchors": 14,
+    "fences": 24,
+    "checked_utc": "2026-10-10T14:31:43.090879+00:00",
+    "source_sha256": {
+      "README.md": "c5bfd2d4a095065401e8c0136937f0b89249be10b1ca25f08c9b4cf2036f6abc",
+      "AGENTS.md": "62dbaff9f07a3c211f45f3bcde2dd7204450b4f5c51592a6703cfa918b48fc2e",
+      "docs/neon.md": "e0fbff12f58d3aeba49f619126c6c1a3c1949972145cd94747e7c7169f1d168e",
+      "cmake/DocumentationTests.cmake": "67a8bd6d22f1ce10dade9a4ac744884ca71c19cfbbf52af8d4c8ed0c684e99e2"
+    },
+    "server_sha256": "e00b783423f517f33b54dfc83c70328e79d2cb4df4fd79589735a16ec4bc32f4"
+  },
+  "public_playground_performance": {
+    "passed": true,
+    "public_endpoint": "https://dow.ofertasya.app/query",
+    "measurement": "Sequential verified-HTTPS POST calls from one macOS ARM64 client to the public AWS demo",
+    "queries": {
+      "constant": "SELECT 42 AS answer",
+      "products_aggregate": "SELECT country_code, COUNT(*) AS products FROM products GROUP BY country_code ORDER BY country_code"
+    },
+    "samples_per_query_per_cohort": 8,
+    "successful_measured_calls_per_stage": 32,
+    "one_https_session_warmup_excluded": true,
+    "same_reused_https_socket_verified": true,
+    "rows_verified": true,
+    "before": {
+      "measured_utc": "2026-10-10T14:07:04.896432+00:00",
+      "backend": "fresh database TLS/SCRAM connection per request; no connection pool; TCP_NODELAY not yet enabled",
+      "receipt_sha256": "d0d5d7d532c637645f4d5e3240fa4aba39b72e09939a982835404058692706c3",
+      "cohorts": {
+        "fresh_https": {
+          "constant": {
+            "http_total_ms": {
+              "count": 8,
+              "mean_ms": 558.176,
+              "min_ms": 539.597,
+              "max_ms": 581.307,
+              "median_ms": 561.844
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 307.15250000000003,
+              "min_ms": 295.49,
+              "max_ms": 319.91,
+              "median_ms": 307.055
+            },
+            "curl_process_wall_ms": {
+              "count": 8,
+              "mean_ms": 581.2677344947588,
+              "min_ms": 563.3050000760704,
+              "max_ms": 601.2084169778973,
+              "median_ms": 584.4090000609867
+            }
+          },
+          "products_aggregate": {
+            "http_total_ms": {
+              "count": 8,
+              "mean_ms": 562.830375,
+              "min_ms": 523.4609999999999,
+              "max_ms": 686.987,
+              "median_ms": 541.3485
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 303.83875,
+              "min_ms": 297.36,
+              "max_ms": 323.3,
+              "median_ms": 298.15
+            },
+            "curl_process_wall_ms": {
+              "count": 8,
+              "mean_ms": 583.3349375316175,
+              "min_ms": 537.8364999778569,
+              "max_ms": 707.7506249770522,
+              "median_ms": 564.079333038535
+            }
+          }
+        },
+        "reused_https": {
+          "constant": {
+            "client_request_body_wall_ms": {
+              "count": 8,
+              "mean_ms": 415.101276099449,
+              "min_ms": 409.6685419790447,
+              "max_ms": 424.5082079432905,
+              "median_ms": 413.98556251078844
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 301.08875,
+              "min_ms": 294.26,
+              "max_ms": 314.04,
+              "median_ms": 297.81
+            }
+          },
+          "products_aggregate": {
+            "client_request_body_wall_ms": {
+              "count": 8,
+              "mean_ms": 417.3276772489771,
+              "min_ms": 399.9077919870615,
+              "max_ms": 433.9432920096442,
+              "median_ms": 415.10014596860856
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 302.06125,
+              "min_ms": 297.9,
+              "max_ms": 320.82,
+              "median_ms": 299.78
+            }
+          }
+        }
+      }
+    },
+    "intermediate": {
+      "status": "Historical intermediate phase; synchronous session reset before HTTP response",
+      "receipt_sha256": "e4b824887ca8d625ba02737fbf570d4ce5d9c1f75c5dbd6bc367dfec071a80b2",
+      "cohorts": {
+        "fresh_https": {
+          "constant": {
+            "http_total_ms": {
+              "count": 8,
+              "mean_ms": 235.191125,
+              "min_ms": 214.985,
+              "max_ms": 324.413,
+              "median_ms": 221.16899999999998
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 5.6975,
+              "min_ms": 5.44,
+              "max_ms": 6.02,
+              "median_ms": 5.65
+            },
+            "curl_process_wall_ms": {
+              "count": 8,
+              "mean_ms": 262.62197400501464,
+              "min_ms": 234.26679195836186,
+              "max_ms": 386.7185410344973,
+              "median_ms": 244.31995855411515
+            }
+          },
+          "products_aggregate": {
+            "http_total_ms": {
+              "count": 8,
+              "mean_ms": 230.223625,
+              "min_ms": 220.429,
+              "max_ms": 237.726,
+              "median_ms": 233.8835
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 9.76125,
+              "min_ms": 9.22,
+              "max_ms": 10.78,
+              "median_ms": 9.585
+            },
+            "curl_process_wall_ms": {
+              "count": 8,
+              "mean_ms": 254.89098936668597,
+              "min_ms": 244.82958298176527,
+              "max_ms": 262.54004100337625,
+              "median_ms": 256.3444374827668
+            }
+          }
+        },
+        "reused_https": {
+          "constant": {
+            "client_request_body_wall_ms": {
+              "count": 8,
+              "mean_ms": 88.44022375706118,
+              "min_ms": 84.18545895256102,
+              "max_ms": 92.53770799841732,
+              "median_ms": 88.77520804526284
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 5.7525,
+              "min_ms": 5.63,
+              "max_ms": 5.92,
+              "median_ms": 5.735
+            }
+          },
+          "products_aggregate": {
+            "client_request_body_wall_ms": {
+              "count": 8,
+              "mean_ms": 89.63488550216425,
+              "min_ms": 85.73829103261232,
+              "max_ms": 94.38291704282165,
+              "median_ms": 88.97079195594415
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 10.15875,
+              "min_ms": 9.4,
+              "max_ms": 11.72,
+              "median_ms": 10.085
+            }
+          }
+        }
+      }
+    },
+    "final": {
+      "measured_utc": "2026-10-10T14:41:11.947355+00:00",
+      "backend": "TCP_NODELAY; prewarmed bounded database pool; background session reset finishes before reuse",
+      "receipt_sha256": "7f1d10b34ef12bcb5498c8e0a6d493fb894df9afd86711eaf478a739ef74d162",
+      "source_sha256": {
+        "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
+        "examples/postgres/flask/gunicorn.conf.py": "8fb7bcd8349046340f40dd0c0c3fe1aa4dc4635615ab5b951c7279a9b7ab4b84",
+        "examples/postgres/flask/requirements.txt": "ecc7f5741f0d3489177e686fd4486f02906b6befe25c7312c22f8f696476f700",
+        "src/pgwire.cpp": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23"
+      },
+      "server_sha256": "58422efd92d7dffacda6e7806c0322dfbbbcc2d26f0e0be5d66f147681289d9e",
+      "library_sha256": "09f483318725618bc007352ec7c4cd7ad22f321c53559ba82bf9bcb32d838db3",
+      "cohorts": {
+        "fresh_https": {
+          "constant": {
+            "http_total_ms": {
+              "count": 8,
+              "mean_ms": 209.02462500000001,
+              "min_ms": 198.047,
+              "max_ms": 217.205,
+              "median_ms": 209.74200000000002
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 5.6899999999999995,
+              "min_ms": 5.57,
+              "max_ms": 6.01,
+              "median_ms": 5.63
+            },
+            "curl_process_wall_ms": {
+              "count": 8,
+              "mean_ms": 229.45150011219084,
+              "min_ms": 216.53449989389628,
+              "max_ms": 240.02795899286866,
+              "median_ms": 231.2724170042202
+            }
+          },
+          "products_aggregate": {
+            "http_total_ms": {
+              "count": 8,
+              "mean_ms": 210.781,
+              "min_ms": 200.324,
+              "max_ms": 223.926,
+              "median_ms": 210.0595
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 9.6175,
+              "min_ms": 9.21,
+              "max_ms": 10.43,
+              "median_ms": 9.585
+            },
+            "curl_process_wall_ms": {
+              "count": 8,
+              "mean_ms": 232.4007864954183,
+              "min_ms": 222.0517919631675,
+              "max_ms": 247.05283297225833,
+              "median_ms": 230.52497894968837
+            }
+          }
+        },
+        "reused_https": {
+          "constant": {
+            "client_request_body_wall_ms": {
+              "count": 8,
+              "mean_ms": 69.86334901012015,
+              "min_ms": 65.54191699251533,
+              "max_ms": 73.60616698861122,
+              "median_ms": 69.97037504334003
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 5.6525,
+              "min_ms": 5.51,
+              "max_ms": 5.8,
+              "median_ms": 5.67
+            }
+          },
+          "products_aggregate": {
+            "client_request_body_wall_ms": {
+              "count": 8,
+              "mean_ms": 74.63472375820857,
+              "min_ms": 72.76895805262029,
+              "max_ms": 76.14354102406651,
+              "median_ms": 74.7757704812102
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 9.8225,
+              "min_ms": 9.09,
+              "max_ms": 11.39,
+              "median_ms": 9.54
+            }
+          }
+        }
+      }
+    },
+    "before_to_final": {
+      "constant": {
+        "fresh_https": {
+          "http_total_ms": {
+            "before_mean_ms": 558.176,
+            "after_mean_ms": 209.02462500000001,
+            "reduction_ms": 349.15137500000003,
+            "reduction_percent": 62.55220127701657,
+            "mean_ratio_before_over_after": 2.670383932036716
+          },
+          "ui_backend_elapsed_ms": {
+            "before_mean_ms": 307.15250000000003,
+            "after_mean_ms": 5.6899999999999995,
+            "reduction_ms": 301.46250000000003,
+            "reduction_percent": 98.1475000203482,
+            "mean_ratio_before_over_after": 53.981107205623914
+          }
+        },
+        "warm_https": {
+          "client_request_body_wall_ms": {
+            "before_mean_ms": 415.101276099449,
+            "after_mean_ms": 69.86334901012015,
+            "reduction_ms": 345.2379270893289,
+            "reduction_percent": 83.16956534882286,
+            "mean_ratio_before_over_after": 5.941617199589429
+          },
+          "ui_backend_elapsed_ms": {
+            "before_mean_ms": 301.08875,
+            "after_mean_ms": 5.6525,
+            "reduction_ms": 295.43625000000003,
+            "reduction_percent": 98.12264656185262,
+            "mean_ratio_before_over_after": 53.266475011057054
+          }
+        }
+      },
+      "products_aggregate": {
+        "fresh_https": {
+          "http_total_ms": {
+            "before_mean_ms": 562.830375,
+            "after_mean_ms": 210.781,
+            "reduction_ms": 352.049375,
+            "reduction_percent": 62.54981796247226,
+            "mean_ratio_before_over_after": 2.6702139898757475
+          },
+          "ui_backend_elapsed_ms": {
+            "before_mean_ms": 303.83875,
+            "after_mean_ms": 9.6175,
+            "reduction_ms": 294.22125,
+            "reduction_percent": 96.83466970555928,
+            "mean_ratio_before_over_after": 31.59227969846634
+          }
+        },
+        "warm_https": {
+          "client_request_body_wall_ms": {
+            "before_mean_ms": 417.3276772489771,
+            "after_mean_ms": 74.63472375820857,
+            "reduction_ms": 342.69295349076856,
+            "reduction_percent": 82.11603786976208,
+            "mean_ratio_before_over_after": 5.59160208860662
+          },
+          "ui_backend_elapsed_ms": {
+            "before_mean_ms": 302.06125,
+            "after_mean_ms": 9.8225,
+            "reduction_ms": 292.23875,
+            "reduction_percent": 96.74817607356125,
+            "mean_ratio_before_over_after": 30.751972512089587
+          }
+        }
+      }
+    },
+    "scope": {
+      "http_total": "Curl DNS/TCP/TLS/request/server response/body transport; excludes curl process startup",
+      "ui_backend_timer": "Application elapsed_ms includes pooled database acquisition, query and result conversion; excludes HTTP transit, synchronous rollback and background session reset. Timer join and rollback still complete before the HTTP response.",
+      "warmness": "New curl HTTPS connection per fresh call. Same requests TLS socket verified across one warmup plus16 calls; database pooling deployed and prewarmed for both cohorts. Fresh HTTPS does not mean a cold database connection.",
+      "not_a_database_benchmark": true,
+      "code_or_cloud_mutated": false,
+      "browser_wall_clock": "Not measured; displayed UI ms is server JSON elapsed_ms, not click-to-render duration.",
+      "attribution": "Combined TCP_NODELAY transport change, prewarmed Flask database pool, and background DISCARD ALL reset. No isolated attribution claim; reset finishes before connection reuse."
+    },
+    "client_tools": {
+      "fresh_https": "curl 8.7.1 with normal certificate verification",
+      "reused_https": "requests 2.34.2",
+      "certificate_bundle": "certifi 2026.07.22"
+    },
+    "limitations": [
+      "Small sequential response-time sample, not a throughput benchmark or a latency guarantee",
+      "HTTPS connection setup is included in the fresh cohort; both final cohorts use an already prewarmed database pool",
+      "Application elapsed_ms excludes network and final connection cleanup; full client response time is reported separately",
+      "TCP_NODELAY, connection pooling and reset scheduling changed together; these results do not isolate their individual effects"
+    ]
+  },
+  "updated_utc": "2026-10-10T14:47:40.736447+00:00"
+}

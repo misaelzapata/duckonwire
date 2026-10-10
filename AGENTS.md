@@ -18,7 +18,15 @@ Quack is trusted local access: PostgreSQL's per-user read/write rules and query 
 
 Set passwords through environment variables or protected input. Never put credentials in command arguments, URLs, logs, screenshots or result JSON. Without `DUCKONWIRE_TOKEN`, the owner generates a token in its private mode-0600 descriptor. Protected users have separate credentials; the descriptor token is not their PostgreSQL password. Never disable TLS verification to make a test pass.
 
-The [Flask playground](examples/postgres/flask/app.py) is a separate ordinary Flask/psycopg application, not a server or client SDK. Configure a genuine protected reader through backend `PG*` variables and verified TLS; system trust roots are the default, with `PGSSLROOTCERT` for private CAs. Keep connection settings out of browser inputs. Each request must cap result rows and query time, then roll back and close its connection; validate the reader's actual write denial when testing this example.
+The [Flask playground](examples/postgres/flask/app.py) is an ordinary Flask/psycopg application. Configure a genuine protected reader through backend `PG*` variables and verified TLS; system trust roots are the default, with `PGSSLROOTCERT` for private CAs. Keep connection settings out of browser inputs. Each worker uses a bounded connection pool initialized after forking. Each request must cap result rows and query time, stop and join its cancellation timer, then roll back before returning the connection. The pool's background reset must complete before that session is available to another request. Close cancelled or broken connections so they are replaced. Validate actual write denial, connection reuse, fresh snapshots, reset completion and cancellation recovery when testing this example.
+
+## Neon and postgres_fdw
+
+The human setup guide is [docs/neon.md](docs/neon.md). Use [examples/neon/setup.sql](examples/neon/setup.sql), [query.sql](examples/neon/query.sql) and [cleanup.sql](examples/neon/cleanup.sql) through ordinary `psql`, not a custom client. Use psql/libpq 16+ for `\getenv` and system CA trust. The user's normal `PG*` settings connect to Neon; `duckonwire_host`, `duckonwire_port`, `duckonwire_database`, `duckonwire_user` and `duckonwire_password` are psql variables for the separate outgoing DuckOnWire connection. Setup can read them from `DUCKONWIRE_FDW_*` environment variables. Prompt for the remote password with hidden Bash `read -s`, export it briefly, and unset it after setup; do not put its value in `-v`, a URL, shell history, echoed SQL or public evidence.
+
+The remote endpoint must be reachable from Neon, use a publicly trusted certificate and a real protected read-only account. Keep `sslmode=verify-full`, `updatable=false` and `truncatable=false`. The default `sslrootcert=system` uses trusted public CAs; `duckonwire_sslrootcert` / `DUCKONWIRE_FDW_SSLROOTCERT` can name a CA file readable by the PostgreSQL backend for an isolated fixture. Do not relax TLS verification. Map only `CURRENT_USER`, never `PUBLIC`. The mapping stores the reader credential in Neon; don't claim that credentials are absent from PostgreSQL catalogs. Manual foreign-table columns must match the demo schema; do not assume `IMPORT FOREIGN SCHEMA` or arbitrary PostgreSQL catalog compatibility.
+
+Setup creates the `duckonwire` schema/server in one transaction and fails on existing names. Cleanup deliberately has no `CASCADE`: it must not remove other schemas, mappings or remote data. Keep the interactive window-query sample bounded; qualify changes with the actual provided SQL. PostgreSQL FDW transactions, cursor operations and savepoints require their own runtime checks; ordinary-driver tests do not establish full FDW or write support. Use an isolated Neon namespace/database for tests and preserve the user's permanent configuration.
 
 ## Ownership, isolation and transactions
 
@@ -27,6 +35,7 @@ The [Flask playground](examples/postgres/flask/app.py) is a separate ordinary Fl
 - Stop only a process your task owns. Use graceful termination for cleanup; crash tests must target an isolated fixture owner. Preserve other servers, databases and user edits; do not overwrite an active library or remove another process's descriptor.
 - Bind data values with the driver's prepared API. `COMMIT` confirms writes; `ROLLBACK` discards them. Disconnect rolls back pending work. After an explicit transaction fails, roll back before reuse.
 - Native snapshots last until the transaction ends, including requested PostgreSQL `READ COMMITTED`. `SERIALIZABLE` is unsupported. On write conflicts, roll back and re-read. If a connection breaks during `COMMIT`, reconcile the outcome before repeating a non-idempotent write.
+- PostgreSQL savepoints work only inside an explicit transaction on a protected read-only connection. Recoverable query errors can roll back to that savepoint while retaining the native snapshot. Writer and legacy shared-token connections reject savepoints with SQLSTATE `0A000`; internal, fatal or memory errors require a full rollback.
 - Protected mode blocks external file/network SQL and configuration changes. Import data locally before enabling it. Limits and cancellation are cooperative engine controls, not hard process-memory or I/O deadlines.
 
 ## Build and verify
@@ -47,7 +56,7 @@ cmake -DSOURCE_DIR=. -DSERVER_BINARY=build/bin/duckonwire-server -P cmake/Docume
 
 CTest covers native sessions/transactions, PostgreSQL protocol, access rules, SCRAM, concurrent smoke and bootstrap regressions. The [CI workflow](.github/workflows/verify.yml) adds the two-million-row native benchmark and installed-package relocation checks. Run relevant checks after changes; do not repeat expensive workloads without a material reason or measure performance while another build/load is running.
 
-The `native-attach` CTest runs the actual `attach-client` against its own temporary server. It checks remote reads, a join with local data, `CONNECT remote`, parameterized changes, transactions and cleanup. To run just this example's checks, build `attach-client` and `attach-tests`, then use `ctest --test-dir build -R native-attach --output-on-failure`. This executable is added on main; the existing rc.5 downloads predate it.
+The `native-attach` CTest runs the actual `attach-client` against its own temporary server. It checks remote reads, a join with local data, `CONNECT remote`, parameterized changes, transactions and cleanup. To run just this example's checks, build `attach-client` and `attach-tests`, then use `ctest --test-dir build -R native-attach --output-on-failure`. This executable is in current source builds; earlier packages may not contain it.
 
 The [documentation workflow](.github/workflows/documentation.yml) checks guide links and actual server options, then runs native transactions, local/protected stock-driver login and concurrent client ingestion with complex reads. External S3/R2 credentials are not required by this workflow; consult the separately recorded cloud evidence.
 
@@ -56,6 +65,8 @@ Documentation and stock-driver example changes use that focused workflow. Engine
 Use [examples/postgres](examples/postgres) for stock-driver checks. Node `ingest.mjs` sends actual client values; `bulk.mjs` generates rows inside DuckDB. Their throughput scopes differ. Record row count, batch size, commits, reader overlap, integrity, hardware and timing exclusions; claim durable reopening only when it was tested.
 
 ## Pinned dependencies and evidence
+
+Published native bundles were tested on macOS 26 ARM64 and Ubuntu 24.04 x86-64-v3 with glibc 2.39, libcurl 4 and OpenSSL 3. Do not promise older operating systems, emulated AVX2 on ARM, or Windows support from those results. Native Docker source builds separately test AMD64 and ARM64. Consult package manifests and the result index for current platform and binding qualification.
 
 [cmake/Pins.cmake](cmake/Pins.cmake) is authoritative:
 

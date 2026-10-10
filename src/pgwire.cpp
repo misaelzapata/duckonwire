@@ -7,6 +7,9 @@
 #include "duckdb.hpp"
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/main/config.hpp"
+#include "duckdb/main/valid_checker.hpp"
+#include "duckdb/transaction/meta_transaction.hpp"
+#include "duckdb/transaction/transaction.hpp"
 #include "duckdb/parser/parser.hpp"
 #include "duckdb/parser/statement/execute_statement.hpp"
 #include "duckdb/parser/statement/create_statement.hpp"
@@ -48,7 +51,9 @@
 #include <limits>
 #include <map>
 #include <mutex>
+#include <new>
 #include <random>
+#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <thread>
@@ -58,6 +63,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -679,6 +685,78 @@ bool DeallocateAll(const std::string &sql) {
     if (target == "PREPARE") input >> target;
     return target == "ALL" && !(input >> extra);
 }
+
+std::string CursorName(const std::string &value) {
+    std::string name;
+    if (!value.empty() && value.front() == '"') {
+        for (std::size_t i = 1; i + 1 < value.size(); ++i) {
+            name.push_back(value[i]);
+            if (value[i] == '"') ++i;
+        }
+    } else {
+        name = value;
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    }
+    if (name.empty() || name.size() > 63) throw WireError("42602", "Cursor or savepoint identifier must contain 1..63 bytes");
+    return name;
+}
+const std::string SQL_IDENTIFIER = R"(("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_]*))";
+enum class FdwKind { NONE, SETTING, FETCH, CLOSE, CLOSE_ALL, SAVEPOINT, ROLLBACK_TO, RELEASE };
+struct FdwCommand { FdwKind kind = FdwKind::NONE; std::string name; std::uint64_t amount = 0; };
+struct FdwDeclaration { std::string name, query; };
+bool FdwDeclare(const std::string &sql, FdwDeclaration &command) {
+    if (FirstWord(sql) != "DECLARE") return false;
+    static const std::regex pattern("^\\s*DECLARE\\s+" + SQL_IDENTIFIER + R"(\s+(?:NO\s+SCROLL\s+)?CURSOR\s+FOR\s+([\s\S]+)$)", std::regex::icase);
+    std::smatch match;
+    if (!std::regex_match(sql, match, pattern)) throw WireError("0A000", "SQL cursors support forward non-hold SELECT only");
+    command.name = CursorName(match[1]); command.query = match[2]; return true;
+}
+bool FdwSetting(const std::string &sql) {
+    static const std::array<const char *,3> commands{{"SET SEARCH_PATH = PG_CATALOG", "SET TIMEZONE = 'GMT'", "SET INTERVALSTYLE = POSTGRES"}};
+    auto value = Upper(sql); while (!value.empty() && (std::isspace(static_cast<unsigned char>(value.back())) || value.back()==';')) value.pop_back();
+    auto first=value.find_first_not_of(" \t\r\n"); if(first!=std::string::npos)value.erase(0,first);
+    return std::find(commands.begin(), commands.end(), value) != commands.end();
+}
+FdwCommand FdwControl(const std::string &sql) {
+    FdwCommand command;
+    if (FdwSetting(sql)) { command.kind = FdwKind::SETTING; return command; }
+    const auto word = FirstWord(sql);
+    std::smatch match;
+    if (word == "FETCH") {
+        static const std::regex pattern("^\\s*FETCH\\s+(?:FORWARD\\s+)?([0-9]+|ALL)\\s+(?:FROM|IN)\\s+" + SQL_IDENTIFIER + R"(\s*;?\s*$)", std::regex::icase);
+        if (!std::regex_match(sql, match, pattern)) throw WireError("0A000", "SQL cursors support forward FETCH only");
+        command.kind = FdwKind::FETCH; command.name = CursorName(match[2]);
+        try { command.amount = Upper(match[1]) == "ALL" ? UINT64_MAX : std::stoull(match[1]); }
+        catch (const std::exception &) { throw WireError("22003", "FETCH count is out of range"); }
+    } else if (word == "CLOSE") {
+        static const std::regex all(R"(^\s*CLOSE\s+ALL\s*;?\s*$)", std::regex::icase);
+        static const std::regex pattern("^\\s*CLOSE\\s+" + SQL_IDENTIFIER + R"(\s*;?\s*$)", std::regex::icase);
+        if (std::regex_match(sql, all)) command.kind = FdwKind::CLOSE_ALL;
+        else if (std::regex_match(sql, match, pattern)) { command.kind = FdwKind::CLOSE; command.name = CursorName(match[1]); }
+        else throw WireError("0A000", "Unsupported SQL CLOSE command");
+    } else if (word == "SAVEPOINT" || word == "RELEASE" || (word == "ROLLBACK" && Upper(sql).find("TO") != std::string::npos)) {
+        const std::string prefix = word == "SAVEPOINT" ? "SAVEPOINT" : word == "RELEASE" ? "RELEASE(?:\\s+SAVEPOINT)?" : "ROLLBACK(?:\\s+WORK|\\s+TRANSACTION)?\\s+TO(?:\\s+SAVEPOINT)?";
+        const std::regex pattern("^\\s*" + prefix + "\\s+" + SQL_IDENTIFIER + R"(\s*;?\s*$)", std::regex::icase);
+        if (!std::regex_match(sql, match, pattern)) throw WireError("42601", "Invalid savepoint command");
+        command.kind = word == "SAVEPOINT" ? FdwKind::SAVEPOINT : word == "RELEASE" ? FdwKind::RELEASE : FdwKind::ROLLBACK_TO;
+        command.name = CursorName(match[1]);
+    }
+    return command;
+}
+std::vector<std::string> SplitCommands(const std::string &sql) {
+    std::vector<std::string> result;
+    std::size_t start = 0;
+    for (const auto &token : duckdb::Parser::Tokenize(sql)) {
+        if (token.type == duckdb::SimplifiedTokenType::SIMPLIFIED_TOKEN_OPERATOR && sql[token.start] == ';') {
+            if (sql.substr(start, token.start - start).find_first_not_of(" \t\r\n") != std::string::npos)
+                result.push_back(sql.substr(start, token.start - start));
+            start = token.start + 1;
+        }
+    }
+    if (sql.substr(start).find_first_not_of(" \t\r\n") != std::string::npos) result.push_back(sql.substr(start));
+    return result;
+}
+
 bool FilenameReference(const duckdb::Identifier &identifier) {
     if (identifier.empty()) return false;
     const auto name = Upper(identifier.GetIdentifierName());
@@ -805,6 +883,8 @@ struct PgWireServer::Impl {
 struct PgWireServer::Impl::Session {
     struct Statement {
         std::string sql;
+        std::string fdw_cursor_name;
+        FdwCommand control;
         duckdb::StatementType type = duckdb::StatementType::INVALID_STATEMENT;
         duckdb::unique_ptr<duckdb::PreparedStatement> prepared;
         std::vector<std::uint32_t> parameter_oids;
@@ -821,7 +901,8 @@ struct PgWireServer::Impl::Session {
         duckdb::unique_ptr<duckdb::DataChunk> chunk;
         std::size_t chunk_row = 0;
         std::uint64_t sent = 0, changed = 0;
-        bool complete = false, described = false;
+        std::uint64_t generation = 0;
+        bool complete = false, described = false, failed = false;
         std::vector<std::uint32_t> described_oids;
         std::string tag;
     };
@@ -834,8 +915,16 @@ struct PgWireServer::Impl::Session {
     bool read_only = true;
     std::uint32_t id, cancel_secret;
     bool failed_transaction = false, skip_until_sync = false, implicit_extended_transaction = false;
+    bool implicit_simple_transaction = false;
+    bool recoverable_failure = true;
+    unsigned suppress_ready = 0;
+    std::uint64_t resource_generation = 0;
+    std::atomic<std::uint64_t> cancel_generation {0};
+    struct Savepoint { std::string name; std::uint64_t transaction_id, generation; };
+    std::vector<Savepoint> savepoints;
     std::unordered_map<std::string, std::shared_ptr<Statement>> statements;
     std::unordered_map<std::string, Portal> portals;
+    std::unordered_map<std::string, Portal> sql_cursors;
     Session(Impl &owner, int socket_p, std::uint32_t id_p)
         : server(owner), connection(owner.database), socket(socket_p), id(id_p), cancel_secret(0) {
         if (RAND_bytes(reinterpret_cast<unsigned char *>(&cancel_secret), sizeof(cancel_secret)) != 1)
@@ -882,6 +971,7 @@ struct PgWireServer::Impl::Session {
         if (socket >= 0) shutdown(socket, SHUT_RDWR);
     }
     void Interrupt() {
+        cancel_generation.fetch_add(1);
         duckdb::shared_ptr<duckdb::ClientContext> context;
         { std::lock_guard<std::mutex> guard(connection_lock); context = connection.context; }
         if (context) context->Interrupt();
@@ -893,8 +983,8 @@ struct PgWireServer::Impl::Session {
     }
     char State() { return connection.IsAutoCommit() ? 'I' : failed_transaction ? 'E' : 'T'; }
     void Ready() {
-        if (connection.IsAutoCommit()) failed_transaction = false;
-        Message(socket, 'Z', Buffer {static_cast<unsigned char>(State())});
+        if (connection.IsAutoCommit()) TransactionFinished();
+        if (!suppress_ready) Message(socket, 'Z', Buffer {static_cast<unsigned char>(State())});
     }
     void Run();
     bool Startup();
@@ -908,6 +998,16 @@ struct PgWireServer::Impl::Session {
     void EnsurePrepared(Statement &statement);
     void Handle(char type, const Buffer &body);
     void Simple(const std::string &sql);
+    bool FdwSimple(const std::string &sql);
+    void FdwStore(Portal &&portal);
+    void FdwExecute(Portal &portal, std::uint32_t maximum, bool simple);
+    void ReadOnlyTransaction();
+    void SavepointControl(const FdwCommand &command);
+    void RecordFailure(const std::string &state, bool fatal = false);
+    void TransactionFinished() {
+        failed_transaction = false; recoverable_failure = true;
+        sql_cursors.clear(); savepoints.clear();
+    }
     void Parse(Reader &in);
     void Bind(Reader &in);
     duckdb::StatementSignature BoundSignature(const Statement &statement, const duckdb::vector<Value> &parameters);
@@ -929,7 +1029,9 @@ struct PgWireServer::Impl::Session {
         if (portal) portal->described = true;
     }
     void GuardTransaction(const std::string &sql) {
-        if (failed_transaction && !TransactionEnd(sql)) throw WireError("25P02", "Current transaction is aborted; issue ROLLBACK");
+        const auto control = FdwControl(sql);
+        if (failed_transaction && !TransactionEnd(sql) && control.kind != FdwKind::ROLLBACK_TO)
+            throw WireError("25P02", "Current transaction is aborted; issue ROLLBACK or ROLLBACK TO SAVEPOINT");
     }
     std::string CommandTag(const Statement &statement, const duckdb::QueryResult &result, std::uint64_t rows) {
         using S = duckdb::StatementType;
@@ -1169,12 +1271,12 @@ void PgWireServer::Impl::Session::Run() {
             if (skip_until_sync && type != 'S') continue;
             try { Handle(static_cast<char>(type), body); }
             catch (const WireError &error) {
-                if (!connection.IsAutoCommit()) failed_transaction = true;
+                RecordFailure(error.code, error.fatal);
                 ErrorMessage(socket, error); if (error.fatal) break;
                 if (type == 'Q') Ready(); else skip_until_sync = true;
             } catch (const std::exception &error) {
-                if (!connection.IsAutoCommit()) failed_transaction = true;
                 const duckdb::ErrorData native(error);
+                RecordFailure(ErrorState(native));
                 ErrorMessage(socket, WireError(ErrorState(native), native.RawMessage()));
                 if (type == 'Q') Ready(); else skip_until_sync = true;
             }
@@ -1187,6 +1289,7 @@ void PgWireServer::Impl::Session::Run() {
     CloseSocket();
 }
 void PgWireServer::Impl::Session::ResetConnection(bool preserve_statements) {
+    TransactionFinished();
     portals.clear();
     if (!connection.IsAutoCommit()) connection.Rollback();
     if (preserve_statements) for (auto &entry : statements) entry.second->prepared.reset();
@@ -1201,11 +1304,81 @@ void PgWireServer::Impl::Session::ResetConnection(bool preserve_statements) {
     }
 }
 void PgWireServer::Impl::Session::EnsurePrepared(Statement &statement) {
-    if (!statement.prepared && !statement.empty && !statement.setting && !statement.deallocate) {
+    if (!statement.prepared && !statement.empty && !statement.setting && !statement.deallocate && statement.control.kind == FdwKind::NONE) {
         statement.prepared = connection.Prepare(statement.sql);
         if (statement.prepared->HasError()) NativeError(statement.prepared->GetErrorObject());
         if (statement.prepared->GetParameterCount() != statement.parameter_oids.size())
             throw WireError("0A000", "Prepared statement parameter count changed after session reset");
+    }
+}
+void PgWireServer::Impl::Session::RecordFailure(const std::string &state, bool fatal) {
+    if (connection.IsAutoCommit()) return;
+    if (!failed_transaction) recoverable_failure = true;
+    if (state != "25P02") {
+        const bool known = state.compare(0, 2, "22") == 0 || state.compare(0, 2, "42") == 0 ||
+                           state == "57014" || state == "53300" || state == "54000" ||
+                           state == "34000" || state == "3B001" || state == "0A000" || state == "55000";
+        recoverable_failure = recoverable_failure && known && !fatal;
+    }
+    failed_transaction = true;
+}
+void PgWireServer::Impl::Session::ReadOnlyTransaction() {
+    if (!server.protected_mode || !read_only || connection.IsAutoCommit()) return;
+    connection.context->RunFunctionInTransaction([&] { connection.context->transaction.SetReadOnly(); }, false);
+}
+void PgWireServer::Impl::Session::SavepointControl(const FdwCommand &command) {
+    if (!server.protected_mode || !read_only)
+        throw WireError("0A000", "SAVEPOINT is supported only for protected read-only database users");
+    if (connection.IsAutoCommit() || implicit_extended_transaction || implicit_simple_transaction)
+        throw WireError("25P01", "SAVEPOINT requires an explicit read-only transaction");
+    ReadOnlyTransaction();
+    if (command.kind == FdwKind::SAVEPOINT) {
+        if (failed_transaction) throw WireError("25P02", "Current transaction is aborted; issue ROLLBACK TO SAVEPOINT");
+        if (savepoints.size() >= MAX_OBJECTS) throw WireError("54000", "Too many savepoints");
+        const auto &transaction = connection.context->transaction.ActiveTransaction();
+        savepoints.push_back({command.name, transaction.global_transaction_id, resource_generation});
+    } else {
+        auto target = savepoints.size();
+        while (target && savepoints[target - 1].name != command.name) --target;
+        if (!target) throw WireError("3B001", "Unknown savepoint");
+        const auto frame = savepoints[target - 1];
+        if (command.kind == FdwKind::RELEASE) {
+            if (failed_transaction) throw WireError("25P02", "Current transaction is aborted; issue ROLLBACK TO SAVEPOINT");
+            savepoints.resize(target - 1);
+        } else {
+            if (failed_transaction && !recoverable_failure)
+                throw WireError("25P02", "This transaction error requires a full ROLLBACK");
+            auto &context = *connection.context;
+            context.RunFunctionInTransaction([&] {
+                auto &transaction = context.transaction.ActiveTransaction();
+                if (transaction.global_transaction_id != frame.transaction_id) throw WireError("25P02", "Savepoint transaction no longer exists; issue ROLLBACK");
+                if (!transaction.IsReadOnly() || transaction.ModifiedDatabase()) throw WireError("25P02", "Savepoint requires an unmodified read-only transaction; issue ROLLBACK");
+                if (transaction.GetActiveQuery() != duckdb::MAXIMUM_QUERY_ID)
+                    throw WireError("25P02", "Savepoint requires a finalized query; issue ROLLBACK");
+                if (duckdb::ValidChecker::IsInvalidated(*context.db)) throw WireError("25P02", "The native database is invalid; issue ROLLBACK");
+                for (auto &database : transaction.OpenedTransactions()) {
+                    auto native = transaction.TryGetTransaction(database.get());
+                    if (!native || !native->IsReadOnly()) throw WireError("25P02", "Savepoint contains a modified native transaction; issue ROLLBACK");
+                    if (native->active_query != duckdb::MAXIMUM_QUERY_ID) throw WireError("25P02", "Savepoint native query is still active; issue ROLLBACK");
+                    if (duckdb::ValidChecker::IsInvalidated(database.get())) throw WireError("25P02", "Savepoint attached database is invalid; issue ROLLBACK");
+                }
+                if (duckdb::ValidChecker::IsInvalidated(transaction)) {
+                    // The pinned native API has no validity reset. Reconstruct
+                    // only this finalized, unmodified read transaction's checker;
+                    // the MetaTransaction and all MVCC snapshots remain intact.
+                    auto &validity = transaction.transaction_validity;
+                    validity.~ValidChecker();
+                    new (static_cast<void *>(&validity)) duckdb::ValidChecker(*context.db);
+                }
+            }, false);
+            for (auto cursor = sql_cursors.begin(); cursor != sql_cursors.end();) {
+                if (cursor->second.generation > frame.generation) cursor = sql_cursors.erase(cursor); else ++cursor;
+            }
+            // Portals are retired by the caller after its control response, so
+            // the currently executing ROLLBACK portal never becomes dangling.
+            savepoints.resize(target);
+            failed_transaction = false; recoverable_failure = true;
+        }
     }
 }
 void PgWireServer::Impl::Session::Handle(char type, const Buffer &body) {
@@ -1249,6 +1422,107 @@ void PgWireServer::Impl::Session::Handle(char type, const Buffer &body) {
     default: throw WireError("0A000", "Unsupported PostgreSQL frontend message");
     }
 }
+
+void PgWireServer::Impl::Session::FdwStore(Portal &&portal) {
+    const auto name=portal.statement->fdw_cursor_name;
+    if (name.empty() || sql_cursors.count(name)) throw WireError("42P03", "Cursor already exists");
+    if (sql_cursors.size()>=MAX_OBJECTS) throw WireError("54000", "Too many SQL cursors");
+    if (connection.IsAutoCommit() || implicit_extended_transaction || implicit_simple_transaction)
+        throw WireError("25P01", "DECLARE requires an explicit transaction");
+    if (portal.statement->type!=duckdb::StatementType::SELECT_STATEMENT) throw WireError("42501", "SQL cursors support SELECT only");
+    ExecutionGuard execution(*this);
+    ReadOnlyTransaction();
+    auto signature=BoundSignature(*portal.statement,portal.parameters); AuthorizeBound(signature.properties);
+    if (!signature.properties.IsReadOnly()) throw WireError("42501", "SQL cursors must be read-only");
+    auto execute=duckdb::make_uniq<duckdb::ExecuteStatement>();
+    execute->name=duckdb::Identifier(portal.statement->prepared->GetName());execute->query=portal.statement->sql;
+    for(std::size_t i=0;i<portal.parameters.size();++i)
+        execute->bound_values[duckdb::Identifier(std::to_string(i+1))]=duckdb::BoundParameterData(portal.parameters[i]);
+    execution.StartTimer(); portal.result=connection.Query(std::move(execute),duckdb::QueryResultMemoryType::BUFFER_MANAGED);
+    if(portal.result->HasError())NativeError(portal.result->GetErrorObject());
+    portal.generation = ++resource_generation;
+    sql_cursors.emplace(name,std::move(portal));
+    Buffer done; PutString(done,"DECLARE CURSOR"); Message(socket,'C',done);
+}
+void PgWireServer::Impl::Session::FdwExecute(Portal &request, std::uint32_t maximum, bool simple) {
+    const auto command = request.statement->control;
+    GuardTransaction(request.statement->sql);
+    if (command.kind == FdwKind::SAVEPOINT || command.kind == FdwKind::ROLLBACK_TO || command.kind == FdwKind::RELEASE) {
+        SavepointControl(command);
+        Buffer done; PutString(done, command.kind == FdwKind::SAVEPOINT ? "SAVEPOINT" : command.kind == FdwKind::RELEASE ? "RELEASE" : "ROLLBACK");
+        Message(socket, 'C', done); request.complete = true; return;
+    }
+    if (command.kind == FdwKind::SETTING) {
+        Buffer done; PutString(done, "SET"); Message(socket, 'C', done); request.complete = true; return;
+    }
+    if (command.kind == FdwKind::CLOSE || command.kind == FdwKind::CLOSE_ALL) {
+        if (command.kind == FdwKind::CLOSE_ALL) sql_cursors.clear();
+        else if (!sql_cursors.erase(command.name)) throw WireError("34000", "Unknown SQL cursor");
+        Buffer done; PutString(done, "CLOSE CURSOR"); Message(socket, 'C', done); request.complete = true; return;
+    }
+    auto found = sql_cursors.find(command.name);
+    if (found == sql_cursors.end()) throw WireError("34000", "Unknown SQL cursor");
+    auto &cursor = found->second;
+    if (cursor.failed) throw WireError("55000", "This SQL cursor cannot execute after an error");
+    if (simple) RowDescription(cursor.result->GetNames(), cursor.result->GetTypes(), {}, nullptr);
+    if (request.complete) { Buffer done; PutString(done, "FETCH " + std::to_string(request.sent)); Message(socket, 'C', done); return; }
+    const auto cancel = cancel_generation.load();
+    try {
+        ExecutionGuard execution(*this); execution.StartTimer();
+        std::uint32_t emitted = 0;
+        while (request.sent < command.amount && !cursor.complete) {
+            if (cancel_generation.load() != cancel) throw WireError("57014", "SQL cursor fetch was interrupted");
+            if (!cursor.chunk || cursor.chunk_row >= cursor.chunk->size()) {
+                cursor.chunk = cursor.result->Fetch(); cursor.chunk_row = 0;
+                if (cursor.result->HasError()) NativeError(cursor.result->GetErrorObject());
+                if (!cursor.chunk || !cursor.chunk->size()) { cursor.complete = true; break; }
+            }
+            if (maximum && emitted == maximum) { Message(socket, 's'); return; }
+            Buffer row; Put16(row, static_cast<std::uint16_t>(cursor.result->ColumnCount()));
+            for (std::size_t i = 0; i < cursor.result->ColumnCount(); ++i) {
+                auto value = cursor.chunk->GetValue(i, cursor.chunk_row);
+                if (value.IsNull()) { Put32(row, UINT32_MAX); continue; }
+                auto field = Field(value, Format(request.result_formats, i, cursor.result->ColumnCount()));
+                if (field.size() > MAX_FRAME - 4 || row.size() + field.size() + 4 > MAX_FRAME - 4)
+                    throw WireError("54000", "Cursor row exceeds frame limit");
+                Put32(row, static_cast<std::uint32_t>(field.size())); row.insert(row.end(), field.begin(), field.end());
+            }
+            Message(socket, 'D', row); ++request.sent; ++emitted; ++cursor.chunk_row; ++cursor.sent;
+        }
+        request.complete = true;
+        Buffer done; PutString(done, "FETCH " + std::to_string(request.sent)); Message(socket, 'C', done);
+    } catch (...) { cursor.failed = true; throw; }
+}
+bool PgWireServer::Impl::Session::FdwSimple(const std::string &sql) {
+    const auto control = FdwControl(sql);
+    FdwDeclaration declaration;
+    if (control.kind == FdwKind::NONE && !FdwDeclare(sql, declaration)) return false;
+    GuardTransaction(sql);
+    if (control.kind != FdwKind::NONE) {
+        Portal request; request.statement = std::make_shared<Statement>();
+        request.statement->sql = sql; request.statement->control = control;
+        FdwExecute(request, 0, true);
+        if (control.kind == FdwKind::ROLLBACK_TO) {
+            const auto generation = savepoints.back().generation;
+            for (auto entry = portals.begin(); entry != portals.end();) {
+                if (entry->second.generation > generation) entry = portals.erase(entry); else ++entry;
+            }
+        } else if (control.kind == FdwKind::CLOSE_ALL) portals.clear();
+        Ready(); return true;
+    }
+    ReadOnlyTransaction();
+    auto parsed = connection.ExtractStatements(declaration.query);
+    if (parsed.size() != 1 || parsed[0]->type != duckdb::StatementType::SELECT_STATEMENT)
+        throw WireError("42501", "SQL cursors support one SELECT only");
+    Authorize(*parsed[0]);
+    Portal portal; portal.statement = std::make_shared<Statement>(); portal.statement->sql = declaration.query;
+    portal.statement->type = parsed[0]->type; portal.statement->fdw_cursor_name = declaration.name;
+    portal.statement->prepared = connection.Prepare(declaration.query);
+    if (portal.statement->prepared->HasError()) NativeError(portal.statement->prepared->GetErrorObject());
+    if (portal.statement->prepared->GetParameterCount()) throw WireError("42P02", "DECLARE parameter requires extended Bind");
+    FdwStore(std::move(portal)); Ready(); return true;
+}
+
 void PgWireServer::Impl::Session::Simple(const std::string &input_sql) {
     const auto sql = NormalizeTransactions(input_sql);
     const auto controls = ControlCommands(sql);
@@ -1272,6 +1546,36 @@ void PgWireServer::Impl::Session::Simple(const std::string &input_sql) {
         } else { Buffer body; PutString(body, "DISCARD ALL"); Message(socket, 'C', body); }
         Ready(); return;
     }
+    const auto commands = SplitCommands(sql);
+    bool custom = false;
+    for (const auto &command : commands) {
+        FdwDeclaration declaration;
+        if (FdwControl(command).kind != FdwKind::NONE || FdwDeclare(command, declaration)) custom = true;
+    }
+    if (custom && commands.size() > 1) {
+        bool implicit = connection.IsAutoCommit();
+        if (implicit) { connection.BeginTransaction(); ReadOnlyTransaction(); implicit_simple_transaction = true; }
+        ++suppress_ready;
+        try {
+            for (const auto &command : commands) {
+                const auto word = FirstWord(command);
+                if (implicit && (word == "BEGIN" || word == "START")) {
+                    implicit = false; implicit_simple_transaction = false;
+                    Buffer done; PutString(done, "BEGIN"); Message(socket, 'C', done); continue;
+                }
+                Simple(command);
+                if (TransactionEnd(command) && FdwControl(command).kind != FdwKind::ROLLBACK_TO) implicit = false;
+            }
+            if (implicit) connection.Commit();
+        } catch (...) {
+            --suppress_ready; implicit_simple_transaction = false;
+            if (implicit) { try { connection.Rollback(); } catch (...) {} TransactionFinished(); }
+            throw;
+        }
+        --suppress_ready; implicit_simple_transaction = false; Ready(); return;
+    }
+    if (custom && !commands.empty() && FdwSimple(commands[0])) return;
+    ReadOnlyTransaction();
     portals.erase(""); statements.erase("");
     if (DeallocateAll(sql)) {
         GuardTransaction(sql); portals.clear(); statements.clear();
@@ -1284,7 +1588,7 @@ void PgWireServer::Impl::Session::Simple(const std::string &input_sql) {
     }
     const bool batch = extracted.size() > 1;
     bool implicit = batch && connection.IsAutoCommit();
-    if (implicit) connection.BeginTransaction();
+    if (implicit) { connection.BeginTransaction(); ReadOnlyTransaction(); }
     try {
         for (auto &statement : extracted) {
             const auto text = statement->ToString(); GuardTransaction(text);
@@ -1294,9 +1598,10 @@ void PgWireServer::Impl::Session::Simple(const std::string &input_sql) {
                 // PostgreSQL BEGIN converts the surrounding simple-query implicit batch into an explicit transaction.
                 implicit = false; Buffer body; PutString(body, "BEGIN"); Message(socket, 'C', body); continue;
             }
-            if (batch && connection.IsAutoCommit() && !transaction) { connection.BeginTransaction(); implicit = true; }
+            if (batch && connection.IsAutoCommit() && !transaction) { connection.BeginTransaction(); ReadOnlyTransaction(); implicit = true; }
             if (failed_transaction && TransactionEnd(text)) {
                 connection.Rollback(); failed_transaction = false;
+                TransactionFinished();
                 Buffer body; PutString(body, "ROLLBACK"); Message(socket, 'C', body); continue;
             }
             if (SessionSetting(text)) { Buffer body; PutString(body, "SET"); Message(socket, 'C', body); continue; }
@@ -1307,6 +1612,7 @@ void PgWireServer::Impl::Session::Simple(const std::string &input_sql) {
             try {
                 ExecutionGuard execution(*this);
                 if (read_transaction) connection.BeginTransaction();
+                ReadOnlyTransaction();
                 if (server.protected_mode && read_only && statement->type != duckdb::StatementType::TRANSACTION_STATEMENT) {
                     auto signature = connection.context->BindStatement(statement->Copy()); AuthorizeBound(signature.properties);
                 }
@@ -1323,6 +1629,8 @@ void PgWireServer::Impl::Session::Simple(const std::string &input_sql) {
             if (portal.result->GetStatementProperties().return_type == duckdb::StatementReturnType::QUERY_RESULT)
                 RowDescription(portal.result->GetNames(), portal.result->GetTypes(), {}, &portal);
             Rows(portal, 0);
+            if (transaction && TransactionEnd(text)) TransactionFinished();
+            else if (transaction) ReadOnlyTransaction();
             if (transaction) implicit = false;
             if (connection.IsAutoCommit()) failed_transaction = false;
         }
@@ -1335,20 +1643,26 @@ void PgWireServer::Impl::Session::Simple(const std::string &input_sql) {
 }
 void PgWireServer::Impl::Session::Parse(Reader &in) {
     auto name = in.String(); auto sql = NormalizeTransactions(in.String()); auto count = in.U16();
+    const auto control = FdwControl(sql);
+    FdwDeclaration declaration; if(FdwDeclare(sql,declaration)) sql=declaration.query;
     std::vector<std::uint32_t> oids; for (unsigned i = 0; i < count; ++i) oids.push_back(in.U32()); in.End();
     for (auto oid : oids) if (oid) DuckType(oid);
     GuardTransaction(sql);
+    ReadOnlyTransaction();
     if (!name.empty() && statements.count(name)) throw WireError("42P05", "Prepared statement already exists");
     if (statements.size() >= MAX_OBJECTS && !statements.count(name)) throw WireError("54000", "Too many prepared statements");
     auto deallocate = DeallocateAll(sql);
-    auto extracted = deallocate ? duckdb::vector<duckdb::unique_ptr<duckdb::SQLStatement>>() : connection.ExtractStatements(sql);
+    auto extracted = deallocate || control.kind != FdwKind::NONE ? duckdb::vector<duckdb::unique_ptr<duckdb::SQLStatement>>() : connection.ExtractStatements(sql);
+    if (!declaration.name.empty() && (extracted.size()!=1 || extracted[0]->type!=duckdb::StatementType::SELECT_STATEMENT)) throw WireError("42501","SQL cursors support one SELECT only");
     if (extracted.size() > 1) throw WireError("42601", "A prepared statement must contain a single command");
-    auto statement = std::make_shared<Statement>(); statement->sql = sql; statement->empty = extracted.empty() && !deallocate;
+    auto statement = std::make_shared<Statement>(); statement->sql = sql; statement->fdw_cursor_name=declaration.name;
+    statement->control = control;
+    statement->empty = extracted.empty() && !deallocate && control.kind == FdwKind::NONE;
     if (!extracted.empty()) statement->type = extracted[0]->type;
     statement->deallocate = deallocate;
     statement->setting = !statement->empty && SessionSetting(sql);
     if (!extracted.empty() && !statement->setting) Authorize(*extracted[0]);
-    if (!statement->empty && !statement->setting && !statement->deallocate) {
+    if (!statement->empty && !statement->setting && !statement->deallocate && control.kind == FdwKind::NONE) {
         statement->prepared = connection.Prepare(sql);
         if (statement->prepared->HasError()) NativeError(statement->prepared->GetErrorObject());
         auto parameters = statement->prepared->GetParameterCount();
@@ -1369,6 +1683,8 @@ void PgWireServer::Impl::Session::Bind(Reader &in) {
     auto name = in.String(); auto source = in.String();
     auto found = statements.find(source);
     if (found == statements.end()) throw WireError("26000", "Unknown prepared statement");
+    GuardTransaction(found->second->sql);
+    ReadOnlyTransaction();
     EnsurePrepared(*found->second);
     if (!name.empty() && portals.count(name)) throw WireError("42P03", "Portal already exists");
     if (portals.size() >= MAX_OBJECTS && !portals.count(name)) throw WireError("54000", "Too many portals");
@@ -1376,7 +1692,7 @@ void PgWireServer::Impl::Session::Bind(Reader &in) {
     for (unsigned i = 0; i < formats_count; ++i) formats.push_back(in.U16());
     auto count = in.U16();
     if (count != found->second->parameter_oids.size()) throw WireError("08P01", "Bound parameter count does not match statement");
-    Portal portal; portal.statement = found->second;
+    Portal portal; portal.statement = found->second; portal.generation = ++resource_generation;
     for (std::size_t i = 0; i < count; ++i) {
         auto format = Format(formats, i, count); auto length = static_cast<std::int32_t>(in.U32());
         if (format > 1) throw WireError("08P01", "Unknown parameter format");
@@ -1431,7 +1747,14 @@ void PgWireServer::Impl::Session::Describe(Reader &in) {
         auto found = portals.find(name); if (found == portals.end()) throw WireError("34000", "Unknown portal");
         portal = &found->second; statement = portal->statement;
     } else throw WireError("08P01", "Invalid Describe object type", true);
-    if (statement->empty || statement->setting || statement->deallocate) {
+    if (statement->control.kind == FdwKind::FETCH) {
+        GuardTransaction(statement->sql);
+        auto cursor = sql_cursors.find(statement->control.name);
+        if (cursor == sql_cursors.end()) throw WireError("34000", "Unknown SQL cursor");
+        RowDescription(cursor->second.result->GetNames(), cursor->second.result->GetTypes(), portal ? portal->result_formats : std::vector<std::uint16_t>{}, portal);
+        return;
+    }
+    if (!statement->fdw_cursor_name.empty() || statement->control.kind != FdwKind::NONE || statement->empty || statement->setting || statement->deallocate) {
         Message(socket, 'n'); return;
     }
     EnsurePrepared(*statement);
@@ -1469,6 +1792,20 @@ void PgWireServer::Impl::Session::Execute(Reader &in) {
     auto name = in.String(); auto maximum = in.U32(); in.End();
     auto found = portals.find(name); if (found == portals.end()) throw WireError("34000", "Unknown portal");
     auto &portal = found->second; auto &statement = *portal.statement; GuardTransaction(statement.sql);
+    if (statement.control.kind != FdwKind::NONE) {
+        FdwExecute(portal, maximum, false);
+        if (statement.control.kind == FdwKind::ROLLBACK_TO) {
+            const auto generation = savepoints.back().generation;
+            for (auto entry = portals.begin(); entry != portals.end();) {
+                if (entry->first != name && entry->second.generation > generation) entry = portals.erase(entry); else ++entry;
+            }
+        } else if (statement.control.kind == FdwKind::CLOSE_ALL) {
+            for (auto entry = portals.begin(); entry != portals.end();) {
+                if (entry->first != name) entry = portals.erase(entry); else ++entry;
+            }
+        }
+        return;
+    }
     if (statement.empty) { Message(socket, 'I'); portal.complete = true; return; }
     if (statement.deallocate) {
         Buffer body; PutString(body, "DEALLOCATE"); Message(socket, 'C', body);
@@ -1477,13 +1814,19 @@ void PgWireServer::Impl::Session::Execute(Reader &in) {
     if (statement.setting) { Buffer body; PutString(body, "SET"); Message(socket, 'C', body); portal.complete = true; return; }
     if (failed_transaction && TransactionEnd(statement.sql)) {
         connection.Rollback(); failed_transaction = false; Buffer body; PutString(body, "ROLLBACK"); Message(socket, 'C', body);
+        TransactionFinished();
         portal.complete = true; return;
+    }
+    if (!statement.fdw_cursor_name.empty()) {
+        if(portal.complete)throw WireError("55000","DECLARE portal has already executed");
+        Portal cursor;cursor.statement=portal.statement;cursor.parameters=portal.parameters;FdwStore(std::move(cursor));portal.complete=true;return;
     }
     if (!portal.result) {
         ExecutionGuard execution(*this);
         if (connection.IsAutoCommit() && statement.prepared->GetStatementType() != duckdb::StatementType::TRANSACTION_STATEMENT) {
             connection.BeginTransaction(); implicit_extended_transaction = true;
         }
+        ReadOnlyTransaction();
         if (server.protected_mode && read_only) { auto signature = BoundSignature(statement, portal.parameters); AuthorizeBound(signature.properties); }
         execution.StartTimer(); portal.result = statement.prepared->Execute(portal.parameters, false);
         if (portal.result->HasError()) NativeError(portal.result->GetErrorObject());
@@ -1495,6 +1838,8 @@ void PgWireServer::Impl::Session::Execute(Reader &in) {
         }
     }
     Rows(portal, maximum);
+    if (TransactionEnd(statement.sql)) TransactionFinished();
+    else ReadOnlyTransaction();
     if (connection.IsAutoCommit()) { failed_transaction = false; implicit_extended_transaction = false; }
 }
 void PgWireServer::Impl::Session::Rows(Portal &portal, std::uint32_t maximum) {
@@ -1630,6 +1975,11 @@ void PgWireServer::Impl::Accept() {
         // complete frames on their worker thread with blocking sockets.
         const auto client_flags = fcntl(client, F_GETFL, 0);
         if (client_flags < 0 || fcntl(client, F_SETFL, client_flags & ~O_NONBLOCK)) {
+            close(client); continue;
+        }
+        // Send small protocol responses without waiting for TCP coalescing.
+        const int no_delay = 1;
+        if (setsockopt(client, IPPROTO_TCP, TCP_NODELAY, &no_delay, sizeof(no_delay))) {
             close(client); continue;
         }
         timeval timeout {10, 0}; setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));

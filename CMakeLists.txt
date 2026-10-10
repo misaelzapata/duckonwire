@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(DuckOnWire VERSION 0.2.0 LANGUAGES C CXX)
+project(DuckOnWire VERSION 0.3.0 LANGUAGES C CXX)
 
 if(NOT UNIX)
   message(FATAL_ERROR "DuckOnWire's server currently requires POSIX (macOS or Linux).")

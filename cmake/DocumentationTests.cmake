@@ -5,7 +5,7 @@ if(NOT SOURCE_DIR)
 endif()
 file(REAL_PATH "${SOURCE_DIR}" SOURCE_DIR)
 if(NOT GUIDES)
-  set(GUIDES README.md AGENTS.md)
+  set(GUIDES README.md AGENTS.md docs/neon.md)
 endif()
 
 function(count_check name)
@@ -206,9 +206,12 @@ foreach(guide IN LISTS GUIDES)
   get_property(text GLOBAL PROPERTY "doc_link_text_${cache_key}")
   # Markdown inside code is a literal, not a rendered link.
   string(REGEX REPLACE "`[^`\r\n]*`" "" text "${text}")
-  string(REGEX MATCHALL "\\[[^]]*\\]\\([^\r\n)]*\\)" matches "${text}")
+  # Match destinations directly so nested image badges cannot consume later links.
+  string(REGEX MATCHALL "\\]\\([^\r\n)]*\\)" matches "${text}")
+  # CMake lists do not split at semicolons with unbalanced square brackets.
+  string(REPLACE "](" "(" matches "${matches}")
   foreach(match IN LISTS matches)
-    string(REGEX REPLACE "^.*\\]\\((.*)\\)$" "\\1" target "${match}")
+    string(REGEX REPLACE "^\\((.*)\\)$" "\\1" target "${match}")
     check_link("${path}" "${target}")
   endforeach()
   string(REGEX MATCHALL "(^|\n)[ \t]*\\[[^]]+\\]:[ \t]*(<[^>]+>|[^ \t\r\n]+)" matches "${text}")

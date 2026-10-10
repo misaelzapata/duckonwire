@@ -6,7 +6,7 @@ foreach(required SOURCE_DIR BUILD_DIR PLATFORM)
   endif()
 endforeach()
 if(NOT DEFINED VERSION)
-  set(VERSION "0.2.0-rc.5")
+  set(VERSION "0.3.0")
 endif()
 if(NOT VERSION MATCHES "^[0-9][A-Za-z0-9_.+-]*$" OR
    NOT PLATFORM MATCHES "^[A-Za-z0-9][A-Za-z0-9_.+-]*$")
@@ -127,7 +127,7 @@ package_run("Installed PostgreSQL protocol acceptance" "${bundle}" ${clean_env}
   "${bundle}/bin/pgwire-protocol-tests" --server "${bundle}/bin/duckonwire-server"
   --fixture-parent "${staging}/test-fixtures")
 string(REGEX MATCH "\\{\"passed\":true,[^\r\n]*\\}" pgwire_result "${package_stdout}")
-package_require_checks("${pgwire_result}" 22 "Installed PostgreSQL protocol acceptance")
+package_require_checks("${pgwire_result}" 31 "Installed PostgreSQL protocol acceptance")
 file(WRITE "${bundle}/share/duckonwire/pgwire-acceptance.json" "${pgwire_result}\n")
 package_run("Installed access rule acceptance" "${bundle}" ${clean_env}
   "${bundle}/bin/access-tests" --fixture-parent "${staging}/test-fixtures")

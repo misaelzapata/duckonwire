@@ -3,48 +3,63 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Explore a public product catalog with a read-only SQL connection to DuckDB.">
-  <title>DuckOnWire · Data playground</title>
-  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='duck.svg') }}">
+  <meta name="description" content="Browse tables and try read-only SQL on a native DuckDB catalog.">
+  <title>DuckOnWire · Explore your data</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='duckonwire-logo.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
-  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
-  <div class="page">
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="DuckOnWire home"><img class="duck" src="{{ url_for('static', filename='duck.svg') }}" alt="" aria-hidden="true"> DuckOnWire<span class="wordmark-dot">.</span></a>
-      <span class="connection-label"><span class="status-dot"></span>{{ label }}</span>
+  <div class="shell">
+    <header>
+      <a class="brand" href="/"><img class="duck" src="{{ url_for('static', filename='duckonwire-logo.png') }}" alt="" width="62" height="52">DuckOnWire<span class="brand-dot">.</span></a>
+      <span class="status">{{ label }}</span>
     </header>
     <main>
       <section class="hero">
-        <p class="eyebrow">DuckDB · SQL playground</p>
-        <h1>Query the catalog.</h1>
-        <p class="intro">Run a query against a native DuckDB server. Browse public products from Argentina and Spain, compare brands, and explore sample prices.</p>
-        <div class="facts"><span><b>Read only</b> connection</span><span><b>200 rows</b> per result</span><span><b>Timed queries</b> to keep the demo responsive</span></div>
-      </section>
-      <section class="workspace" aria-label="SQL playground">
-        <aside class="presets">
-          <div class="section-label">Start exploring <span>01—04</span></div>
-          {% for preset in presets %}
-          <button type="button" class="preset{% if loop.first %} active{% endif %}" data-query="{{ preset.sql }}">
-            <span class="preset-number">0{{ loop.index }}</span><span><strong>{{ preset.name }}</strong><small>{{ preset.hint }}</small></span><span class="arrow" aria-hidden="true">↗</span>
-          </button>
-          {% endfor %}
-          <div class="note"><span class="note-mark">i</span><p>Product names and brands are public. <strong>Prices are fictional</strong> and generated for this demo.</p></div>
-        </aside>
-        <div class="query-panel">
-          <form id="query-form">
-            <div class="editor-heading"><label for="sql">SQL editor</label><span>SELECT · WITH · JOIN · WINDOW</span></div>
-            <textarea id="sql" name="sql" spellcheck="false" maxlength="8000" aria-describedby="query-hint">{{ presets[0].sql }}</textarea>
-            <div class="editor-footer"><span id="query-hint">⌘ / Ctrl + Enter to run</span><button id="run" type="submit">Run query <span aria-hidden="true">→</span></button></div>
-          </form>
-          <div class="results-heading"><h2>Results</h2><span id="result-meta">Ready when you are</span></div>
-          <div id="notice" role="status" aria-live="polite"></div>
-          <div id="results" class="results"><div class="empty"><span aria-hidden="true">↗</span><h3>Run your first query.</h3><p>Choose a sample query or write your own.</p></div></div>
+        <div>
+          <p class="eyebrow">DuckDB · Data playground</p>
+          <h1>Query the catalog.</h1>
+          <p class="intro">Pick a table, explore its columns, or try a useful query. Real public products, sample prices, and your normal SQL tools.</p>
         </div>
+        <div class="facts"><span class="fact"><b>Read only</b> by design</span><span class="fact"><b>200 rows</b> max</span></div>
       </section>
-      <footer><span>Flask + your normal PostgreSQL driver. SQL runs in DuckDB.</span><span lang="es">Solo lectura · Prueba una consulta sin cambiar los datos.</span></footer>
+      <div class="workspace">
+        <aside class="sidebar">
+          <div class="card">
+            <div class="card-head"><h2>Tables</h2><span class="count" id="table-count">…</span></div>
+            <div class="tables" id="tables"><div class="empty">Loading catalog…</div></div>
+            <div class="sidebar-label">Try a query</div>
+            <div class="presets">
+              {% for preset in presets %}
+              <button type="button" class="preset" data-preset="{{ loop.index0 }}"><span aria-hidden="true">↗</span>{{ preset.name }}</button>
+              {% endfor %}
+            </div>
+          </div>
+          <p class="note">Names and brands are public. <strong>Prices are fictional</strong> and generated for this demo. Queries never change the data.</p>
+        </aside>
+        <section class="main">
+          <div class="card">
+            <form id="query-form">
+              <div class="editor-head"><strong>SQL editor</strong><span>SELECT · WITH · JOIN · WINDOW</span></div>
+              <textarea id="sql" spellcheck="false" maxlength="8000" aria-label="SQL query">{{ presets[0].sql }}</textarea>
+              <div class="editor-bottom"><span class="shortcut">⌘ / Ctrl + Enter to run</span><button class="run" id="run" type="submit">Run query →</button></div>
+            </form>
+          </div>
+          <div class="card details" id="details">
+            <div class="details-top"><h2 id="detail-title">Table columns</h2><button type="button" class="secondary" id="use-table">Use in editor ↗</button></div>
+            <div class="columns" id="columns"></div>
+          </div>
+          <div class="card">
+            <div class="result-head"><h2 id="result-title">Results</h2><span class="result-meta" id="result-meta">Ready when you are</span></div>
+            <div class="notice" id="notice" role="status" aria-live="polite"></div>
+            <div class="results" id="results"><div class="empty">Choose a table to preview its rows.</div></div>
+          </div>
+        </section>
+      </div>
     </main>
+    <footer><span>Flask + a standard PostgreSQL driver. Queries run in DuckDB.</span><span>Solo lectura · Explora sin cambiar los datos.</span></footer>
   </div>
+  <script id="presets-data" type="application/json">{{ presets|tojson }}</script>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </body>
 </html>

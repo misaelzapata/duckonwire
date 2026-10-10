@@ -12,9 +12,10 @@ on:
       - 'examples/demo/**'
       - 'cmake/**'
       - '!cmake/DocumentationTests.cmake'
-      - '!cmake/QualifiedPackage.cmake'
       - 'patches/**'
       - 'CMakeLists.txt'
+      - '.github/workflows/verify.yml'
+      - '.github/workflows/release.yml'
   pull_request:
     paths:
       - 'src/**'
@@ -26,14 +27,40 @@ on:
       - 'examples/demo/**'
       - 'cmake/**'
       - '!cmake/DocumentationTests.cmake'
-      - '!cmake/QualifiedPackage.cmake'
       - 'patches/**'
       - 'CMakeLists.txt'
+      - '.github/workflows/verify.yml'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
+    inputs:
+      version:
+        description: Package version
+        type: string
+        default: 0.3.0
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        default: 0.3.0
+    outputs:
+      package_artifact:
+        description: Fresh native package from this run
+        value: ${{ jobs.verify.outputs.package_artifact }}
+      source_head:
+        description: Source commit tested and packaged
+        value: ${{ jobs.verify.outputs.source_head }}
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 jobs:
   verify:
+    outputs:
+      package_artifact: native-linux-x86_64-v3
+      source_head: ${{ steps.provenance.outputs.source_head }}
+    env:
+      RELEASE_VERSION: ${{ inputs.version || '0.3.0' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -45,23 +72,34 @@ jobs:
       - name: Build native library, server, clients and tests
         run: cmake --build build --parallel 2
       - name: Native acceptance and concurrent smoke
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --verbose --output-log build/test-results/ctest.log
+      - name: Validate all 106 checks and record the summary
+        id: provenance
+        run: |
+          cmake -DTEST_LOG="$PWD/build/Testing/Temporary/LastTest.log" \
+            -DREPORT_FILE="$PWD/build/test-results/test-summary.json" \
+            -DSOURCE_DIR="$PWD" -DEXPECTED_SOURCE_HEAD="$GITHUB_SHA" \
+            -P cmake/TestSummary.cmake
+          printf 'source_head=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Two million inserts with concurrent complex reads
         run: build/bin/duckonwire-benchmark --mode both --rows 2000000 --writers 4 --readers 4 --batch 25000 --server build/bin/duckonwire-server --environment 'GitHub Actions Linux' --output build/test-results/benchmark.json
       - name: Install, verify relocation and package native runtime
-        run: cmake -DSOURCE_DIR="$GITHUB_WORKSPACE" -DBUILD_DIR="$GITHUB_WORKSPACE/build" -DVERSION=0.2.0-rc.5 -DPLATFORM=linux-x86_64-v3 -DOUTPUT_DIR="$GITHUB_WORKSPACE/build/packages" -P cmake/Package.cmake
+        run: cmake -DSOURCE_DIR="$GITHUB_WORKSPACE" -DBUILD_DIR="$GITHUB_WORKSPACE/build" -DVERSION="$RELEASE_VERSION" -DPLATFORM=linux-x86_64-v3 -DOUTPUT_DIR="$GITHUB_WORKSPACE/build/packages" -P cmake/Package.cmake
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: native-linux-x86_64-v3
           path: |
-            build/packages/duckonwire-0.2.0-rc.5-linux-x86_64-v3.tar.gz
-            build/packages/duckonwire-0.2.0-rc.5-linux-x86_64-v3.manifest.json
-            build/packages/duckonwire-0.2.0-rc.5-linux-x86_64-v3.sha256
+            build/packages/duckonwire-${{ env.RELEASE_VERSION }}-linux-x86_64-v3.tar.gz
+            build/packages/duckonwire-${{ env.RELEASE_VERSION }}-linux-x86_64-v3.manifest.json
+            build/packages/duckonwire-${{ env.RELEASE_VERSION }}-linux-x86_64-v3.sha256
           if-no-files-found: error
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: native-test-results
           path: |
-            build/Testing/Temporary/
-            build/test-results/
+            build/Testing/Temporary/*.log
+            build/test-results/*.json
+            build/test-results/*.log
+            build/test-results/*.sha256
+            build/test-results/*.txt

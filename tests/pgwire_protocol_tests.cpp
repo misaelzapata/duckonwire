@@ -440,6 +440,110 @@ int main(int argc, char **argv) {
 			wire->Parse("explicit_cast", "SELECT $1::INTEGER"); wire->Describe('S', "explicit_cast"); wire->Bind("explicit_cast", "explicit_cast", {std::string("43")}, true); wire->Execute("explicit_cast"); wire->Message('S');
 			const auto recovered = wire->Until("Z"); Require(!Contains(recovered, 'E') && Description(recovered).size() == 1 && Description(recovered)[0].second == 23 && Rows(recovered).size() == 1, "Explicit cast did not recover unresolved metadata session");
 		});
+		test("sql_cursor_requires_explicit_transaction", [&] {
+			auto wire = client();
+			const auto replies = wire->Query("DECLARE outside_cursor CURSOR FOR SELECT 1");
+			Require(HasError(replies, "25P01") && State(replies) == 'I', "SQL cursor escaped transaction scope");
+			Require(Scalar(*wire, "SELECT 11") == 11, "Rejected SQL cursor poisoned connection");
+		});
+		test("sql_cursor_forward_pagination_preserves_every_row", [&] {
+			auto wire = client(); Require(State(wire->Query("BEGIN")) == 'T', "Cursor BEGIN failed");
+			const auto declared = wire->Query("DECLARE page_cursor NO SCROLL CURSOR FOR SELECT i::INTEGER FROM range(15003) t(i)");
+			Require(!Contains(declared, 'E') && Command(declared) == "DECLARE CURSOR" && !Contains(declared, 'D'), "Cursor declaration returned rows or failed");
+			std::int64_t count = 0;
+			for (unsigned page = 0; page < 17; ++page) {
+				const auto fetched = wire->Query("FETCH FORWARD 1000 FROM page_cursor");
+				Require(!Contains(fetched, 'E') && State(fetched) == 'T', "Cursor FETCH failed or ended transaction");
+				const auto rows = Rows(fetched);
+				Require(Command(fetched) == "FETCH " + std::to_string(rows.size()), "Cursor fetch command count differs from result");
+				for (const auto &row : rows) Require(row.size() == 1 && row[0] && std::stoll(*row[0]) == count++, "Cursor lost, duplicated or reordered a row");
+				if (rows.empty()) break;
+			}
+			Require(count == 15003, "SQL cursor failed complete pagination");
+			Require(!Contains(wire->Query("CLOSE page_cursor"), 'E'), "Cursor close failed");
+			Require(State(wire->Query("COMMIT")) == 'I', "Cursor COMMIT failed");
+		});
+		test("sql_cursor_identifier_case_and_duplicate_errors", [&] {
+			auto wire = client(); wire->Query("BEGIN");
+			Require(!Contains(wire->Query("DECLARE \"Mixed Cursor\" CURSOR FOR SELECT 12"), 'E'), "Quoted cursor identifier rejected");
+			const auto row = Rows(wire->Query("FETCH 1 FROM \"Mixed Cursor\""));
+			Require(row.size() == 1 && row[0][0] == "12", "Quoted cursor result changed");
+			Require(!Contains(wire->Query("DECLARE lower_cursor CURSOR FOR SELECT 13"), 'E'), "Unquoted cursor declaration failed");
+			const auto lower = Rows(wire->Query("FETCH 1 FROM LOWER_CURSOR"));
+			Require(lower.size() == 1 && lower[0].size() == 1 && lower[0][0] == "13", "Unquoted cursor identifier was not folded");
+			const auto duplicate = wire->Query("DECLARE LOWER_CURSOR CURSOR FOR SELECT 99");
+			Require(HasError(duplicate, "42P03") && State(duplicate) == 'E', "Duplicate cursor did not abort transaction with correct error");
+			wire->Query("ROLLBACK"); Require(Scalar(*wire, "SELECT 14") == 14, "Duplicate cursor rollback failed");
+		});
+		test("sql_cursor_independent_positions_and_zero_fetch", [&] {
+			auto wire = client(); wire->Query("BEGIN");
+			Require(!Contains(wire->Query("DECLARE first_cursor CURSOR FOR SELECT i::INTEGER FROM range(3) t(i)"), 'E'), "First cursor declaration failed");
+			Require(!Contains(wire->Query("DECLARE second_cursor CURSOR FOR SELECT i::INTEGER FROM range(10,13) t(i)"), 'E'), "Second cursor declaration failed");
+			const auto zero = wire->Query("FETCH 0 FROM first_cursor");
+			Require(!Contains(zero, 'E') && Rows(zero).empty() && Description(zero).size() == 1 && Command(zero) == "FETCH 0", "Zero FETCH advanced or lost metadata");
+			const auto first = Rows(wire->Query("FETCH 1 FROM first_cursor"));
+			const auto second = Rows(wire->Query("FETCH 2 FROM second_cursor"));
+			Require(first.size() == 1 && first[0][0] == "0" && second.size() == 2 && second[0][0] == "10" && second[1][0] == "11", "Cursor positions interfered");
+			const auto remainder = Rows(wire->Query("FETCH ALL FROM first_cursor"));
+			Require(remainder.size() == 2 && remainder[0][0] == "1" && remainder[1][0] == "2", "FETCH ALL lost remainder");
+			wire->Query("ROLLBACK");
+		});
+		test("extended_cursor_declaration_binds_values_without_returning_rows", [&] {
+			auto wire = client(); wire->Query("BEGIN");
+			wire->Parse("declare_bound", "DECLARE bound_cursor CURSOR FOR SELECT $1::INTEGER AS id,$2::VARCHAR AS name,$3::DECIMAL(18,2) AS price", {23,25,1700});
+			wire->Bind("declare_bound", "declare_bound", {std::string("15"),std::string("Coffee 'dark roast'"),std::string("19.25")});
+			wire->Describe('P', "declare_bound"); wire->Execute("declare_bound"); wire->Message('S');
+			const auto declared = wire->Until("Z");
+			Require(!Contains(declared, 'E') && Contains(declared, 'n') && !Contains(declared, 'D') && Command(declared) == "DECLARE CURSOR" && State(declared) == 'T', "Extended DECLARE metadata or command mismatch");
+			const auto fetched = wire->Query("FETCH 1 FROM bound_cursor"); const auto rows = Rows(fetched); const auto columns = Description(fetched);
+			Require(!Contains(fetched, 'E') && rows.size() == 1 && rows[0].size() == 3 && rows[0][0] == "15" && rows[0][1] == "Coffee 'dark roast'" && rows[0][2] == "19.25", "Bound cursor values changed");
+			Require(columns.size() == 3 && columns[0].second == 23 && columns[1].second == 25 && columns[2].second == 1700, "Bound cursor lost result types");
+			wire->Query("COMMIT"); Require(Scalar(*wire, "SELECT 16") == 16, "Extended DECLARE sent extra ReadyForQuery frames");
+		});
+		test("extended_fetch_and_close_keep_protocol_synchronized", [&] {
+			auto wire = client(); wire->Query("BEGIN");
+			Require(!Contains(wire->Query("DECLARE prepared_cursor CURSOR FOR SELECT i::INTEGER FROM range(2) t(i)"), 'E'), "Prepared control cursor setup failed");
+			wire->Parse("fetch_cursor", "FETCH 1 FROM prepared_cursor"); wire->Bind("fetch_cursor", "fetch_cursor");
+			wire->Describe('P', "fetch_cursor"); wire->Execute("fetch_cursor"); wire->Message('S');
+			const auto fetched = wire->Until("Z"); const auto rows = Rows(fetched);
+			Require(!Contains(fetched, 'E') && rows.size() == 1 && rows[0][0] == "0" && Command(fetched) == "FETCH 1" && State(fetched) == 'T', "Prepared FETCH failed");
+			Require(Scalar(*wire, "SELECT 17") == 17, "Prepared FETCH emitted premature or duplicate ReadyForQuery");
+			wire->Parse("close_cursor", "CLOSE prepared_cursor"); wire->Bind("close_cursor", "close_cursor");
+			wire->Describe('P', "close_cursor"); wire->Execute("close_cursor"); wire->Message('S');
+			const auto closed = wire->Until("Z");
+			Require(!Contains(closed, 'E') && Contains(closed, 'n') && Command(closed) == "CLOSE CURSOR" && State(closed) == 'T', "Prepared CLOSE failed");
+			Require(Scalar(*wire, "SELECT 18") == 18, "Prepared CLOSE left protocol frames unread"); wire->Query("COMMIT");
+		});
+		test("sql_cursors_are_removed_at_transaction_end", [&] {
+			auto wire = client();
+			for (const auto &ending : {std::string("COMMIT"),std::string("ROLLBACK")}) {
+				wire->Query("BEGIN"); Require(!Contains(wire->Query("DECLARE end_cursor CURSOR FOR SELECT 19"), 'E'), "Transaction cursor setup failed");
+				Require(State(wire->Query(ending)) == 'I', "Cursor transaction did not end"); wire->Query("BEGIN");
+				const auto gone = wire->Query("FETCH 1 FROM end_cursor");
+				Require(HasError(gone, "34000") && State(gone) == 'E', "Cursor survived transaction end"); wire->Query("ROLLBACK");
+			}
+			Require(Scalar(*wire, "SELECT 20") == 20, "Cursor cleanup poisoned session");
+		});
+		test("close_all_preserves_transaction_and_prepared_statements", [&] {
+			auto observer = client(); auto wire = client();
+			Require(!Contains(wire->Query("CREATE TABLE pgwire_cursor_close_all(id INTEGER)"), 'E'), "CLOSE ALL fixture setup failed");
+			wire->Query("BEGIN"); wire->Query("INSERT INTO pgwire_cursor_close_all VALUES(21)");
+			wire->Parse("still_prepared", "SELECT $1::INTEGER", {23}); wire->Message('S'); Require(!Contains(wire->Until("Z"), 'E'), "Prepared statement setup failed");
+			Require(!Contains(wire->Query("DECLARE close_all_cursor CURSOR FOR SELECT 22"), 'E'), "CLOSE ALL cursor setup failed");
+			const auto closed = wire->Query("CLOSE ALL");
+			Require(!Contains(closed, 'E') && State(closed) == 'T', "CLOSE ALL reset connection or ended transaction");
+			Require(Scalar(*observer, "SELECT count(*) FROM pgwire_cursor_close_all") == 0 && Scalar(*wire, "SELECT count(*) FROM pgwire_cursor_close_all") == 1, "CLOSE ALL committed or discarded pending write");
+			wire->Bind("still_prepared", "still_prepared", {std::string("23")}); wire->Execute("still_prepared"); wire->Message('S');
+			const auto preserved = wire->Until("Z"); const auto rows = Rows(preserved);
+			Require(!Contains(preserved, 'E') && rows.size() == 1 && rows[0][0] == "23", "CLOSE ALL removed prepared statements");
+			wire->Query("COMMIT"); Require(Scalar(*observer, "SELECT sum(id) FROM pgwire_cursor_close_all") == 21, "CLOSE ALL changed committed contents");
+		});
+		test("savepoints_do_not_fake_rollback_for_legacy_writers", [&] {
+			auto wire = client(); wire->Query("BEGIN");
+			const auto unsupported = wire->Query("SAVEPOINT writer_savepoint");
+			Require(HasError(unsupported, "0A000") && State(unsupported) == 'E', "Writer savepoint was accepted without write rollback semantics");
+			Require(State(wire->Query("ROLLBACK")) == 'I' && Scalar(*wire, "SELECT 24") == 24, "Rejected writer savepoint did not recover after rollback");
+		});
 		test("cancel_request_interrupts_query_and_session_recovers", [&] {
 			auto wire = client(); wire->QuerySend("SELECT sum(sin(i::DOUBLE)) FROM range(1000000000) t(i)");
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));

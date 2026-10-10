@@ -1,7 +1,7 @@
 {
   "project": "DuckOnWire",
-  "version": "0.2.0-rc.5",
-  "status": "native server qualified on macOS and Linux; ten stock PostgreSQL drivers qualified on macOS and C/Python/Node on Linux; immutable rc.4 remains separate",
+  "version": "0.3.0",
+  "status": "Current-source native, Neon and Flask functional acceptance passed; binary release qualification is recorded independently per platform",
   "native_engine_version": "v2.1.0-dev0",
   "quack_protocol": 7,
   "patches_sha256": {
@@ -41,6 +41,10 @@
     {
       "path": "native-attach.json",
       "sha256": "2bccc82cbf46cddaaba26860d796b7588962fba347d415583b22ea4e89621ccf"
+    },
+    {
+      "path": "neon-integration.json",
+      "sha256": "0e9c38d60065ec563fc496d5e7ef7f79bbb629abb3d0ca706eb6fe4726353a32"
     }
   ],
   "benchmark_runs": [
@@ -280,50 +284,28 @@
       "benchmark-aws.json"
     ]
   },
-  "recorded_results_scope": "The result files and benchmark runs below belong to the qualified 0.2.0-rc.3 upstream-plus-patch build. They do not qualify the new fork-source build.",
+  "recorded_results_scope": "Historical native and benchmark files retain their original source and platform qualifications. PostgreSQL, ATTACH, Neon and Flask results identify their own tested source hashes and workload scopes.",
   "release": {
-    "version": "0.2.0-rc.5",
-    "status": "acceptance and publication are recorded by the attached platform manifests and release.json",
-    "download_page": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.5",
-    "other_language_bindings": "PostgreSQL clients use stock language drivers. Historical native Quack bindings outside C/C++ are paired separately; their binaries are not included.",
+    "version": "0.3.0",
+    "status": "Current-source functional acceptance passed; fresh package and publication receipts are recorded by the release workflow and versioned release manifest",
+    "workflow": ".github/workflows/release.yml",
+    "download_page": "https://github.com/misaelzapata/duckonwire/releases",
     "bundle_types": [
       "source",
-      "macOS ARM64 native C/C++",
-      "Linux x86-64-v3 Ubuntu 24.04 glibc 2.39 native C/C++"
+      "Linux x86-64-v3 Ubuntu 24.04 native C/C++"
     ],
-    "github_actions": "https://github.com/misaelzapata/duckonwire/actions",
-    "package_workflow": {
-      "script": "cmake/Package.cmake",
-      "requirements": "Clean committed tracked Git tree and completed native CMake build with BUILD_TESTING=ON",
-      "command": "cmake -DSOURCE_DIR=\"$PWD\" -DBUILD_DIR=\"$PWD/build\" -DVERSION=0.2.0-rc.5 -DPLATFORM=macos26-arm64 -DOUTPUT_DIR=\"$PWD/build/packages\" -P cmake/Package.cmake",
-      "linux_platform_label": "linux-x86_64-v3",
-      "outputs": [
-        "duckonwire-0.2.0-rc.5-PLATFORM.tar.gz",
-        "duckonwire-0.2.0-rc.5-PLATFORM.manifest.json",
-        "duckonwire-0.2.0-rc.5-PLATFORM.sha256"
-      ],
-      "post_install_checks": [
-        "native21 and transaction flow14",
-        "PostgreSQL protocol22",
-        "access rules13 and SCRAM12",
-        "10000-row embedded and Quack loopback smoke with reopen verification",
-        "documentation and CLI help",
-        "stock-driver login/CRUD and complex concurrent VALUES ingestion recorded by release CI"
-      ],
-      "extra_driver_binaries_included": false,
-      "native_archive_contents": "Git HEAD project sources/examples plus installed native C/C++ programs, paired engine and headers; Package.cmake does not emit a separate source archive."
-    },
-    "source_archives": "Provided by GitHub at the release tag",
-    "endpoints": [
-      "PostgreSQL protocol",
-      "Native Quack CONNECT"
+    "post_install_checks": [
+      "native21 and embedded transaction flow14",
+      "ATTACH12",
+      "PostgreSQL protocol31",
+      "access13 and SCRAM12",
+      "concurrent embedded and Quack smoke with persistence",
+      "documentation and CLI help"
     ],
-    "normal_postgres_drivers": true,
-    "qualified_runtime_reuse": {
-      "script": "cmake/QualifiedPackage.cmake",
-      "workflow": "https://github.com/misaelzapata/duckonwire/actions/workflows/release.yml",
-      "scope": "A verified unchanged Linux native runtime may be reused only when compiled project sources/pins match its manifest; current tracked source is archived and installed acceptance is repeated"
-    }
+    "driver_gate": "Fresh same-run package with 20 real postgres_fdw cases and stock C/Python/Node driver checks",
+    "docker_gate": "Native AMD64 and ARM64 source builds and runtime acceptance",
+    "experimental": true,
+    "manifest": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/release.json"
   },
   "quack_paired_drivers_required": true,
   "postgres_client_duckdb_required": false,
@@ -333,7 +315,7 @@
     "status": "real S3 and Cloudflare R2 reads passed in trusted local, Quack and PostgreSQL mode"
   },
   "postgresql": {
-    "status": "passed current-source macOS ARM64 qualification",
+    "status": "Recorded PostgreSQL driver qualification; current-source native, Neon and Flask checks are reported separately",
     "wire_protocol": "3.0",
     "uses_custom_client_connection_class": false,
     "client_DuckDB_installation_changed": false,
@@ -363,7 +345,7 @@
       "dummy_products": "English Coffee/Rice labels; ten CRUD examples revalidated on macOS",
       "client_ingestion_rows": 2000000,
       "client_ingestion_scope": "Actual client VALUES over verified TLS/SCRAM, separate read account; evidence recorded separately from server-generated workloads",
-      "runtime_qualification": "The native C++ sources and engine pins have not changed with the guides"
+      "runtime_qualification": "Recorded stock-driver and bulk workloads retain their source hashes in postgres-compatibility.json; current native transport, Neon and Flask checks appear in neon-integration.json"
     }
   },
   "public_access": {
@@ -374,47 +356,16 @@
     "platform": "macOS ARM64",
     "scope": "owned loopback TLS/SCRAM fixtures; reader/writer permissions, cancellation and capacity"
   },
-  "current_source_qualification": {
-    "platform": "macOS ARM64",
-    "source_hashes": {
-      "src/server.cpp": "a20ad52174f0f3e9c30550f610dad456b57ad506003ade6434ea2492a4982148",
-      "src/pgwire.cpp": "33930733e3b37eb431d372fe6751c85c5a4ce600a08376b1639ec9fdc0f46404",
-      "src/scram.cpp": "f2eab5f583e894e418e1563b941458a376693839d918ee931ed47d70f91e053d",
-      "src/access.cpp": "79517dae02865cdebf9698f28e8a754bfab87f488f94d6563842e24508f937ea",
-      "include/duckonwire/pgwire.hpp": "3a90cd6854b322564b565b714fb407c9312126aa1df7ad577afd125dbf824fcc"
-    },
-    "server_sha256": "ba9feef20128c77df158607cce1b32b65a21389eb55da24af621d8513f52ca75",
-    "paired_library_sha256": "5beb16eb653a59c11a37471da2c4182ffcf882adebb1774e55d6fef2b88b6e39",
-    "ctest_suites": 6,
-    "ctest_failed": 0,
-    "native_checks": 21,
-    "transaction_flow_checks": 14,
-    "postgres_protocol_checks": 22,
-    "access_parser_checks": 13,
-    "scram_checks": 12,
-    "bootstrap_checks": 17,
-    "concurrent_smoke_rows_per_mode": 10000,
-    "binary_release": "rc.5 package acceptance and publication are recorded in attached platform manifests and release.json",
-    "linux_current_source": {
-      "passed": true,
-      "source_head": "83ac192fc1e437f6c7ca2efd82db44d456b97381",
-      "platform": "Ubuntu 24.04 x86-64-v3",
-      "native_run": "https://github.com/misaelzapata/duckonwire/actions/runs/38002689125",
-      "postgres_run": "https://github.com/misaelzapata/duckonwire/actions/runs/38002689122",
-      "native_scope": "Fresh full engine/server build, six CTest suites, two million rows per direct/Quack mode, installed relocation and package generation",
-      "postgres_scope": "Fresh server against qualified pinned release library; C/Python/Node CRUD, local and verified TLS/SCRAM, two million server-generated rows with complex readers",
-      "guide_scope": "This evidence predates the new connection tutorial and documentation workflow"
-    }
-  },
   "documentation": {
     "guides": [
       "README.md",
-      "AGENTS.md"
+      "AGENTS.md",
+      "docs/neon.md"
     ],
     "server_options": 13,
     "workflow": "https://github.com/misaelzapata/duckonwire/actions/workflows/documentation.yml",
     "command": "cmake -DSOURCE_DIR=. -DSERVER_BINARY=build/bin/duckonwire-server -P cmake/DocumentationTests.cmake",
-    "executable_scope": "Native transactions, stock C/Python/Node login and CRUD, verified TLS/SCRAM reader/writer permissions, 100000 client VALUES rows, two million database-generated rows and complex concurrent reads",
+    "executable_scope": "Native transactions, stock C/Python/Node login and CRUD, verified TLS/SCRAM reader/writer permissions, 100000 client VALUES rows, two million database-generated rows and complex concurrent reads; real local postgres_fdw paging, parameters, savepoint recovery and typed results",
     "cloud_scope": "Real S3/R2 reads remain separately recorded; CI does not require or publish cloud credentials",
     "local_tutorial_execution": {
       "passed": true,
@@ -425,12 +376,23 @@
       "concurrent_readers": 4,
       "own_fixture_removed": true,
       "original_database_accessed": false
-    }
+    },
+    "documents": 3,
+    "verified_links": 80,
+    "verified_anchors": 14,
+    "verified_fences": 24,
+    "source_sha256": {
+      "README.md": "c5bfd2d4a095065401e8c0136937f0b89249be10b1ca25f08c9b4cf2036f6abc",
+      "AGENTS.md": "62dbaff9f07a3c211f45f3bcde2dd7204450b4f5c51592a6703cfa918b48fc2e",
+      "docs/neon.md": "e0fbff12f58d3aeba49f619126c6c1a3c1949972145cd94747e7c7169f1d168e",
+      "cmake/DocumentationTests.cmake": "67a8bd6d22f1ce10dade9a4ac744884ca71c19cfbbf52af8d4c8ed0c684e99e2"
+    },
+    "passed": true
   },
   "previous_release": {
-    "version": "0.2.0-rc.4",
-    "download_page": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.4",
-    "scope": "Quack-only native bundles; immutable assets remain unchanged"
+    "version": "0.2.0-rc.5",
+    "download_page": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.5",
+    "scope": "Historical immutable packages; they predate current Neon integration"
   },
   "native_attach": {
     "result": "native-attach.json",
@@ -453,5 +415,177 @@
     ],
     "installed_runtime_checks": 12,
     "installed_runtime_passed": true
-  }
+  },
+  "historical_qualification": {
+    "before_neon_integration": {
+      "platform": "macOS ARM64",
+      "source_hashes": {
+        "src/server.cpp": "a20ad52174f0f3e9c30550f610dad456b57ad506003ade6434ea2492a4982148",
+        "src/pgwire.cpp": "33930733e3b37eb431d372fe6751c85c5a4ce600a08376b1639ec9fdc0f46404",
+        "src/scram.cpp": "f2eab5f583e894e418e1563b941458a376693839d918ee931ed47d70f91e053d",
+        "src/access.cpp": "79517dae02865cdebf9698f28e8a754bfab87f488f94d6563842e24508f937ea",
+        "include/duckonwire/pgwire.hpp": "3a90cd6854b322564b565b714fb407c9312126aa1df7ad577afd125dbf824fcc"
+      },
+      "server_sha256": "ba9feef20128c77df158607cce1b32b65a21389eb55da24af621d8513f52ca75",
+      "paired_library_sha256": "5beb16eb653a59c11a37471da2c4182ffcf882adebb1774e55d6fef2b88b6e39",
+      "ctest_suites": 6,
+      "ctest_failed": 0,
+      "native_checks": 21,
+      "transaction_flow_checks": 14,
+      "postgres_protocol_checks": 22,
+      "access_parser_checks": 13,
+      "scram_checks": 12,
+      "bootstrap_checks": 17,
+      "concurrent_smoke_rows_per_mode": 10000,
+      "binary_release": "rc.5 package acceptance and publication are recorded in attached platform manifests and release.json",
+      "linux_current_source": {
+        "passed": true,
+        "source_head": "83ac192fc1e437f6c7ca2efd82db44d456b97381",
+        "platform": "Ubuntu 24.04 x86-64-v3",
+        "native_run": "https://github.com/misaelzapata/duckonwire/actions/runs/38002689125",
+        "postgres_run": "https://github.com/misaelzapata/duckonwire/actions/runs/38002689122",
+        "native_scope": "Fresh full engine/server build, six CTest suites, two million rows per direct/Quack mode, installed relocation and package generation",
+        "postgres_scope": "Fresh server against qualified pinned release library; C/Python/Node CRUD, local and verified TLS/SCRAM, two million server-generated rows with complex readers",
+        "guide_scope": "This evidence predates the new connection tutorial and documentation workflow"
+      }
+    },
+    "release_0_2_0_rc_5": {
+      "version": "0.2.0-rc.5",
+      "status": "acceptance and publication are recorded by the attached platform manifests and release.json",
+      "download_page": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.5",
+      "other_language_bindings": "PostgreSQL clients use stock language drivers. Historical native Quack bindings outside C/C++ are paired separately; their binaries are not included.",
+      "bundle_types": [
+        "source",
+        "macOS ARM64 native C/C++",
+        "Linux x86-64-v3 Ubuntu 24.04 glibc 2.39 native C/C++"
+      ],
+      "github_actions": "https://github.com/misaelzapata/duckonwire/actions",
+      "package_workflow": {
+        "script": "cmake/Package.cmake",
+        "requirements": "Clean committed tracked Git tree and completed native CMake build with BUILD_TESTING=ON",
+        "command": "cmake -DSOURCE_DIR=\"$PWD\" -DBUILD_DIR=\"$PWD/build\" -DVERSION=0.2.0-rc.5 -DPLATFORM=macos26-arm64 -DOUTPUT_DIR=\"$PWD/build/packages\" -P cmake/Package.cmake",
+        "linux_platform_label": "linux-x86_64-v3",
+        "outputs": [
+          "duckonwire-0.2.0-rc.5-PLATFORM.tar.gz",
+          "duckonwire-0.2.0-rc.5-PLATFORM.manifest.json",
+          "duckonwire-0.2.0-rc.5-PLATFORM.sha256"
+        ],
+        "post_install_checks": [
+          "native21 and transaction flow14",
+          "PostgreSQL protocol22",
+          "access rules13 and SCRAM12",
+          "10000-row embedded and Quack loopback smoke with reopen verification",
+          "documentation and CLI help",
+          "stock-driver login/CRUD and complex concurrent VALUES ingestion recorded by release CI"
+        ],
+        "extra_driver_binaries_included": false,
+        "native_archive_contents": "Git HEAD project sources/examples plus installed native C/C++ programs, paired engine and headers; Package.cmake does not emit a separate source archive."
+      },
+      "source_archives": "Provided by GitHub at the release tag",
+      "endpoints": [
+        "PostgreSQL protocol",
+        "Native Quack CONNECT"
+      ],
+      "normal_postgres_drivers": true,
+      "qualified_runtime_reuse": {
+        "scope": "A verified unchanged Linux native runtime may be reused only when compiled project sources/pins match its manifest; current tracked source is archived and installed acceptance is repeated",
+        "historical_script": "https://github.com/misaelzapata/duckonwire/blob/v0.2.0-rc.5/cmake/QualifiedPackage.cmake",
+        "historical_workflow": "https://github.com/misaelzapata/duckonwire/blob/v0.2.0-rc.5/.github/workflows/release.yml"
+      }
+    },
+    "before_tcp_and_pool": {
+      "status": "Historical functional baseline before TCP_NODELAY and Flask database pooling",
+      "source_sha256": {
+        "src/pgwire.cpp": "c0925594f78ae5307c49dde7d7b92c69d4e18605b86917383eec93e954122100",
+        "tests/pgwire_protocol_tests.cpp": "d1a90c03169aa6652c30e27f54bf31d4c5c83eeb5d37e74d8fcc77b6440848ab",
+        "tests/postgres_fdw.py": "472f0b4635e65e63e6b7163c17e0a5c3d92a01a3feb1edb419917453f681947a",
+        "tests/flask_playground.py": "0965b30c316828a71a1fc662b01839484a4f679b0572ffa669d423ee1c70c263"
+      },
+      "local_server_sha256": "5a63dd791703823de0480652b61f541bfed9dcc7d0a362b4677d16b56f152509",
+      "local_library_sha256": "5beb16eb653a59c11a37471da2c4182ffcf882adebb1774e55d6fef2b88b6e39",
+      "aws_runtime": {
+        "source_pgwire_sha256": "c0925594f78ae5307c49dde7d7b92c69d4e18605b86917383eec93e954122100",
+        "server_sha256": "a07cb8f8879930d001338b039f1b244e62a0c02d07597ed4245110d5eb8b707a",
+        "library_sha256": "09f483318725618bc007352ec7c4cd7ad22f321c53559ba82bf9bcb32d838db3"
+      },
+      "native_unique_checks": 106,
+      "postgres_fdw_checks": 20,
+      "flask_checks": 33,
+      "flask_source_sha256": {
+        "examples/postgres/flask/app.py": "3f021b22338e30022e3c84c102671472e66b95ba67897861a1c216a87ed6997b",
+        "examples/postgres/flask/requirements.txt": "6f0d19cb106cc6e2db17d852f4ba054a1e96dc921cb675d98ac5a6a2f3af858c",
+        "examples/postgres/flask/static/app.css": "8bc906a9e4db602e0e26e36e580090853c4def1f30db12e8eedd1943f08e3551",
+        "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
+        "examples/postgres/flask/static/duckonwire-logo.png": "197ff502adb593bbf825af2b7b1387c31040c6719ac410314b63ac5c3d00d17e",
+        "examples/postgres/flask/templates/index.html": "d98b9445e10b79dd91f1bbddbed98d1a32a8097a8b79749615f69437648a3c6e"
+      },
+      "neon_checks": 10,
+      "baseline_public_result_sha256": "430268a57d4fa858831d5c3c838e8ff4eae56afa8cb0aaf290ee43a41fd86090",
+      "performance_receipt_sha256": "d0d5d7d532c637645f4d5e3240fa4aba39b72e09939a982835404058692706c3",
+      "previous_neon_receipt_sha256": "8db68b5be557769c61d9f7cd19e7808fb82367c18e73230b169a02e52d613da1"
+    }
+  },
+  "current_source_qualification": {
+    "result": "neon-integration.json",
+    "passed": true,
+    "scope": "Current sources passed 106 native checks, 20 real postgres_fdw checks and 45 local Flask checks; the isolated AWS owner passed 31 PostgreSQL, 21 native and 12 ATTACH checks, with 42 deployed Flask checks, 17 HTTPS checks and 10 real Neon checks. Fresh CI and package qualification remain independent.",
+    "source_sha256": {
+      "src/pgwire.cpp": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
+      "tests/pgwire_protocol_tests.cpp": "d1a90c03169aa6652c30e27f54bf31d4c5c83eeb5d37e74d8fcc77b6440848ab",
+      "tests/postgres_fdw.py": "472f0b4635e65e63e6b7163c17e0a5c3d92a01a3feb1edb419917453f681947a",
+      "tests/flask_playground.py": "f4dbb12ed45fb88104b0b669dafbaa2fc654aadb14efd861be08015aef043987",
+      "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
+      "examples/postgres/flask/gunicorn.conf.py": "8fb7bcd8349046340f40dd0c0c3fe1aa4dc4635615ab5b951c7279a9b7ab4b84",
+      "examples/postgres/flask/requirements.txt": "ecc7f5741f0d3489177e686fd4486f02906b6befe25c7312c22f8f696476f700",
+      "examples/postgres/flask/static/app.css": "8bc906a9e4db602e0e26e36e580090853c4def1f30db12e8eedd1943f08e3551",
+      "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
+      "examples/postgres/flask/static/duckonwire-logo.png": "197ff502adb593bbf825af2b7b1387c31040c6719ac410314b63ac5c3d00d17e",
+      "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1"
+    },
+    "native_unique_checks": 106,
+    "postgres_fdw_checks": 20,
+    "neon_checks": 10,
+    "flask_checks": 45,
+    "manual_web_review": "passed",
+    "deployed_flask_checks": 42,
+    "public_https_checks": 17,
+    "result_sha256": "0e9c38d60065ec563fc496d5e7ef7f79bbb629abb3d0ca706eb6fe4726353a32"
+  },
+  "neon": {
+    "result": "neon-integration.json",
+    "passed": true,
+    "foreign_access": "read-only",
+    "same_direct_writer_connection_reads_and_writes": true,
+    "products": 46462,
+    "countries": [
+      "Argentina",
+      "Spain"
+    ],
+    "prices": "synthetic",
+    "queries": "paging, bound parameters, local join, CTE, window, aggregate, recovery and concurrent bound client VALUES"
+  },
+  "public_playground": {
+    "result": "neon-integration.json",
+    "passed": true,
+    "url": "https://dow.ofertasya.app",
+    "database_role": "protected read-only",
+    "driver": "psycopg / psycopg_pool",
+    "local_checks": 45,
+    "deployed_checks": 42,
+    "public_https_checks": 17,
+    "performance": {
+      "type": "Verified HTTPS request/response samples; not a database throughput benchmark",
+      "samples_per_query_per_cohort": 8,
+      "measured_calls_per_stage": 32,
+      "select42_reused_https_before_mean_ms": 415.101276099449,
+      "select42_reused_https_final_mean_ms": 69.86334901012015,
+      "countries_reused_https_before_mean_ms": 417.3276772489771,
+      "countries_reused_https_final_mean_ms": 74.63472375820857,
+      "full_timing_scope": "HTTPS reused; pooled database already prewarmed; row verification enabled; synchronous rollback included before complete HTTP response; normal CA verification",
+      "server_elapsed_is_not_http_wall_time": true
+    },
+    "manual_web_review": "passed",
+    "browser_timing_scope": "Single actual browser observations: displayed server elapsed_ms and browser ResourceTiming recorded separately; 32-request HTTPS distributions appear in neon-integration.json"
+  },
+  "updated_utc": "2026-10-10T14:47:40.736447+00:00"
 }
