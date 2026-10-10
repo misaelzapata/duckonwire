@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [Dockerfile, .dockerignore, compose.yaml, 'docker/**', 'src/**', 'include/**', 'cmake/**', CMakeLists.txt, 'patches/**', '.github/workflows/docker.yml']
+    paths: [Dockerfile, .dockerignore, compose.yaml, 'docker/**', 'src/**', 'include/**', 'cmake/**', CMakeLists.txt, 'patches/**', 'tests/**', 'examples/**', '.github/workflows/docker.yml']
   pull_request:
-    paths: [Dockerfile, .dockerignore, compose.yaml, 'docker/**', 'src/**', 'include/**', 'cmake/**', CMakeLists.txt, 'patches/**', '.github/workflows/docker.yml']
+    paths: [Dockerfile, .dockerignore, compose.yaml, 'docker/**', 'src/**', 'include/**', 'cmake/**', CMakeLists.txt, 'patches/**', 'tests/**', 'examples/**', '.github/workflows/docker.yml']
 permissions:
   contents: read
 defaults:

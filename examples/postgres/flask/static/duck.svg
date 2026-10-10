@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">DuckOnWire</title>
+  <desc id="desc">A bright yellow duck perched on a blue network cable.</desc>
+  <defs>
+    <path id="wire" d="M20 211h49c32 0 36 10 62 10s34-14 62-14h43"/>
+    <path id="duck" d="m43 125 31 16c20-19 45-24 72-16l6-21c-7-9-10-19-7-30 5-20 23-33 43-29 22 3 36 24 31 45-2 11-8 17-13 25l-2 18c11 13 16 29 9 45-9 22-32 32-63 32H99c-27 0-47-15-53-38l-10-36c-2-7 0-13 7-11Z"/>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#wire" stroke="#FFF" stroke-width="24"/>
+    <use href="#wire" stroke="#14253D" stroke-width="16"/>
+    <use href="#wire" stroke="#43BEED" stroke-width="9"/>
+    <path d="m105 207 5 12m46-12 3 8" stroke="#FFF" stroke-width="14"/>
+    <path d="m105 207 5 12m46-12 3 8" stroke="#14253D" stroke-width="9"/>
+    <path d="m105 207 5 12m46-12 3 8" stroke="#FFAA35" stroke-width="5"/>
+  </g>
+  <g stroke-linejoin="round">
+    <use href="#duck" fill="#FFDE32" stroke="#FFF" stroke-width="16"/>
+    <use href="#duck" fill="#FFDE32" stroke="#14253D" stroke-width="7"/>
+    <path d="m218 82 20 9c6 3 7 8 0 11l-24 9" fill="#FFAA35" stroke="#14253D" stroke-width="6"/>
+  </g>
+  <path d="M90 151c15-11 35-10 53 1-4 21-29 31-47 16" fill="#F4BC25" stroke="#14253D" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="192" cy="77" r="5" fill="#14253D"/>
+  <circle cx="193.5" cy="75.5" r="1.5" fill="#FFF"/>
+  <path d="M161 68c5-7 11-11 18-12" fill="none" stroke="#FFF09A" stroke-width="6" stroke-linecap="round"/>
+  <g fill="#43BEED" stroke="#FFF" stroke-width="12">
+    <rect x="8" y="201" width="20" height="20" rx="6"/>
+    <rect x="228" y="197" width="20" height="20" rx="6"/>
+  </g>
+  <g fill="#43BEED" stroke="#14253D" stroke-width="5">
+    <rect x="8" y="201" width="20" height="20" rx="6"/>
+    <rect x="228" y="197" width="20" height="20" rx="6"/>
+  </g>
+</svg>

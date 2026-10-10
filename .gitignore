@@ -6,6 +6,9 @@
 .runtime/
 /workspace/
 /access.tsv
+/.env
+/.env.*
+/.venv-flask/
 *.key
 *.pem
 /.native/

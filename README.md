@@ -349,6 +349,21 @@ These are trusted-local operations. A protected public account cannot create clo
 
 **46,462 real manufacturer-brand products** from Argentina and Spain, with reproducible **synthetic prices**. No stores, retailer/private-label brands or private identifiers. Included [CSV](examples/demo/products.csv) and [schema](examples/demo/schema.sql) support `--init-demo`; the benchmark uses a separate generated fixture. Own code is MIT; see [third-party notices](THIRD_PARTY_NOTICES.txt).
 
+## Flask playground
+
+The [Flask example](examples/postgres/flask/app.py) is a separate web application using ordinary `psycopg`. Connect it to an existing protected server with a real **read-only account**:
+
+```sh
+python3 -m venv .venv-flask
+.venv-flask/bin/pip install -r examples/postgres/flask/requirements.txt
+export PGHOST=db.example.com PGPORT=9496 PGDATABASE=duckonwire
+export PGUSER=reader PGPASSWORD='your-reader-account-password' PGSSLMODE=verify-full
+cd examples/postgres/flask
+../../../.venv-flask/bin/gunicorn --bind 127.0.0.1:8000 --workers 2 --threads 2 --timeout 40 app:app
+```
+
+Open `http://127.0.0.1:8000`. Public certificates use system trust roots; for a private CA, set `PGSSLROOTCERT` to its certificate file. Connection settings stay on the backend. The page offers product queries, joins and window functions, limits results to 200 rows and times out long queries. Each request closes its own connection; the server's reader rule enforces read-only access.
+
 ## Server options
 
 The defaults are enough for local use. Open this reference when you need a different database, network address or query limit.
@@ -410,6 +425,8 @@ The native server, examples and tests live here; engine changes live in the [Duc
 DuckOnWire permite compartir una base DuckDB mediante un servidor C++. Puedes usar tu driver PostgreSQL habitual sin cambiar DuckDB en los clientes, o Quack con el motor nativo compatible. El [tutorial](#tutorial) recorre estas opciones:
 
 Para probar con Docker, clona el repositorio y ejecuta `docker compose up --build -d`. El [ejemplo](#try-with-docker) inserta, actualiza y lee con `psql`; las cuentas y TLS se configuran automáticamente y la base persiste en un volumen.
+
+El [ejemplo Flask](#flask-playground) permite explorar el catálogo desde una página web. Usa Flask y `psycopg` normales, las variables `PG*` y una cuenta real de solo lectura con TLS verificado; las credenciales permanecen en el servidor web.
 
 1. **Probar en tu máquina:** inicia el servidor y ejecuta un ejemplo con la misma contraseña. En este modo la contraseña es compartida; el nombre de usuario no crea permisos separados.
 2. **Dar acceso por red:** configura cuentas reales de lectura o escritura y un certificado. El login sigue siendo **usuario y contraseña**. TLS cifra la conexión y verifica el servidor; SCRAM comprueba la contraseña sin enviarla. El driver se encarga de ambos.

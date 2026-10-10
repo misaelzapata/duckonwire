@@ -16,6 +16,8 @@ Quack is trusted local access: PostgreSQL's per-user read/write rules and query 
 
 Set passwords through environment variables or protected input. Never put credentials in command arguments, URLs, logs, screenshots or result JSON. Without `DUCKONWIRE_TOKEN`, the owner generates a token in its private mode-0600 descriptor. Protected users have separate credentials; the descriptor token is not their PostgreSQL password. Never disable TLS verification to make a test pass.
 
+The [Flask playground](examples/postgres/flask/app.py) is a separate ordinary Flask/psycopg application, not a server or client SDK. Configure a genuine protected reader through backend `PG*` variables and verified TLS; system trust roots are the default, with `PGSSLROOTCERT` for private CAs. Keep connection settings out of browser inputs. Each request must cap result rows and query time, then roll back and close its connection; validate the reader's actual write denial when testing this example.
+
 ## Ownership, isolation and transactions
 
 - Concurrent clients connect to the owner; they do not open its DuckDB file directly. File aliases cannot bypass the lock. Use one connection per concurrent worker.

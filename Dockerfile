@@ -13,7 +13,7 @@ COPY include/ include/
 COPY examples/ examples/
 COPY tests/ tests/
 RUN cmake -S . -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-      -DNATIVE_ARCH=OFF -DDISABLE_UNITY=ON -DBUILD_TESTING=ON \
+      -DNATIVE_ARCH=OFF -DBUILD_TESTING=ON \
     && cmake --build /build --parallel "${BUILD_JOBS}" \
     && cmake --install /build --prefix /opt/duckonwire \
     && cmake --install /build --prefix /opt/duckonwire --component Tests
