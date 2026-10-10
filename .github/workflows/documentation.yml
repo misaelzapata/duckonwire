@@ -29,7 +29,7 @@ jobs:
     uses: ./.github/workflows/postgres.yml
     with:
       package_artifact: ${{ inputs.package_artifact || '' }}
-    # Reuses the verified pinned engine, compiles the current C++ server, checks
+    # Uses this run's fresh package, or builds the exact current pins, checks
     # --help, and runs native/protocol tests and C/Python/Node TLS/SCRAM examples.
     # Two million bound rows overlap ten demo queries across protected clients.
     # Private S3/R2 accounts and credentials are intentionally absent from CI.

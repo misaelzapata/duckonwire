@@ -15,7 +15,7 @@ defaults:
 jobs:
   postgres:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 90
     env:
       DUCKONWIRE_TOKEN: ci-local-test-password
       PGPASSWORD: ci-local-test-password
@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Dependencies
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ libpq-dev libcurl4t64 libssl-dev python3-venv postgresql postgresql-contrib jq
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++ git libpq-dev libcurl4-openssl-dev libssl-dev python3-venv postgresql postgresql-contrib jq
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         if: inputs.package_artifact != ''
         with:
@@ -46,44 +46,13 @@ jobs:
           done
           git rev-parse HEAD > build/test-results/source-head.txt
           sha256sum src/pgwire.cpp src/server.cpp src/scram.cpp src/access.cpp build/engine/lib/libduckdb.so > build/test-results/provenance.sha256
-      - name: Reuse the qualified pinned engine for focused guide checks
+      - name: Build the current pinned server and protocol tests
         if: inputs.package_artifact == ''
-        # The engine pins have not changed. Compile this server and its tests
-        # afresh against the immutable rc.4 library, verifying the whole archive.
         run: |
-          mkdir -p build/engine build/bin build/test-results
-          cat > build/require-pins.cmake <<'CMAKE'
-          include("${CMAKE_CURRENT_LIST_DIR}/../cmake/Pins.cmake")
-          if(NOT DUCKONWIRE_DUCKDB_COMMIT STREQUAL "848126236a4a8879f232bed7ab5f702683a55300" OR
-             NOT DUCKONWIRE_QUACK_COMMIT STREQUAL "a6e7cb9243ee3d7ec0e5371b720be3292a32061f" OR
-             NOT DUCKONWIRE_HTTPFS_COMMIT STREQUAL "96a2f2e88e5dd075facbc5a65dc3afd67aa2bb44" OR
-             NOT DUCKONWIRE_DUCKDB_SOURCE_MODE STREQUAL "COMMITTED" OR
-             NOT DUCKONWIRE_QUACK_SOURCE_MODE STREQUAL "COMMITTED" OR
-             NOT DUCKONWIRE_HTTPFS_PATCH_SHA256 STREQUAL "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
-            message(FATAL_ERROR "Engine pins changed: qualify a fresh engine before reusing a release library")
-          endif()
-          CMAKE
-          cmake -P build/require-pins.cmake
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNATIVE_ARCH=OFF -DCMAKE_C_FLAGS=-march=x86-64-v3 -DCMAKE_CXX_FLAGS=-march=x86-64-v3
+          cmake --build build --parallel 2 --target duckonwire-server duckonwire-password access-tests scram-tests pgwire-protocol-tests native-tests transaction-flow attach-client attach-tests
           git rev-parse HEAD > build/test-results/source-head.txt
-          curl --fail --location --retry 3 https://github.com/misaelzapata/duckonwire/releases/download/v0.2.0-rc.4/duckonwire-0.2.0-rc.4-linux-x86_64-v3.tar.gz -o build/engine.tar.gz
-          echo '42e42aab7eabe64ed7d3d0557dd147163f49313cf62ecd0e652fa7717626a9da  build/engine.tar.gz' | sha256sum --check
-          tar -xzf build/engine.tar.gz -C build/engine --strip-components=1
-          test -f build/engine/include/duckdb.hpp
-          sha256sum src/pgwire.cpp src/server.cpp src/scram.cpp src/access.cpp build/engine/lib/libduckdb.so > build/test-results/provenance.sha256
-      - name: Compile current native server and protocol tests
-        if: inputs.package_artifact == ''
-        run: |
-          flags=(-std=c++17 -O2 -march=x86-64-v3 -Iinclude -Ibuild/engine/include -Itests/support -Iexamples/demo)
-          libraries=(-Lbuild/engine/lib -lduckdb -pthread -lssl -lcrypto '-Wl,-rpath,$ORIGIN/../engine/lib')
-          g++ "${flags[@]}" src/server.cpp src/pgwire.cpp src/scram.cpp src/access.cpp examples/demo/initialize.cpp "${libraries[@]}" -o build/bin/duckonwire-server
-          g++ "${flags[@]}" src/password.cpp src/scram.cpp -lcrypto -o build/bin/duckonwire-password
-          g++ "${flags[@]}" tests/access_tests.cpp src/access.cpp -o build/bin/access-tests
-          g++ "${flags[@]}" tests/scram_tests.cpp src/scram.cpp -lcrypto -o build/bin/scram-tests
-          g++ "${flags[@]}" tests/pgwire_protocol_tests.cpp "${libraries[@]}" -o build/bin/pgwire-protocol-tests
-          g++ "${flags[@]}" tests/native_tests.cpp "${libraries[@]}" -o build/bin/native-tests
-          g++ "${flags[@]}" examples/transaction_flow.cpp "${libraries[@]}" -o build/bin/transaction-flow
-          g++ "${flags[@]}" examples/attach.cpp "${libraries[@]}" -o build/bin/attach-client
-          g++ "${flags[@]}" tests/attach_tests.cpp "${libraries[@]}" -o build/bin/attach-tests
+          sha256sum src/pgwire.cpp src/server.cpp src/scram.cpp src/access.cpp build/lib/libduckdb.so > build/test-results/provenance.sha256
           sha256sum examples/attach.cpp tests/attach_tests.cpp README.md AGENTS.md >> build/test-results/provenance.sha256
       - name: Compile the ordinary libpq client
         run: cc -I"$(pg_config --includedir)" examples/postgres/c/crud.c -L"$(pg_config --libdir)" -lpq -o build/bin/pg-crud
