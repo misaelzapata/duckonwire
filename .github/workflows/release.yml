@@ -137,6 +137,8 @@ jobs:
           cat > release-notes.txt <<'NOTES'
           Connect your apps to DuckDB with standard PostgreSQL drivers, or use native Quack. This release includes verified TLS, SCRAM accounts, read/write access rules and the read-only Neon postgres_fdw tutorial.
 
+          Explore tables and run real queries with the included Flask playground. It reuses authenticated connections and keeps them ready between visits. A runnable top-prices query shows how to get the same results with less work.
+
           The same source commit passed 106 native/bootstrap checks, the actual FDW SQL tutorial, stock-driver examples, concurrent workloads and Docker tests on AMD64 and ARM64. Checksums and source pins are included.
 
           The native binary is for Ubuntu 24.04 on x86-64-v3 CPUs. For ARM64, use Docker or build from the included source. Queries run in DuckDB; full PostgreSQL SQL/catalog/ORM compatibility is not promised.

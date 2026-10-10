@@ -31,6 +31,20 @@ PRESETS = [
      "sql": "WITH latest AS (\n  SELECT product_id, price, day,\n         row_number() OVER (PARTITION BY product_id ORDER BY day DESC, id DESC) AS position\n  FROM prices WHERE product_id <= 500\n)\nSELECT p.id, p.name, p.brand, r.price, r.day\nFROM products p JOIN latest r ON r.product_id = p.id AND r.position = 1\nWHERE p.id <= 500 ORDER BY p.id"},
     {"id": "countries", "name": "Products by country", "hint": "Count the catalog's two markets",
      "sql": "SELECT country_code, count(*) AS products\nFROM products GROUP BY country_code ORDER BY country_code"},
+    {"id": "top", "name": "Top prices by country", "hint": "Native TopK over generated prices",
+     "sql": "WITH grouped AS (\n"
+            "  SELECT p.country_code,\n"
+            "    arg_max(struct_pack(name := p.name, brand := p.brand, price := pr.price),\n"
+            "      struct_pack(has_price := pr.price IS NOT NULL, price := pr.price,\n"
+            "                  reverse_id := -CAST(p.id AS BIGINT)), 3) AS chosen\n"
+            "  FROM products p JOIN prices pr ON pr.product_id = p.id\n"
+            "  GROUP BY p.country_code\n"
+            "), expanded AS (\n"
+            "  SELECT country_code, unnest(chosen) AS item FROM grouped\n"
+            ")\n"
+            "SELECT country_code, item.name AS name, item.brand AS brand, item.price AS price\n"
+            "FROM expanded\n"
+            "ORDER BY country_code ASC NULLS LAST, price DESC NULLS LAST, name ASC NULLS LAST"},
 ]
 
 

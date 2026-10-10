@@ -1,9 +1,12 @@
 """Exercise the ordinary Flask client against an existing protected reader account."""
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
 import sys
+import socket
+from types import SimpleNamespace
 import time
 import threading
 import uuid
@@ -20,6 +23,123 @@ from app import PRESETS, app, close_pool, connection_pool, connection_settings, 
 
 checks = []
 
+WINDOW_TOP3 = 'WITH ranked AS (SELECT p.country_code,p.name,p.brand,pr.price,row_number() OVER(PARTITION BY p.country_code ORDER BY pr.price DESC NULLS LAST,p.id ASC NULLS LAST) AS position FROM products p JOIN prices pr ON pr.product_id=p.id) SELECT country_code,name,brand,price FROM ranked WHERE position<=3 ORDER BY country_code ASC NULLS LAST,price DESC NULLS LAST,name ASC NULLS LAST'
+TOPK_FIXTURES = [('mixed_price_nulls', "WITH products(id,country_code,name,brand) AS (VALUES (1,'AR','Null first','A'),(2,'AR','High','B'),(3,'AR','Null third','C'),(4,'AR','Low','D')), prices(product_id,price) AS (VALUES (1,CAST(NULL AS DECIMAL(18,2))),(2,5.00),(3,NULL),(4,1.00)), "), ('equal_price_id_tiebreak', "WITH products(id,country_code,name,brand) AS (VALUES (1,'AR','Z-name','A'),(2,'AR','A-name','B'),(3,'AR','M-name','C'),(4,'AR','B-name','D')), prices(product_id,price) AS (VALUES (4,CAST(10.00 AS DECIMAL(18,2))),(2,10.00),(3,10.00),(1,10.00)), "), ('multiple_prices_same_product', "WITH products(id,country_code,name,brand) AS (VALUES (1,'ES','Repeated','A'),(2,'ES','Other','B')), prices(product_id,price) AS (VALUES (1,CAST(10.00 AS DECIMAL(18,2))),(1,10.00),(1,9.00),(2,8.00)), "), ('null_brand_payload', "WITH products(id,country_code,name,brand) AS (VALUES (1,'ES','One',CAST(NULL AS VARCHAR)),(2,'ES','Two',NULL),(3,'ES','Three',NULL),(4,'ES','Four','excluded')), prices(product_id,price) AS (VALUES (1,CAST(7.00 AS DECIMAL(18,2))),(2,6.00),(3,5.00),(4,4.00)), "), ('null_country_group', "WITH products(id,country_code,name,brand) AS (VALUES (1,CAST(NULL AS VARCHAR),'Null country one','A'),(2,NULL,'Null country two','B'),(3,'AR','Normal','C')), prices(product_id,price) AS (VALUES (1,CAST(7.00 AS DECIMAL(18,2))),(2,6.00),(3,5.00)), "), ('all_null_prices', "WITH products(id,country_code,name,brand) AS (VALUES (1,'AR','One','A'),(2,'AR','Two','B'),(3,'AR','Three','C'),(4,'AR','Four','D')), prices(product_id,price) AS (VALUES (4,CAST(NULL AS DECIMAL(18,2))),(2,NULL),(3,NULL),(1,NULL)), "), ('small_groups_and_null_names', "WITH products(id,country_code,name,brand) AS (VALUES (1,'AR',CAST(NULL AS VARCHAR),'A'),(2,'ES','Two','B'),(3,'ES','Three','C')), prices(product_id,price) AS (VALUES (1,CAST(7.00 AS DECIMAL(18,2))),(2,6.00),(3,5.00)), "), ('mixed_all_features', "WITH products(id,country_code,name,brand) AS (VALUES (1,CAST(NULL AS VARCHAR),'Null country',NULL),(2,NULL,'Other null country','B'),(3,NULL,'Third null country',NULL),(4,NULL,'Fourth null country','D'),(5,'AR','Tie high id','E'),(6,'AR','Tie higher id',NULL),(7,'ES','Small group',NULL)), prices(product_id,price) AS (VALUES (1,CAST(NULL AS DECIMAL(18,2))),(2,9.00),(2,9.00),(3,9.00),(4,NULL),(5,10.00),(6,10.00),(7,NULL)), ")]
+
+
+def maintenance_checks(maintenance):
+    """Exercise the real official check against actual authenticated native sockets."""
+    interval = maintenance.POOL_CHECK_INTERVAL_SECONDS
+    maintenance.POOL_CHECK_INTERVAL_SECONDS = 0.02
+    try:
+        with ConnectionPool(kwargs=connection_settings() | {"prepare_threshold": None},
+                            min_size=2, max_size=2, num_workers=1, open=False) as isolated:
+            isolated.wait(timeout=5)
+            first, second = isolated.getconn(), isolated.getconn()
+            identities = {first.info.backend_pid, second.info.backend_pid}
+            isolated.putconn(first)
+            isolated.putconn(second)
+            verified = set()
+            all_checked = threading.Event()
+            def actual_check(connection):
+                ConnectionPool.check_connection(connection)
+                verified.add(connection.info.backend_pid)
+                if len(verified) == 2:
+                    all_checked.set()
+            isolated.check_connection = actual_check
+            stop = threading.Event()
+            monitor = threading.Thread(target=maintenance._maintain_pool,
+                                       args=(isolated, stop), daemon=True)
+            created = isolated.get_stats()["connections_num"]
+            monitor.start()
+            try:
+                check("periodic official health checks cover both idle authenticated sessions",
+                      all_checked.wait(timeout=3) and verified == identities
+                      and isolated.get_stats()["connections_num"] == created)
+            finally:
+                stop.set()
+                monitor.join(timeout=3)
+            check("maintenance stop interrupts the periodic wait without residual work", not monitor.is_alive())
+            # Break only our idle client sockets without telling the pool. This matches
+            # a peer idle timeout: a Connection remains open until the next native check.
+            for connection in (first, second):
+                duplicate = socket.socket(fileno=os.dup(connection.fileno()))
+                try:
+                    duplicate.shutdown(socket.SHUT_RDWR)
+                finally:
+                    duplicate.close()
+            verified.clear()
+            all_checked.clear()
+            stop = threading.Event()
+            monitor = threading.Thread(target=maintenance._maintain_pool,
+                                       args=(isolated, stop), daemon=True)
+            monitor.start()
+            try:
+                check("maintenance replaces both peer-closed idle sockets before a user checkout",
+                      all_checked.wait(timeout=5) and len(verified) == 2
+                      and not verified.intersection(identities))
+            finally:
+                stop.set()
+                monitor.join(timeout=3)
+            ready_first, ready_second = isolated.getconn(), isolated.getconn()
+            try:
+                check("replacement pool remains bounded and yields two clean native sessions",
+                      {ready_first.info.backend_pid, ready_second.info.backend_pid} == verified
+                      and ready_first.info.transaction_status == ready_second.info.transaction_status == TransactionStatus.IDLE
+                      and isolated.max_size == 2)
+            finally:
+                isolated.putconn(ready_first)
+                isolated.putconn(ready_second)
+            entered, release = threading.Event(), threading.Event()
+            def blocked_check(connection):
+                entered.set()
+                if not release.wait(timeout=3):
+                    raise psycopg.OperationalError("Test health-check barrier timed out")
+                ConnectionPool.check_connection(connection)
+            isolated.check_connection = blocked_check
+            stop = threading.Event()
+            monitor = threading.Thread(target=maintenance._maintain_pool,
+                                       args=(isolated, stop), daemon=True)
+            monitor.start()
+            try:
+                held = False
+                if entered.wait(timeout=2):
+                    try:
+                        early = isolated.getconn(timeout=0.05)
+                        isolated.putconn(early)
+                    except PoolTimeout:
+                        held = True
+                check("official health check withholds idle sockets until verification finishes", held)
+            finally:
+                release.set()
+                stop.set()
+                monitor.join(timeout=3)
+            ready = isolated.getconn(timeout=3)
+            try:
+                check("health-check barrier releases the same verified idle session",
+                      ready.info.backend_pid in verified
+                      and ready.info.transaction_status == TransactionStatus.IDLE)
+            finally:
+                isolated.putconn(ready)
+        stop = threading.Event()
+        monitor = threading.Thread(target=maintenance._maintain_pool,
+                                   args=(isolated, stop), daemon=True)
+        monitor.start()
+        monitor.join(timeout=1)
+        check("maintenance exits when its original pool is closed", not monitor.is_alive())
+        worker = SimpleNamespace()
+        maintenance.post_worker_init(worker)
+        thread = worker._pool_health_thread
+        maintenance.post_worker_init(worker)
+        check("post-fork worker initialization creates exactly one maintenance thread",
+              thread is worker._pool_health_thread and thread.is_alive()
+              and len([item for item in threading.enumerate() if item.name == "pool-health"]) == 1)
+        maintenance.worker_exit(None, worker)
+        check("worker exit stops maintenance and closes its pool", worker._pool_health_stop.is_set()
+              and not thread.is_alive() and not any(item.name == "pool-health" for item in threading.enumerate()))
+    finally:
+        maintenance.POOL_CHECK_INTERVAL_SECONDS = interval
+
 
 def check(name, passed):
     checks.append({"name": name, "passed": bool(passed)})
@@ -34,6 +154,12 @@ def run():
     os.environ["PGPASSWORD"] = os.environ["PGREADER_PASSWORD"]
     check("TLS hostname and certificate verification enabled",
           connection_settings()["sslmode"] == "verify-full")
+    spec = importlib.util.spec_from_file_location("playground_gunicorn", EXAMPLE / "gunicorn.conf.py")
+    maintenance = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(maintenance)
+    check("module import creates neither a pool nor pre-fork maintenance threads",
+          __import__("app")._pool is None
+          and not any(item.name == "pool-health" for item in threading.enumerate()))
     warm_pool()
     client = app.test_client()
     page = client.get("/")
@@ -76,6 +202,20 @@ def run():
         check("actual catalog preset " + preset["id"], response.status_code == 200
               and body["row_count"] == (2 if preset["id"] == "countries" else 5)
               and body["truncated"] == (preset["id"] != "countries") and body["read_only"])
+    top = next(preset["sql"] for preset in PRESETS if preset["id"] == "top")
+    example_top = (ROOT / "examples/postgres/queries/top-prices.sql").read_text()
+    def answer(source):
+        response = client.post("/query", json={"sql": source, "limit": 200})
+        if response.status_code != 200:
+            raise AssertionError("TopK query failed")
+        body = response.get_json()
+        return {key: body[key] for key in ("columns", "rows", "row_count", "truncated", "read_only")}
+    reference = answer(WINDOW_TOP3)
+    check("TopK preset and public SQL match all six window-ranked catalog rows",
+          reference["row_count"] == 6 and answer(top) == reference and answer(example_top) == reference)
+    for name, prefix in TOPK_FIXTURES:
+        check("actual TopK/window equivalence for " + name,
+              answer(prefix + top.removeprefix("WITH ")) == answer(prefix + WINDOW_TOP3.removeprefix("WITH ")))
     response = client.post("/query", json={"sql": "SELECT i FROM range(10000) t(i)", "limit": 200})
     body = response.get_json()
     check("database-side cap preserves exactly 200 requested rows", response.status_code == 200
@@ -263,6 +403,7 @@ def run():
     response = client.post("/query", json={"sql": "SELECT count(*) FROM products"})
     check("connection reusable and catalog unchanged after errors and cancellation",
           response.status_code == 200 and response.get_json()["rows"] == [[46462]])
+    maintenance_checks(maintenance)
 
 
 if __name__ == "__main__":

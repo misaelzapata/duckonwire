@@ -44,7 +44,7 @@
     },
     {
       "path": "neon-integration.json",
-      "sha256": "901045ff6193a47340fef3f3628b621b91c3faa329243fe5c36401211b358238"
+      "sha256": "5f91fbfbdfe233dd5546d649abd7c719304cfd22bf193912f395779b9819c505"
     }
   ],
   "benchmark_runs": [
@@ -383,7 +383,7 @@
     "verified_fences": 24,
     "source_sha256": {
       "README.md": "c5bfd2d4a095065401e8c0136937f0b89249be10b1ca25f08c9b4cf2036f6abc",
-      "AGENTS.md": "62dbaff9f07a3c211f45f3bcde2dd7204450b4f5c51592a6703cfa918b48fc2e",
+      "AGENTS.md": "bb3d9c8faaf8a24f05076b0753f3e8ba39fd171145b0161e7aaa845d9a9463b3",
       "docs/neon.md": "e0fbff12f58d3aeba49f619126c6c1a3c1949972145cd94747e7c7169f1d168e",
       "cmake/DocumentationTests.cmake": "67a8bd6d22f1ce10dade9a4ac744884ca71c19cfbbf52af8d4c8ed0c684e99e2"
     },
@@ -537,29 +537,32 @@
   "current_source_qualification": {
     "result": "neon-integration.json",
     "passed": true,
-    "scope": "Current sources passed 106 native checks, 20 real postgres_fdw checks and 45 local Flask checks; the isolated AWS owner passed 31 PostgreSQL, 21 native and 12 ATTACH checks, with 42 deployed Flask checks, 17 HTTPS checks and 10 real Neon checks. Fresh CI and package qualification remain independent.",
+    "scope": "Native106 and postgres_fdw20 runtime qualification preserved on unchanged native sources; current Flask65 local,62 deployed,18 HTTPS and genuine311-second idle maintenance pass, with seven presets and exact TopK equivalence. Fresh package CI remains independent.",
     "source_sha256": {
       "src/pgwire.cpp": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
       "tests/pgwire_protocol_tests.cpp": "d1a90c03169aa6652c30e27f54bf31d4c5c83eeb5d37e74d8fcc77b6440848ab",
       "tests/postgres_fdw.py": "645d482fc057998b5278a39c05d12d5763785be9a70e979d151c3f0b745face2",
-      "tests/flask_playground.py": "f4dbb12ed45fb88104b0b669dafbaa2fc654aadb14efd861be08015aef043987",
-      "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
-      "examples/postgres/flask/gunicorn.conf.py": "8fb7bcd8349046340f40dd0c0c3fe1aa4dc4635615ab5b951c7279a9b7ab4b84",
+      "tests/flask_playground.py": "c35947ef88bed5e6603e57a9128d2b76835385e34870c88ab3804040139ed263",
+      "examples/postgres/flask/app.py": "78db36a333495da2446a22c685fde272762b9e2492eb6ddd03d56ce41925f1e7",
+      "examples/postgres/flask/gunicorn.conf.py": "ff28c92e3ce18b36c0b6c94bc971a4cd79b79dc11b8bfd7c80cf8ca9b17c6683",
       "examples/postgres/flask/requirements.txt": "ecc7f5741f0d3489177e686fd4486f02906b6befe25c7312c22f8f696476f700",
       "examples/postgres/flask/static/app.css": "8bc906a9e4db602e0e26e36e580090853c4def1f30db12e8eedd1943f08e3551",
       "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
       "examples/postgres/flask/static/duckonwire-logo.png": "197ff502adb593bbf825af2b7b1387c31040c6719ac410314b63ac5c3d00d17e",
-      "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1"
+      "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1",
+      "examples/postgres/queries/top-prices.sql": "80e3faccd891ca3ef8a750d03e0691be7ae09bcedaa30936139b532cc6a50349"
     },
     "native_unique_checks": 106,
     "postgres_fdw_checks": 20,
     "neon_checks": 10,
-    "flask_checks": 45,
+    "flask_checks": 65,
     "manual_web_review": "passed",
-    "deployed_flask_checks": 42,
-    "public_https_checks": 17,
-    "result_sha256": "901045ff6193a47340fef3f3628b621b91c3faa329243fe5c36401211b358238",
-    "postgres_fdw_qualification_receipt_sha256": "c203aa408b3f3d1ac862d64d508f01ca3a614eba69cf1d12235748b33cfadf95"
+    "deployed_flask_checks": 62,
+    "public_https_checks": 18,
+    "result_sha256": "5f91fbfbdfe233dd5546d649abd7c719304cfd22bf193912f395779b9819c505",
+    "postgres_fdw_qualification_receipt_sha256": "c203aa408b3f3d1ac862d64d508f01ca3a614eba69cf1d12235748b33cfadf95",
+    "actual_live_idle_seconds": 311.2574726017192,
+    "idle_maintenance_passed": true
   },
   "neon": {
     "result": "neon-integration.json",
@@ -580,22 +583,32 @@
     "url": "https://dow.ofertasya.app",
     "database_role": "protected read-only",
     "driver": "psycopg / psycopg_pool",
-    "local_checks": 45,
-    "deployed_checks": 42,
-    "public_https_checks": 17,
+    "local_checks": 65,
+    "deployed_checks": 62,
+    "public_https_checks": 18,
     "performance": {
       "type": "Verified HTTPS request/response samples; not a database throughput benchmark",
       "samples_per_query_per_cohort": 8,
       "measured_calls_per_stage": 32,
       "select42_reused_https_before_mean_ms": 415.101276099449,
-      "select42_reused_https_final_mean_ms": 69.86334901012015,
+      "select42_reused_https_final_mean_ms": 69.31603122211527,
       "countries_reused_https_before_mean_ms": 417.3276772489771,
-      "countries_reused_https_final_mean_ms": 74.63472375820857,
+      "countries_reused_https_final_mean_ms": 77.18001565081067,
       "full_timing_scope": "HTTPS reused; pooled database already prewarmed; row verification enabled; synchronous rollback included before complete HTTP response; normal CA verification",
-      "server_elapsed_is_not_http_wall_time": true
+      "server_elapsed_is_not_http_wall_time": true,
+      "select42_reused_https_before_idle_maintenance_mean_ms": 69.86334901012015,
+      "countries_reused_https_before_idle_maintenance_mean_ms": 74.63472375820857,
+      "first_topk_after311s_api_ms": 36.35,
+      "first_topk_after311s_loopback_http_ms": 39.607885759323835,
+      "current_receipt_sha256": "5113fa663e030a5722e514228433d3ee9321ea54044476c8f5c78aa213b82ac2"
     },
     "manual_web_review": "passed",
-    "browser_timing_scope": "Single actual browser observations: displayed server elapsed_ms and browser ResourceTiming recorded separately; 32-request HTTPS distributions appear in neon-integration.json"
+    "browser_timing_scope": "Single actual browser observations: displayed server elapsed_ms and browser ResourceTiming recorded separately; 32-request HTTPS distributions appear in neon-integration.json",
+    "periodic_health_check_seconds": 60,
+    "idle_maintenance_passed": true,
+    "actual_idle_seconds": 311.2574726017192,
+    "preset_count": 7,
+    "top_prices_sql": "examples/postgres/queries/top-prices.sql"
   },
-  "updated_utc": "2026-10-10T15:04:59.861340+00:00"
+  "updated_utc": "2026-10-10T15:55:48.869633+00:00"
 }

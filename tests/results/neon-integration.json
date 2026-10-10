@@ -2,19 +2,20 @@
   "project": "DuckOnWire",
   "version": "0.3.0",
   "status": "Current source functional acceptance passed locally, on the isolated AWS owner and through real Neon; fresh CI and package qualification are reported independently",
-  "source_snapshot": "Current working tree based on e1449999eed999d6a9064e636d9f43cdd4b303fa; exact tested file hashes below",
+  "source_snapshot": "Current working tree based on 6f5fddd64c4904beee6506704e773b49f6056944; exact tested file hashes below",
   "source_sha256": {
     "src/pgwire.cpp": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
     "tests/pgwire_protocol_tests.cpp": "d1a90c03169aa6652c30e27f54bf31d4c5c83eeb5d37e74d8fcc77b6440848ab",
     "tests/postgres_fdw.py": "645d482fc057998b5278a39c05d12d5763785be9a70e979d151c3f0b745face2",
-    "tests/flask_playground.py": "f4dbb12ed45fb88104b0b669dafbaa2fc654aadb14efd861be08015aef043987",
-    "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
-    "examples/postgres/flask/gunicorn.conf.py": "8fb7bcd8349046340f40dd0c0c3fe1aa4dc4635615ab5b951c7279a9b7ab4b84",
+    "tests/flask_playground.py": "c35947ef88bed5e6603e57a9128d2b76835385e34870c88ab3804040139ed263",
+    "examples/postgres/flask/app.py": "78db36a333495da2446a22c685fde272762b9e2492eb6ddd03d56ce41925f1e7",
+    "examples/postgres/flask/gunicorn.conf.py": "ff28c92e3ce18b36c0b6c94bc971a4cd79b79dc11b8bfd7c80cf8ca9b17c6683",
     "examples/postgres/flask/requirements.txt": "ecc7f5741f0d3489177e686fd4486f02906b6befe25c7312c22f8f696476f700",
     "examples/postgres/flask/static/app.css": "8bc906a9e4db602e0e26e36e580090853c4def1f30db12e8eedd1943f08e3551",
     "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
     "examples/postgres/flask/static/duckonwire-logo.png": "197ff502adb593bbf825af2b7b1387c31040c6719ac410314b63ac5c3d00d17e",
-    "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1"
+    "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1",
+    "examples/postgres/queries/top-prices.sql": "80e3faccd891ca3ef8a750d03e0691be7ae09bcedaa30936139b532cc6a50349"
   },
   "local": {
     "platform": "macOS ARM64",
@@ -159,6 +160,10 @@
           "passed": true
         },
         {
+          "name": "module import creates neither a pool nor pre-fork maintenance threads",
+          "passed": true
+        },
+        {
           "name": "HTML page renders without backend credentials",
           "passed": true
         },
@@ -220,6 +225,46 @@
         },
         {
           "name": "actual catalog preset countries",
+          "passed": true
+        },
+        {
+          "name": "actual catalog preset top",
+          "passed": true
+        },
+        {
+          "name": "TopK preset and public SQL match all six window-ranked catalog rows",
+          "passed": true
+        },
+        {
+          "name": "actual TopK/window equivalence for mixed_price_nulls",
+          "passed": true
+        },
+        {
+          "name": "actual TopK/window equivalence for equal_price_id_tiebreak",
+          "passed": true
+        },
+        {
+          "name": "actual TopK/window equivalence for multiple_prices_same_product",
+          "passed": true
+        },
+        {
+          "name": "actual TopK/window equivalence for null_brand_payload",
+          "passed": true
+        },
+        {
+          "name": "actual TopK/window equivalence for null_country_group",
+          "passed": true
+        },
+        {
+          "name": "actual TopK/window equivalence for all_null_prices",
+          "passed": true
+        },
+        {
+          "name": "actual TopK/window equivalence for small_groups_and_null_names",
+          "passed": true
+        },
+        {
+          "name": "actual TopK/window equivalence for mixed_all_features",
           "passed": true
         },
         {
@@ -333,22 +378,59 @@
         {
           "name": "connection reusable and catalog unchanged after errors and cancellation",
           "passed": true
+        },
+        {
+          "name": "periodic official health checks cover both idle authenticated sessions",
+          "passed": true
+        },
+        {
+          "name": "maintenance stop interrupts the periodic wait without residual work",
+          "passed": true
+        },
+        {
+          "name": "maintenance replaces both peer-closed idle sockets before a user checkout",
+          "passed": true
+        },
+        {
+          "name": "replacement pool remains bounded and yields two clean native sessions",
+          "passed": true
+        },
+        {
+          "name": "official health check withholds idle sockets until verification finishes",
+          "passed": true
+        },
+        {
+          "name": "health-check barrier releases the same verified idle session",
+          "passed": true
+        },
+        {
+          "name": "maintenance exits when its original pool is closed",
+          "passed": true
+        },
+        {
+          "name": "post-fork worker initialization creates exactly one maintenance thread",
+          "passed": true
+        },
+        {
+          "name": "worker exit stops maintenance and closes its pool",
+          "passed": true
         }
       ],
       "passed": true,
       "native_reader_verified": true,
       "rows_limit": 200,
       "source_sha256": {
-        "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
-        "examples/postgres/flask/gunicorn.conf.py": "8fb7bcd8349046340f40dd0c0c3fe1aa4dc4635615ab5b951c7279a9b7ab4b84",
+        "examples/postgres/flask/app.py": "78db36a333495da2446a22c685fde272762b9e2492eb6ddd03d56ce41925f1e7",
+        "examples/postgres/flask/gunicorn.conf.py": "ff28c92e3ce18b36c0b6c94bc971a4cd79b79dc11b8bfd7c80cf8ca9b17c6683",
         "examples/postgres/flask/requirements.txt": "ecc7f5741f0d3489177e686fd4486f02906b6befe25c7312c22f8f696476f700",
         "examples/postgres/flask/static/app.css": "8bc906a9e4db602e0e26e36e580090853c4def1f30db12e8eedd1943f08e3551",
         "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
         "examples/postgres/flask/static/duckonwire-logo.png": "197ff502adb593bbf825af2b7b1387c31040c6719ac410314b63ac5c3d00d17e",
         "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1"
       },
-      "test_source_sha256": "f4dbb12ed45fb88104b0b669dafbaa2fc654aadb14efd861be08015aef043987",
-      "checks_count": 45
+      "test_source_sha256": "c35947ef88bed5e6603e57a9128d2b76835385e34870c88ab3804040139ed263",
+      "checks_count": 65,
+      "qualification_receipt_sha256": "5e770fdf2523dd82cf67fcfd1f1ee90078b41067e8c1636cf7e6afd38ae8e732"
     },
     "paired_engine_unchanged": true,
     "native_acceptance": {
@@ -542,65 +624,66 @@
     "passed": true,
     "status": "passed",
     "public_site": "https://dow.ofertasya.app/",
-    "checked_utc": "2026-10-10T14:45:31.174636+00:00",
-    "scope": "Actual browser SQL editor/button/keyboard interactions after native TCP_NODELAY and fixed warm pooled connections with reset-before-reuse",
+    "scope": "Actual deployed Browser UI through HTTPS; individual ResourceTiming observations, not a throughput or average benchmark",
     "source_sha256": {
-      "src/pgwire.cpp": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
-      "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
-      "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
-      "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1"
+      "examples/postgres/flask/app.py": "78db36a333495da2446a22c685fde272762b9e2492eb6ddd03d56ce41925f1e7",
+      "examples/postgres/flask/gunicorn.conf.py": "ff28c92e3ce18b36c0b6c94bc971a4cd79b79dc11b8bfd7c80cf8ca9b17c6683",
+      "tests/flask_playground.py": "c35947ef88bed5e6603e57a9128d2b76835385e34870c88ab3804040139ed263",
+      "examples/postgres/queries/top-prices.sql": "80e3faccd891ca3ef8a750d03e0691be7ae09bcedaa30936139b532cc6a50349"
     },
-    "evidence_receipt_sha256": "ec27e3864db7de5fc17366dee9070d09f14d57140be3553803aa85c9bce0eaa2",
-    "queries": [
+    "manual_visual_review": {
+      "desktop": "passed",
+      "mobile": "passed",
+      "screenshots_actually_viewed": true
+    },
+    "evidence_receipt_sha256": "cea30348278fc1f41993829086d1cfed6e1e6dfac76640672b68d4f41e700370",
+    "checks": [
       {
-        "name": "join",
-        "passed": true,
-        "visible_summary": "5 rows · 18.2 ms",
-        "query_receipt_sha256": "71f42758e15bd3af7b1722a7c02fc4f26f1382e79fd7654f32f019c865113b93",
-        "browser_resource_timing": [
-          {
-            "duration_ms": 80.29999995231628,
-            "transfer_bytes": 829
-          }
-        ]
+        "name": "Seventh TopK preset returns all six real catalog rows on desktop",
+        "passed": true
       },
       {
-        "name": "window",
-        "passed": true,
-        "visible_summary": "6 rows · 143.83 ms",
-        "query_receipt_sha256": "89286bee2258637634fd083e75b9a9b1a79a553df7c30a317b92b8183fce274e",
-        "browser_resource_timing": [
-          {
-            "duration_ms": 205.39999997615814,
-            "transfer_bytes": 865
-          }
-        ]
+        "name": "Bad SQL reports a sanitized alert with actual HTTP400",
+        "passed": true
       },
       {
-        "name": "aggregate",
-        "passed": true,
-        "visible_summary": "5 rows · 20.05 ms",
-        "query_receipt_sha256": "2c898761052ee143f1820617f6e2fcb5b85e22a2cdcf159a7ace51e2432119ff",
-        "browser_resource_timing": [
-          {
-            "duration_ms": 83.89999997615814,
-            "transfer_bytes": 645
-          }
-        ]
+        "name": "Same browser recovers after SQL error with original catalog counts",
+        "passed": true
       },
       {
-        "name": "bad-sql",
-        "passed": true,
-        "visible_summary": "Query not completed",
-        "query_receipt_sha256": "9e1d5fcdda2d57b94c770bd5f55f66124bfdb02217e29e65dc8b1d65cd45a454",
-        "browser_resource_timing": []
+        "name": "Actual mobile SELECT42 succeeds without page overflow",
+        "passed": true
       },
       {
-        "name": "recovery",
-        "passed": true,
-        "visible_summary": "1 rows · 13.38 ms",
-        "query_receipt_sha256": "0d066479c1ae1f3741b192edbca960701b5f01801569b3e027fbb27ed61a60ed",
-        "browser_resource_timing": []
+        "name": "Desktop rerun retains exactly the same six TopK results",
+        "passed": true
+      }
+    ],
+    "individual_observations": [
+      {
+        "case": "idle-maintenance-topk-desktop.json",
+        "caption": "6 rows · 35.66 ms",
+        "whole_browser_request_ms": 98.29999995231628
+      },
+      {
+        "case": "idle-maintenance-error.json",
+        "caption": null,
+        "whole_browser_request_ms": 66.29999995231628
+      },
+      {
+        "case": "idle-maintenance-recovery.json",
+        "caption": "1 rows · 11.98 ms",
+        "whole_browser_request_ms": 79.89999997615814
+      },
+      {
+        "case": "idle-maintenance-mobile.json",
+        "caption": "1 rows · 5.66 ms",
+        "whole_browser_request_ms": 69.5
+      },
+      {
+        "case": "idle-maintenance-topk-final.json",
+        "caption": "6 rows · 37.86 ms",
+        "whole_browser_request_ms": 110.29999995231628
       }
     ],
     "catalog": {
@@ -608,38 +691,42 @@
       "brands": 178,
       "countries": 2
     },
-    "desktop": {
-      "viewport": [
-        1440,
-        1000
-      ],
-      "manually_reviewed": true,
-      "screenshot_sha256": "b71b94cebcf7bb9796d219da26def22ce365ff3424b01c94f944dded52a4eed2"
-    },
     "mobile": {
       "viewport": [
         390,
         844
       ],
-      "manually_reviewed": true,
       "document_width": 390,
-      "keyboard_control_enter": 42,
-      "screenshot_sha256": "11391e7e3db18e64f4ce77a4ed1c8c4c386e0f7545919e8d943444ba1c45a49b"
+      "no_page_overflow": true,
+      "select42_verified": true,
+      "screenshot_sha256": "b802e0efe6fc230ecbb0eeb29ca654ad63fc1c4854654139534e5e9d7980b094"
     },
-    "tables_columns_and_editor_selection_passed": true,
-    "prices": "fictional",
-    "timing_scope": "Single displayed backend timings and separate ResourceTiming request durations; 32-request HTTPS distribution measured independently in performance-after.json",
-    "expected_console_errors": "One expected HTTP400 from intentional invalid SQL; no favicon error"
+    "desktop": {
+      "manually_reviewed": true,
+      "screenshot_sha256": "8f809d39b8e081185ccb5af1c67b03303a1d619fe72cd0678bcddad1c9d2482b"
+    },
+    "timing_scope": "Individual browser ResourceTiming durations and displayed backend captions; the 32-call distribution is recorded separately."
   },
   "ci": {
     "workflow": ".github/workflows/release.yml",
     "scope": "Fresh paired engine and package, 106 native checks, 20 real postgres_fdw integration checks, C/Python/Node, AMD64/ARM64 Docker",
     "results": "https://github.com/misaelzapata/duckonwire/actions",
-    "status": "Current functional checks above passed on the recorded source hashes; fresh package and CI receipts are published separately by Actions and the versioned release manifest",
+    "status": "Recorded native, Docker and tutorial CI passed at the preceding commit; the idle-maintenance sources passed the local/deployed/live checks above and require their own fresh package pipeline.",
     "package_release": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.3.0",
     "package_manifest": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/release.json",
     "workflow_source_sha256": {
       ".github/workflows/postgres.yml": "289bc5700897f9e548867757c4853efd7d1fb929da786ff1dc90885c108a41e0"
+    },
+    "previous_source_checks": {
+      "head": "6f5fddd64c4904beee6506704e773b49f6056944",
+      "native_run": 38063021191,
+      "documentation_run": 38062241437,
+      "docker_run": 38062241301,
+      "conclusion": "success",
+      "flask_checks_in_previous_tutorial": 42,
+      "release_run": 38062250534,
+      "release_conclusion": "cancelled_before_publish",
+      "reason": "Idle-pool defect found before publishing; these prior receipts do not qualify the maintenance fix."
     }
   },
   "limitations": [
@@ -689,6 +776,165 @@
       "public_result_sha256": "0e9c38d60065ec563fc496d5e7ef7f79bbb629abb3d0ca706eb6fe4726353a32",
       "source_head": "e1449999eed999d6a9064e636d9f43cdd4b303fa",
       "ci_scope": "Superseded CI candidate failed while resolving the Debian psql launcher; native engine and transport unchanged"
+    },
+    "before_idle_maintenance": {
+      "status": "Recorded transport/pool qualification before periodic idle checks and the TopK preset",
+      "source_sha256": {
+        "src/pgwire.cpp": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
+        "tests/pgwire_protocol_tests.cpp": "d1a90c03169aa6652c30e27f54bf31d4c5c83eeb5d37e74d8fcc77b6440848ab",
+        "tests/postgres_fdw.py": "645d482fc057998b5278a39c05d12d5763785be9a70e979d151c3f0b745face2",
+        "tests/flask_playground.py": "f4dbb12ed45fb88104b0b669dafbaa2fc654aadb14efd861be08015aef043987",
+        "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
+        "examples/postgres/flask/gunicorn.conf.py": "8fb7bcd8349046340f40dd0c0c3fe1aa4dc4635615ab5b951c7279a9b7ab4b84",
+        "examples/postgres/flask/requirements.txt": "ecc7f5741f0d3489177e686fd4486f02906b6befe25c7312c22f8f696476f700",
+        "examples/postgres/flask/static/app.css": "8bc906a9e4db602e0e26e36e580090853c4def1f30db12e8eedd1943f08e3551",
+        "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
+        "examples/postgres/flask/static/duckonwire-logo.png": "197ff502adb593bbf825af2b7b1387c31040c6719ac410314b63ac5c3d00d17e",
+        "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1"
+      },
+      "flask_local_checks": 45,
+      "flask_deployed_checks": 42,
+      "public_https_checks": 17,
+      "pool": {
+        "passed": true,
+        "driver": "psycopg_pool",
+        "version": "3.3.3",
+        "physical_connections_prewarmed_per_worker": 2,
+        "limits": {
+          "connections_per_worker": 2,
+          "gunicorn_workers": 2,
+          "maximum_waiting_per_worker": 2,
+          "checkout_timeout_seconds": 3,
+          "max_lifetime_seconds": 3600,
+          "background_workers_per_pool": 1
+        },
+        "reset": "Synchronous timerjoin and rollback; officialpool background DISCARD and autocommitrestore. Session remains unavailable until reset completes; failed/cancelled/closed sessions retire.",
+        "local_checks": 45,
+        "deployed_checks": 42,
+        "public_https_checks": 17,
+        "backend_tls_verification": "verify-full",
+        "backend_role": "protected read-only",
+        "deployed_source_hashes_verified": true,
+        "source_sha256": {
+          "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
+          "examples/postgres/flask/gunicorn.conf.py": "8fb7bcd8349046340f40dd0c0c3fe1aa4dc4635615ab5b951c7279a9b7ab4b84",
+          "examples/postgres/flask/requirements.txt": "ecc7f5741f0d3489177e686fd4486f02906b6befe25c7312c22f8f696476f700",
+          "examples/postgres/flask/static/app.css": "8bc906a9e4db602e0e26e36e580090853c4def1f30db12e8eedd1943f08e3551",
+          "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
+          "examples/postgres/flask/static/duckonwire-logo.png": "197ff502adb593bbf825af2b7b1387c31040c6719ac410314b63ac5c3d00d17e",
+          "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1"
+        },
+        "test_source_sha256": "f4dbb12ed45fb88104b0b669dafbaa2fc654aadb14efd861be08015aef043987",
+        "local_receipt_sha256": "d019277fa3265fca6ac259800711c355c8508db9c1a3f5df7d7775b5157eb414",
+        "pool_receipt_sha256": "852069b0e7ba03d6b23a777ec7082f3dcb079baf8322b0090cc79c274e2c233e",
+        "deployment_receipt_sha256": "beb710fc5d24832d78469147fadad9882089ad7d3404811a77cb31f049604107",
+        "limitations": [
+          "Initial physical TLS/SCRAM login remains costly; postfork warmup covers both availableconnections",
+          "Tight bursts may wait for the previous asynchronous reset",
+          "API elapsed excludes finalrollback/queue insertion; fullpublicHTTPS wall is measured separately",
+          "Performance combines nativeTCPNODELAY and apppool changes, no standalone engine throughput claim"
+        ]
+      },
+      "public_result_sha256": "901045ff6193a47340fef3f3628b621b91c3faa329243fe5c36401211b358238",
+      "manual_web_review": {
+        "passed": true,
+        "status": "passed",
+        "public_site": "https://dow.ofertasya.app/",
+        "checked_utc": "2026-10-10T14:45:31.174636+00:00",
+        "scope": "Actual browser SQL editor/button/keyboard interactions after native TCP_NODELAY and fixed warm pooled connections with reset-before-reuse",
+        "source_sha256": {
+          "src/pgwire.cpp": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
+          "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
+          "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
+          "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1"
+        },
+        "evidence_receipt_sha256": "ec27e3864db7de5fc17366dee9070d09f14d57140be3553803aa85c9bce0eaa2",
+        "queries": [
+          {
+            "name": "join",
+            "passed": true,
+            "visible_summary": "5 rows · 18.2 ms",
+            "query_receipt_sha256": "71f42758e15bd3af7b1722a7c02fc4f26f1382e79fd7654f32f019c865113b93",
+            "browser_resource_timing": [
+              {
+                "duration_ms": 80.29999995231628,
+                "transfer_bytes": 829
+              }
+            ]
+          },
+          {
+            "name": "window",
+            "passed": true,
+            "visible_summary": "6 rows · 143.83 ms",
+            "query_receipt_sha256": "89286bee2258637634fd083e75b9a9b1a79a553df7c30a317b92b8183fce274e",
+            "browser_resource_timing": [
+              {
+                "duration_ms": 205.39999997615814,
+                "transfer_bytes": 865
+              }
+            ]
+          },
+          {
+            "name": "aggregate",
+            "passed": true,
+            "visible_summary": "5 rows · 20.05 ms",
+            "query_receipt_sha256": "2c898761052ee143f1820617f6e2fcb5b85e22a2cdcf159a7ace51e2432119ff",
+            "browser_resource_timing": [
+              {
+                "duration_ms": 83.89999997615814,
+                "transfer_bytes": 645
+              }
+            ]
+          },
+          {
+            "name": "bad-sql",
+            "passed": true,
+            "visible_summary": "Query not completed",
+            "query_receipt_sha256": "9e1d5fcdda2d57b94c770bd5f55f66124bfdb02217e29e65dc8b1d65cd45a454",
+            "browser_resource_timing": []
+          },
+          {
+            "name": "recovery",
+            "passed": true,
+            "visible_summary": "1 rows · 13.38 ms",
+            "query_receipt_sha256": "0d066479c1ae1f3741b192edbca960701b5f01801569b3e027fbb27ed61a60ed",
+            "browser_resource_timing": []
+          }
+        ],
+        "catalog": {
+          "products": 46462,
+          "brands": 178,
+          "countries": 2
+        },
+        "desktop": {
+          "viewport": [
+            1440,
+            1000
+          ],
+          "manually_reviewed": true,
+          "screenshot_sha256": "b71b94cebcf7bb9796d219da26def22ce365ff3424b01c94f944dded52a4eed2"
+        },
+        "mobile": {
+          "viewport": [
+            390,
+            844
+          ],
+          "manually_reviewed": true,
+          "document_width": 390,
+          "keyboard_control_enter": 42,
+          "screenshot_sha256": "11391e7e3db18e64f4ce77a4ed1c8c4c386e0f7545919e8d943444ba1c45a49b"
+        },
+        "tables_columns_and_editor_selection_passed": true,
+        "prices": "fictional",
+        "timing_scope": "Single displayed backend timings and separate ResourceTiming request durations; 32-request HTTPS distribution measured independently in performance-after.json",
+        "expected_console_errors": "One expected HTTP400 from intentional invalid SQL; no favicon error"
+      },
+      "performance_after_receipt_sha256": "7f1d10b34ef12bcb5498c8e0a6d493fb894df9afd86711eaf478a739ef74d162",
+      "reproduced_idle_outlier": {
+        "scope": "Separate reproduced before-fix idle event, not a paired throughput benchmark",
+        "receipt_sha256": "49173b2c20496f1c21be5d045f9bb921c4305f72bd33510e360c5166e9f723ee",
+        "first_loopback_api_ms": 1044.17
+      }
     }
   },
   "flask_pool": {
@@ -702,33 +948,45 @@
       "maximum_waiting_per_worker": 2,
       "checkout_timeout_seconds": 3,
       "max_lifetime_seconds": 3600,
-      "background_workers_per_pool": 1
+      "background_workers_per_pool": 1,
+      "periodic_check_seconds": 60,
+      "max_idle_seconds": 60
     },
-    "reset": "Synchronous timerjoin and rollback; officialpool background DISCARD and autocommitrestore. Session remains unavailable until reset completes; failed/cancelled/closed sessions retire.",
-    "local_checks": 45,
-    "deployed_checks": 42,
-    "public_https_checks": 17,
+    "reset": "Full cancellation timer join and synchronous rollback before return; official background DISCARD ALL reset before availability; errors/canceled/closed sockets retire",
+    "local_checks": 65,
+    "deployed_checks": 62,
+    "public_https_checks": 18,
     "backend_tls_verification": "verify-full",
     "backend_role": "protected read-only",
     "deployed_source_hashes_verified": true,
     "source_sha256": {
-      "examples/postgres/flask/app.py": "0d6f9278284e83668a40491400e58ffe1db12d6950a23133cd646e0615b66bdd",
-      "examples/postgres/flask/gunicorn.conf.py": "8fb7bcd8349046340f40dd0c0c3fe1aa4dc4635615ab5b951c7279a9b7ab4b84",
+      "examples/postgres/flask/app.py": "78db36a333495da2446a22c685fde272762b9e2492eb6ddd03d56ce41925f1e7",
+      "examples/postgres/flask/gunicorn.conf.py": "ff28c92e3ce18b36c0b6c94bc971a4cd79b79dc11b8bfd7c80cf8ca9b17c6683",
       "examples/postgres/flask/requirements.txt": "ecc7f5741f0d3489177e686fd4486f02906b6befe25c7312c22f8f696476f700",
       "examples/postgres/flask/static/app.css": "8bc906a9e4db602e0e26e36e580090853c4def1f30db12e8eedd1943f08e3551",
       "examples/postgres/flask/static/app.js": "dff020d4859a1db0c4f2889f6595740bdf02a815acfdeaf818750f8842901bf9",
       "examples/postgres/flask/static/duckonwire-logo.png": "197ff502adb593bbf825af2b7b1387c31040c6719ac410314b63ac5c3d00d17e",
       "examples/postgres/flask/templates/index.html": "ce54a1fbc6ab4dba0322cc4de0eb8641f6202ad4ccb3699b30e0bbf3e4f121a1"
     },
-    "test_source_sha256": "f4dbb12ed45fb88104b0b669dafbaa2fc654aadb14efd861be08015aef043987",
-    "local_receipt_sha256": "d019277fa3265fca6ac259800711c355c8508db9c1a3f5df7d7775b5157eb414",
-    "pool_receipt_sha256": "852069b0e7ba03d6b23a777ec7082f3dcb079baf8322b0090cc79c274e2c233e",
-    "deployment_receipt_sha256": "beb710fc5d24832d78469147fadad9882089ad7d3404811a77cb31f049604107",
+    "test_source_sha256": "c35947ef88bed5e6603e57a9128d2b76835385e34870c88ab3804040139ed263",
+    "local_receipt_sha256": "5e770fdf2523dd82cf67fcfd1f1ee90078b41067e8c1636cf7e6afd38ae8e732",
+    "pool_receipt_sha256": "106a2a1e94a704ee4885273ce79d832c1dde78f1fef8b6ffc7a64446c1aa31aa",
+    "deployment_receipt_sha256": "4e59f285a18882c0b7ccf7698d3d94e4424fe080112b60d9ca8d51cbac447527",
+    "idle_maintenance_receipt_sha256": "925952aa13f968efc6eaa44cae598dffe97f69269ce1f0f70b894ac394c3b952",
+    "maintenance": {
+      "periodic_check_seconds": 60,
+      "native_idle_timeout_seconds": 300,
+      "api": "Official pool.check() in one maintenance thread per worker after Gunicorn fork",
+      "startup": "warm min2 after Gunicorn fork then one maintenance thread per worker; import creates no threads or sockets",
+      "shutdown": "Stop Event, bounded thread join, close original pool, bounded final join; worker lifecycle tests passed",
+      "full_reset_before_reuse": true
+    },
     "limitations": [
       "Initial physical TLS/SCRAM login remains costly; postfork warmup covers both availableconnections",
       "Tight bursts may wait for the previous asynchronous reset",
       "API elapsed excludes finalrollback/queue insertion; fullpublicHTTPS wall is measured separately",
-      "Performance combines nativeTCPNODELAY and apppool changes, no standalone engine throughput claim"
+      "Performance combines nativeTCPNODELAY and apppool changes, no standalone engine throughput claim",
+      "Worker exit has bounded joins/close; a hypothetical indefinitely stuck daemon check is logged, not claimed forcibly terminated"
     ]
   },
   "documentation": {
@@ -739,10 +997,10 @@
     "links": 80,
     "anchors": 14,
     "fences": 24,
-    "checked_utc": "2026-10-10T14:31:43.090879+00:00",
+    "checked_utc": "2026-10-10T15:47:05.999971+00:00",
     "source_sha256": {
       "README.md": "c5bfd2d4a095065401e8c0136937f0b89249be10b1ca25f08c9b4cf2036f6abc",
-      "AGENTS.md": "62dbaff9f07a3c211f45f3bcde2dd7204450b4f5c51592a6703cfa918b48fc2e",
+      "AGENTS.md": "bb3d9c8faaf8a24f05076b0753f3e8ba39fd171145b0161e7aaa845d9a9463b3",
       "docs/neon.md": "e0fbff12f58d3aeba49f619126c6c1a3c1949972145cd94747e7c7169f1d168e",
       "cmake/DocumentationTests.cmake": "67a8bd6d22f1ce10dade9a4ac744884ca71c19cfbbf52af8d4c8ed0c684e99e2"
     },
@@ -939,6 +1197,138 @@
       }
     },
     "final": {
+      "measured_utc": "2026-10-10T15:51:57.430515+00:00",
+      "backend": "TCP_NODELAY plus bounded prewarmed pool, full background reset and postfork idle maintenance",
+      "receipt_sha256": "5113fa663e030a5722e514228433d3ee9321ea54044476c8f5c78aa213b82ac2",
+      "source_sha256": {
+        "src/pgwire.cpp": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
+        "examples/postgres/flask/app.py": "78db36a333495da2446a22c685fde272762b9e2492eb6ddd03d56ce41925f1e7",
+        "examples/postgres/flask/gunicorn.conf.py": "ff28c92e3ce18b36c0b6c94bc971a4cd79b79dc11b8bfd7c80cf8ca9b17c6683",
+        "tests/flask_playground.py": "c35947ef88bed5e6603e57a9128d2b76835385e34870c88ab3804040139ed263",
+        "examples/postgres/queries/top-prices.sql": "80e3faccd891ca3ef8a750d03e0691be7ae09bcedaa30936139b532cc6a50349"
+      },
+      "server_sha256": "58422efd92d7dffacda6e7806c0322dfbbbcc2d26f0e0be5d66f147681289d9e",
+      "library_sha256": "09f483318725618bc007352ec7c4cd7ad22f321c53559ba82bf9bcb32d838db3",
+      "cohorts": {
+        "fresh_https": {
+          "constant": {
+            "http_total_ms": {
+              "count": 8,
+              "mean_ms": 209.026125,
+              "min_ms": 195.70100000000002,
+              "max_ms": 217.183,
+              "median_ms": 213.00150000000002
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 5.69375,
+              "min_ms": 5.45,
+              "max_ms": 5.98,
+              "median_ms": 5.65
+            },
+            "curl_process_wall_ms": {
+              "count": 8,
+              "mean_ms": 230.49697930400725,
+              "min_ms": 214.1332500614226,
+              "max_ms": 241.70529108960181,
+              "median_ms": 237.75235458742827
+            }
+          },
+          "products_aggregate": {
+            "http_total_ms": {
+              "count": 8,
+              "mean_ms": 215.717375,
+              "min_ms": 197.698,
+              "max_ms": 229.821,
+              "median_ms": 215.1295
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 10.185,
+              "min_ms": 9.3,
+              "max_ms": 11.75,
+              "median_ms": 9.89
+            },
+            "curl_process_wall_ms": {
+              "count": 8,
+              "mean_ms": 238.0505884939339,
+              "min_ms": 219.97279196511954,
+              "max_ms": 250.95583288930357,
+              "median_ms": 240.91183301061392
+            }
+          }
+        },
+        "reused_https": {
+          "constant": {
+            "client_request_body_wall_ms": {
+              "count": 8,
+              "mean_ms": 69.31603122211527,
+              "min_ms": 66.21275003999472,
+              "max_ms": 73.88754200655967,
+              "median_ms": 68.6349164461717
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 5.70625,
+              "min_ms": 5.56,
+              "max_ms": 5.82,
+              "median_ms": 5.73
+            }
+          },
+          "products_aggregate": {
+            "client_request_body_wall_ms": {
+              "count": 8,
+              "mean_ms": 77.18001565081067,
+              "min_ms": 73.5001660650596,
+              "max_ms": 80.01595793757588,
+              "median_ms": 77.12312502553686
+            },
+            "ui_backend_elapsed_ms": {
+              "count": 8,
+              "mean_ms": 9.8375,
+              "min_ms": 9.52,
+              "max_ms": 10.33,
+              "median_ms": 9.684999999999999
+            }
+          }
+        }
+      }
+    },
+    "before_to_final": {
+      "constant": {
+        "before_reused_https_mean_ms": 415.101276099449,
+        "final_reused_https_mean_ms": 69.31603122211527,
+        "observed_reduction_percent": 83.30141697624927,
+        "scope": "Matched sequential response-time observations; combined transport/pool changes, not an isolated heartbeat speedup."
+      },
+      "products_aggregate": {
+        "before_reused_https_mean_ms": 417.3276772489771,
+        "final_reused_https_mean_ms": 77.18001565081067,
+        "observed_reduction_percent": 81.50613538033683,
+        "scope": "Matched sequential response-time observations; combined transport/pool changes, not an isolated heartbeat speedup."
+      }
+    },
+    "scope": {
+      "http_total": "Curl DNS/TCP/TLS/request/server response/body transport; excludes curl process startup",
+      "ui_backend_timer": "Application elapsed_ms includes pooled database acquisition, query and result conversion; excludes HTTP transit, synchronous rollback and background session reset. Timer join and rollback still complete before the HTTP response.",
+      "warmness": "New curl HTTPS connection per fresh call. Same requests TLS socket verified across one warmup plus16 calls; database pooling deployed and prewarmed for both cohorts. Fresh HTTPS does not mean a cold database connection.",
+      "not_a_database_benchmark": true,
+      "code_or_cloud_mutated": false,
+      "browser_wall_clock": "Not measured; displayed UI ms is server JSON elapsed_ms, not click-to-render duration.",
+      "attribution": "TCP_NODELAY, prewarmed bounded database pooling, complete background reset and periodic idle health checks. Warm measurements corroborate current response time; the separate 311-second test establishes idle recovery."
+    },
+    "client_tools": {
+      "fresh_https": "curl 8.7.1 with normal certificate verification",
+      "reused_https": "requests 2.34.2",
+      "certificate_bundle": "certifi 2026.07.22"
+    },
+    "limitations": [
+      "Small sequential response-time sample, not a throughput benchmark or a latency guarantee",
+      "HTTPS connection setup is included in the fresh cohort; both final cohorts use an already prewarmed database pool",
+      "Application elapsed_ms excludes network and final connection cleanup; full client response time is reported separately",
+      "TCP_NODELAY, connection pooling and reset scheduling changed together; these results do not isolate their individual effects"
+    ],
+    "previous_after_tcp_and_pool_before_idle_maintenance": {
       "measured_utc": "2026-10-10T14:41:11.947355+00:00",
       "backend": "TCP_NODELAY; prewarmed bounded database pool; background session reset finishes before reuse",
       "receipt_sha256": "7f1d10b34ef12bcb5498c8e0a6d493fb894df9afd86711eaf478a739ef74d162",
@@ -1035,7 +1425,7 @@
         }
       }
     },
-    "before_to_final": {
+    "previous_before_to_final_comparison": {
       "constant": {
         "fresh_https": {
           "http_total_ms": {
@@ -1104,27 +1494,79 @@
           }
         }
       }
-    },
-    "scope": {
-      "http_total": "Curl DNS/TCP/TLS/request/server response/body transport; excludes curl process startup",
-      "ui_backend_timer": "Application elapsed_ms includes pooled database acquisition, query and result conversion; excludes HTTP transit, synchronous rollback and background session reset. Timer join and rollback still complete before the HTTP response.",
-      "warmness": "New curl HTTPS connection per fresh call. Same requests TLS socket verified across one warmup plus16 calls; database pooling deployed and prewarmed for both cohorts. Fresh HTTPS does not mean a cold database connection.",
-      "not_a_database_benchmark": true,
-      "code_or_cloud_mutated": false,
-      "browser_wall_clock": "Not measured; displayed UI ms is server JSON elapsed_ms, not click-to-render duration.",
-      "attribution": "Combined TCP_NODELAY transport change, prewarmed Flask database pool, and background DISCARD ALL reset. No isolated attribution claim; reset finishes before connection reuse."
-    },
-    "client_tools": {
-      "fresh_https": "curl 8.7.1 with normal certificate verification",
-      "reused_https": "requests 2.34.2",
-      "certificate_bundle": "certifi 2026.07.22"
-    },
-    "limitations": [
-      "Small sequential response-time sample, not a throughput benchmark or a latency guarantee",
-      "HTTPS connection setup is included in the fresh cohort; both final cohorts use an already prewarmed database pool",
-      "Application elapsed_ms excludes network and final connection cleanup; full client response time is reported separately",
-      "TCP_NODELAY, connection pooling and reset scheduling changed together; these results do not isolate their individual effects"
-    ]
+    }
   },
-  "updated_utc": "2026-10-10T15:04:59.861340+00:00"
+  "updated_utc": "2026-10-10T15:55:48.869633+00:00",
+  "idle_maintenance": {
+    "passed": true,
+    "receipt_sha256": "925952aa13f968efc6eaa44cae598dffe97f69269ce1f0f70b894ac394c3b952",
+    "scope": "Deployed LIVE Flask maintenance only; protected native owner, TLS/SCRAM/read-only unchanged; quiet interval has no database-using HTTP requests",
+    "checks": [
+      {
+        "name": "Actual quiet interval exceeds protected native300s idle timeout",
+        "passed": true
+      },
+      {
+        "name": "Two workers retain all four established native sessions at each quiet checkpoint",
+        "passed": true
+      },
+      {
+        "name": "Native socket identities survive the entire quiet interval",
+        "passed": true
+      },
+      {
+        "name": "First actual TopK request after pause returns exact six rows without one-second reconnect backoff",
+        "passed": true
+      },
+      {
+        "name": "Following request is reusable and read-only",
+        "passed": true
+      },
+      {
+        "name": "Live Flask and native owner remain the same processes/images",
+        "passed": true
+      }
+    ],
+    "quiet_interval_seconds": 311.2574726017192,
+    "quiet_started_utc": "2026-10-10T15:42:58.353143+00:00",
+    "quiet_finished_utc": "2026-10-10T15:48:09.610616+00:00",
+    "ordinary_database_http_requests_during_quiet_interval": 0,
+    "workers": 2,
+    "native_connections": 4,
+    "same_four_sockets_established_at_all_checkpoints": true,
+    "native_owner_restarted": false,
+    "first_topk_after_pause": {
+      "row_count": 6,
+      "exact_rows_equal_to_before": true,
+      "api_elapsed_ms": 36.35,
+      "loopback_http_wall_ms": 39.607885759323835
+    },
+    "following_select42": {
+      "rows_verified": true,
+      "api_elapsed_ms": 8.37,
+      "loopback_http_wall_ms": 11.495080310851336
+    },
+    "timing_scope": "Single deployed loopback HTTP observations after a genuine quiet interval; these are not WAN timings or throughput measurements."
+  },
+  "top_prices_query": {
+    "path": "examples/postgres/queries/top-prices.sql",
+    "sha256": "80e3faccd891ca3ef8a750d03e0691be7ae09bcedaa30936139b532cc6a50349",
+    "preset": "top",
+    "dialect": "DuckDB SQL via an ordinary PostgreSQL driver",
+    "actual_catalog_rows": 6,
+    "inline_equivalence_cases": 8,
+    "equivalence_checks": [
+      "actual TopK/window equivalence for mixed_price_nulls",
+      "actual TopK/window equivalence for equal_price_id_tiebreak",
+      "actual TopK/window equivalence for multiple_prices_same_product",
+      "actual TopK/window equivalence for null_brand_payload",
+      "actual TopK/window equivalence for null_country_group",
+      "actual TopK/window equivalence for all_null_prices",
+      "actual TopK/window equivalence for small_groups_and_null_names",
+      "actual TopK/window equivalence for mixed_all_features"
+    ],
+    "equivalence": "Same ordered rows as the explicit NULLS LAST window reference; price ties break by product ID, nullable payloads and duplicate prices remain supported.",
+    "query_profile_receipt_sha256": "b4b24c94f29f15a705124d2e4efe696970596c1d6fc117bdf2c7819746b951c2",
+    "scope": "The bounded TopK query selects three rows per country; its measured costs do not establish universal window-query speedups."
+  }
 }
