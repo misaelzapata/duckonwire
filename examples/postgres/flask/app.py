@@ -59,13 +59,13 @@ PRESETS = [
         "id": "top",
         "name": "Top prices by country",
         "hint": "Three highest price observations in each market",
-        "sql": "WITH grouped AS (\n  SELECT p.country_code,\n    arg_max(struct_pack(product_id := p.id, price := pr.price),\n      struct_pack(has_price := pr.price IS NOT NULL, price := pr.price,\n                  reverse_id := -CAST(p.id AS BIGINT)), 3) AS chosen\n  FROM products p JOIN prices pr ON pr.product_id = p.id\n  GROUP BY p.country_code\n), expanded AS (\n  SELECT country_code, unnest(chosen) AS item FROM grouped\n)\nSELECT e.country_code, p.name AS name, p.brand AS brand, e.item.price AS price\nFROM expanded e JOIN products p ON p.id = e.item.product_id\nORDER BY e.country_code ASC NULLS LAST, price DESC NULLS LAST, name ASC NULLS LAST"
+        "sql": "WITH grouped AS (\n  SELECT p.country_code,\n    arg_max(struct_pack(product_id := p.id, price := pr.price),\n      (CASE WHEN pr.price IS NULL THEN -1000000000::BIGINT\n            ELSE CAST(CAST(pr.price AS DECIMAL(9,2))*100::DECIMAL(3,0) AS BIGINT) END)\n      *4294967296::BIGINT - CAST(p.id AS BIGINT), 3) AS chosen\n  FROM products p JOIN prices pr ON pr.product_id = p.id\n  GROUP BY p.country_code\n), expanded AS (\n  SELECT country_code, unnest(chosen) AS item FROM grouped\n)\nSELECT e.country_code, p.name AS name, p.brand AS brand, e.item.price AS price\nFROM expanded e JOIN products p ON p.id = e.item.product_id\nORDER BY e.country_code ASC NULLS LAST, price DESC NULLS LAST, name ASC NULLS LAST"
     },
     {
         "id": "history_lag",
         "name": "Product price history",
         "hint": "See each change from the previous sample",
-        "sql": "WITH selected_history AS MATERIALIZED (SELECT id,product_id,price,day FROM prices WHERE product_id=1), history AS (\n SELECT id,product_id,price,day,\n        lag(price) OVER(PARTITION BY product_id ORDER BY day ASC NULLS LAST,id) AS previous_price\n FROM selected_history\n)\nSELECT h.id,p.name,p.brand,h.day,h.price,h.previous_price,\n       round(h.price-h.previous_price,2) AS price_change\nFROM history h JOIN products p ON p.id=h.product_id\nORDER BY h.day ASC NULLS LAST,h.id"
+        "sql": "WITH selected_history AS (SELECT id,product_id,price,day FROM prices WHERE product_id=1), history AS (\n SELECT id,product_id,price,day,\n        lag(price) OVER(ORDER BY day ASC NULLS LAST,id) AS previous_price\n FROM selected_history\n)\nSELECT h.id,p.name,p.brand,h.day,h.price,h.previous_price,\n       round(h.price-h.previous_price,2) AS price_change\nFROM history h JOIN products p ON p.id=h.product_id\nORDER BY h.day ASC NULLS LAST,h.id"
     },
     {
         "id": "seven_day_average",
@@ -77,7 +77,7 @@ PRESETS = [
         "id": "brand_movement",
         "name": "Changes by brand",
         "hint": "Compare the first and latest price of each product",
-        "sql": "WITH samples AS (\n SELECT product_id,\n  arg_min(struct_pack(price:=price,day:=day),\n          struct_pack(missing_day:=day IS NULL,day:=day,id:=id)) AS first_sample,\n  arg_max(struct_pack(price:=price,day:=day),\n          struct_pack(has_day:=day IS NOT NULL,day:=day,id:=id)) AS last_sample\n FROM prices GROUP BY product_id\n)\nSELECT p.country_code,p.brand,count(*) AS products_with_history,\n       round(avg(s.last_sample.price-s.first_sample.price),2) AS average_change,\n       count_if(s.last_sample.price>s.first_sample.price) AS products_increased\nFROM samples s JOIN products p ON p.id=s.product_id\nGROUP BY p.country_code,p.brand\nORDER BY average_change DESC NULLS LAST,p.country_code ASC NULLS LAST,p.brand ASC NULLS LAST"
+        "sql": "WITH keyed AS (\n SELECT product_id,price,\n   CAST(CASE WHEN day IS NULL THEN 2147483648\n             WHEN day=DATE 'infinity' THEN 2147483647\n             WHEN day=DATE '-infinity' THEN -2147483647\n             ELSE date_diff('day',DATE '1970-01-01',day) END AS HUGEINT)\n     *18446744073709551616::HUGEINT+id::HUGEINT AS first_key,\n   CAST(CASE WHEN day IS NULL THEN -2147483648\n             WHEN day=DATE 'infinity' THEN 2147483647\n             WHEN day=DATE '-infinity' THEN -2147483647\n             ELSE date_diff('day',DATE '1970-01-01',day) END AS HUGEINT)\n     *18446744073709551616::HUGEINT+id::HUGEINT AS last_key\n FROM prices\n), samples AS (\n SELECT product_id,\n   arg_min(struct_pack(price:=price),first_key) AS first_sample,\n   arg_max(struct_pack(price:=price),last_key) AS last_sample\n FROM keyed GROUP BY product_id\n)\nSELECT p.country_code,p.brand,count(*) AS products_with_history,\n       round(avg(s.last_sample.price-s.first_sample.price),2) AS average_change,\n       count_if(s.last_sample.price>s.first_sample.price) AS products_increased\nFROM samples s JOIN products p ON p.id=s.product_id\nGROUP BY p.country_code,p.brand\nORDER BY average_change DESC NULLS LAST,p.country_code ASC NULLS LAST,p.brand ASC NULLS LAST"
     }
 ]
 

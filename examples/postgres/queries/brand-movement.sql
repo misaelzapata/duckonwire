@@ -1,12 +1,24 @@
--- Changes by brand. Compare the first and latest price of each product.
+-- Compare the first and latest price of every product, grouped by brand.
+-- The native numeric key preserves DATE/observation-id order, including NULLs.
 -- Demo prices are synthetic.
-WITH samples AS (
+WITH keyed AS (
+ SELECT product_id,price,
+   CAST(CASE WHEN day IS NULL THEN 2147483648
+             WHEN day=DATE 'infinity' THEN 2147483647
+             WHEN day=DATE '-infinity' THEN -2147483647
+             ELSE date_diff('day',DATE '1970-01-01',day) END AS HUGEINT)
+     *18446744073709551616::HUGEINT+id::HUGEINT AS first_key,
+   CAST(CASE WHEN day IS NULL THEN -2147483648
+             WHEN day=DATE 'infinity' THEN 2147483647
+             WHEN day=DATE '-infinity' THEN -2147483647
+             ELSE date_diff('day',DATE '1970-01-01',day) END AS HUGEINT)
+     *18446744073709551616::HUGEINT+id::HUGEINT AS last_key
+ FROM prices
+), samples AS (
  SELECT product_id,
-  arg_min(struct_pack(price:=price,day:=day),
-          struct_pack(missing_day:=day IS NULL,day:=day,id:=id)) AS first_sample,
-  arg_max(struct_pack(price:=price,day:=day),
-          struct_pack(has_day:=day IS NOT NULL,day:=day,id:=id)) AS last_sample
- FROM prices GROUP BY product_id
+   arg_min(struct_pack(price:=price),first_key) AS first_sample,
+   arg_max(struct_pack(price:=price),last_key) AS last_sample
+ FROM keyed GROUP BY product_id
 )
 SELECT p.country_code,p.brand,count(*) AS products_with_history,
        round(avg(s.last_sample.price-s.first_sample.price),2) AS average_change,

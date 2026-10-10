@@ -37,6 +37,7 @@ Setup creates the `duckonwire` schema/server in one transaction and fails on exi
 - Native snapshots last until the transaction ends, including requested PostgreSQL `READ COMMITTED`. `SERIALIZABLE` is unsupported. On write conflicts, roll back and re-read. If a connection breaks during `COMMIT`, reconcile the outcome before repeating a non-idempotent write.
 - PostgreSQL savepoints work only inside an explicit transaction on a protected read-only connection. Recoverable query errors can roll back to that savepoint while retaining the native snapshot. Writer and legacy shared-token connections reject savepoints with SQLSTATE `0A000`; internal, fatal or memory errors require a full rollback.
 - Protected mode blocks external file/network SQL and configuration changes. Import data locally before enabling it. Limits and cancellation are cooperative engine controls, not hard process-memory or I/O deadlines.
+- Protected buffers use three quarters of DuckDB's detected memory budget, capped at 1 GiB before services and configuration locking. This reserves headroom beyond the native default of 80% of available memory. Preserve container detection; verify small-memory containers with actual concurrent reads/writes, not only successful startup. The buffer limit does not bound total process RSS.
 
 ## Build and verify
 
@@ -70,7 +71,7 @@ Published native bundles were tested on macOS 26 ARM64 and Ubuntu 24.04 x86-64-v
 
 [cmake/Pins.cmake](cmake/Pins.cmake) is authoritative:
 
-- DuckDB fork: `848126236a4a8879f232bed7ab5f702683a55300`.
+- DuckDB fork: `0cfb63a5f712fadf06a0de33217b7b03666ae66b`.
 - Quack fork: `a6e7cb9243ee3d7ec0e5371b720be3292a32061f`.
 - Official HTTPFS: `96a2f2e88e5dd075facbc5a65dc3afd67aa2bb44`.
 
@@ -80,6 +81,6 @@ Keep one README and organized JSON evidence under `tests/results/`; do not scatt
 
 The approved demo contains manufacturer-brand products from Argentina/Spain and synthetic prices. Do not translate its real product/brand data when editing dummy examples. Use synthetic fixtures or authorized copies for stress tests; never write to private source databases. Public files, archives and embedded HTML/JSON must exclude private datasets, identifiers, SQL/results and credentials. Commit, push or publish only when the task authorizes it.
 
-`--init-demo --demo-prices 1000000` generates repeatable 30-day price history in an empty database. Preserve product/price constraints and atomic initialization; a failed import must leave no partial tables. The default remains the CSV sample. Do not remove foreign keys or add indexes merely to improve a benchmark. Verify an actual plan and measure read gains, memory and confirmed write costs before adopting an index. `--threads` defaults to two and is set before engine configuration is locked.
+`--init-demo --demo-prices 1000000` generates repeatable 30-day price history in an empty database. Preserve product/price constraints and atomic initialization; a failed import must leave no partial tables. The default remains the CSV sample. Do not remove foreign keys or add indexes merely to improve a benchmark. Verify an actual plan and measure read gains, memory and confirmed write costs before adopting an index. Engine workers default to DuckDB's detected CPU capacity capped at two; `--threads 1..64` overrides it. Apply the cap before initialization, services and configuration locking. Verify the default under actual one-CPU and two-CPU quotas.
 
 Use [latency.mjs](examples/postgres/node/latency.mjs) for complete stock-driver query round trips. Keep engine execution, native protocol, web processing and Internet latency separate. Compare identical data, query scope, resources, returned rows and result hashes; record warmup, pauses and median/95th percentile. Full-history aggregates must not be described as cheap point lookups. The web timer includes synchronous transaction cleanup; its pool still withholds a session until background reset finishes. Paging binds LIMIT/OFFSET, stays within existing result caps and uses stable SQL ordering; separate requests retain fresh snapshots, not one frozen multi-page view.

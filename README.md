@@ -6,7 +6,7 @@
 
 **DuckDB, connected.**
 
-[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-106-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
+[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-112-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
 
 DoW turns your DuckDB database into a shared data service. Connect apps in your favorite language, read and write through the same connection, and let readers keep working while new data arrives. Your data stays in DuckDB.
 
@@ -147,7 +147,7 @@ Readers can query and use transactions. Writers can also change rows and tables.
 
 The PostgreSQL endpoint runs up to 8 queries at once and requests cancellation after 30 seconds by default. Extra work returns `53300`; cancellation returns `57014`. After an explicit transaction fails, roll it back before retrying. Cancellation is cooperative, so blocked I/O can take longer.
 
-Protected mode limits DuckDB buffers and spill storage to 1 GiB each and closes idle/incomplete connections after 300 seconds. These are not hard limits on total process memory or I/O. Use `--max-queries` and `--query-timeout-ms` to adjust query limits.
+Protected mode sizes its buffers for the available memory, leaving room for connections and query work, up to 1 GiB. Spill storage is limited to 1 GiB; idle/incomplete connections close after 300 seconds. These are not hard limits on total process memory or I/O. Use `--max-queries` and `--query-timeout-ms` to adjust query limits.
 
 Protected SQL cannot read external files or networks, install extensions or change server configuration. Import data locally first. Permissions cover the database, not individual tables or rows; full PostgreSQL roles and SCRAM channel binding are not implemented.
 
@@ -225,7 +225,7 @@ The [transaction example](examples/transaction_flow.cpp) checks snapshots, rollb
 
 ## Examples and tests
 
-CI verifies **106 checks** across seven native test suites, plus **20 PostgreSQL integration checks**, ordinary-driver examples and concurrent reads during million-row inserts. The [release workflow](.github/workflows/release.yml) builds a fresh package and publishes it only after tests, the tutorial and Docker pass. [See the results](tests/results/index.json).
+CI verifies **112 checks** across seven native test suites, plus **20 PostgreSQL integration checks**, ordinary-driver examples and concurrent reads during million-row inserts. The [release workflow](.github/workflows/release.yml) builds a fresh package and publishes it only after tests, the tutorial and Docker pass. [See the results](tests/results/index.json).
 
 Ordinary PostgreSQL drivers, using standard `PG*` settings:
 
@@ -261,7 +261,7 @@ The second command sends two million rows. Use a test database and run one copy 
 
 With the public demo loaded, add `PG_DEMO_READS=1` to also run its ten queries while inserts arrive. These reads check the unchanged demo tables; inserts go into separate test tables in the same database. The output reports each query's latency and verifies its results.
 
-One local Apple M1 Pro run sent **two million client rows at 313,781 rows/s**, with reads averaging **5.24 ms**. Timing included row creation, transport and 2,000 confirmed commits; login, setup and final checks were excluded. Counts, checksums and complex queries passed in-session. This small numeric loopback workload is not a WAN estimate. [Full results](tests/results/postgres-compatibility.json).
+With a million-price demo loaded, one local Apple M1 Pro run sent **two million client rows at 283,365 rows/s** while running all ten demo queries. Reads averaged **18.85 ms**. Timing included row creation, transport and 2,000 confirmed commits; login, setup and final checks were excluded. Counts, checksums and query results passed in-session. These are local measurements; several complex queries still exceed 10 ms. [Measured conditions](tests/results/performance.json).
 
 `bulk.mjs` and the native benchmark generate rows inside DuckDB with `INSERT SELECT range`. Those results measure database-side generation and writes, not client-data transport. See their distinct conditions in the [result index](tests/results/index.json).
 
@@ -302,7 +302,7 @@ With the same `PG*` connection settings as other examples, measure all ten [demo
 PG_LATENCY_SAMPLES=30 node examples/postgres/node/latency.mjs
 ```
 
-The JSON records averages, median, 95th percentile, row checksums and database settings. It measures complete client query round trips after warmup, including returned rows. Run it without other builds or writes; the default pause between queries avoids a continuous load. Set `PG_LATENCY_OFFSET` to compare pages, or `PG_LATENCY_PAUSE_MS=0` to measure sustained traffic. `--threads` controls engine parallelism; its default is two. Measure on your hardware before changing it.
+The JSON records averages, median, 95th percentile, row checksums and database settings. It measures complete client query round trips after warmup, including returned rows. Run it without other builds or writes; the default pause between queries avoids a continuous load. Set `PG_LATENCY_OFFSET` to compare pages, or `PG_LATENCY_PAUSE_MS=0` to measure sustained traffic. DoW uses up to two engine workers, based on the CPU capacity DuckDB detects. Use `--threads` to override this and measure on your hardware.
 
 </details>
 
@@ -355,7 +355,7 @@ Protected accounts cannot read external objects or create cloud secrets; import 
 | `--state PATH` | Store the private descriptor, including the local token. Must differ from the database path. | `.runtime/native.json` |
 | `--init-demo` | Import the public sample into an empty database. Omit on restart. | Off |
 | `--demo-prices NUMBER` | Generate this many synthetic price observations; requires `--init-demo`. | CSV sample; 46462–10000000 |
-| `--threads NUMBER` | DuckDB worker threads. | `2`; 1–64 |
+| `--threads NUMBER` | DuckDB worker threads. | Automatic, up to `2`; override with 1–64 |
 | `--port NUMBER` | Quack loopback port. | `9495`; 1–65535 |
 | `--pg-port NUMBER` | PostgreSQL port; `0` selects a free port recorded in the descriptor. | `9496`; 0–65535 |
 | `--pg-host ADDRESS` | PostgreSQL listen address. Non-loopback requires protected access. | `127.0.0.1` |

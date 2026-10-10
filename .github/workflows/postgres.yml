@@ -110,7 +110,7 @@ jobs:
             --pg-bin "$(pg_config --bindir)" --psql "$(pg_config --bindir)/psql" \
             --fixture-parent build/fdw-fixtures | tee build/test-results/postgres-fdw.json
           jq -e '.passed and .owned_fixture_cleanup_complete and (.checks | length == 20) and all(.checks[]; .passed)' build/test-results/postgres-fdw.json
-          printf '## PostgreSQL FDW\n\n20 actual checks passed using the public setup/query/cleanup SQL, a protected reader and verified TLS. These are separate from the 106 native/bootstrap checks.\n' >> "$GITHUB_STEP_SUMMARY"
+          printf '## PostgreSQL FDW\n\n20 actual checks passed using the public setup/query/cleanup SQL, a protected reader and verified TLS. These are separate from the 112 native/bootstrap checks.\n' >> "$GITHUB_STEP_SUMMARY"
       - name: Stock drivers and two million rows with complex reads
         run: |
           mkdir -p build/pg-fixture

@@ -114,7 +114,7 @@ jobs:
           const packageName = `duckonwire-${version}-linux-x86_64-v3`;
           const manifest = JSON.parse(fs.readFileSync(`dist/${packageName}.manifest.json`, 'utf8'));
           required(Object.values(JSON.parse(process.env.NEEDS_JSON)).every(job => job.result === 'success'), 'A required workflow did not pass');
-          required(summary.passed && summary.unique_checks === 106 && summary.source_head === head, 'Native checks are incomplete or from another commit');
+          required(summary.passed && summary.unique_checks === 112 && summary.source_head === head, 'Native checks are incomplete or from another commit');
           required(manifest.source_head === head, 'Package source differs from the workflow commit');
           required(fs.readFileSync('proof/postgres/source-head.txt', 'utf8').trim() === head, 'Driver checks are from another commit');
           required(fdw.passed && fdw.owned_fixture_cleanup_complete && fdw.checks.length === 20 && fdw.checks.every(check => check.passed), 'FDW checks are incomplete');
@@ -125,7 +125,7 @@ jobs:
           }
           const receipt = { version, tag: process.env.TAG, source_head: head,
             workflow: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-            native_checks: 106, postgres_fdw_checks: 20, documentation_and_stock_drivers: 'passed',
+            native_checks: 112, postgres_fdw_checks: 20, documentation_and_stock_drivers: 'passed',
             docker_architectures: ['amd64', 'arm64'], runtime_platform: 'Ubuntu 24.04 x86-64-v3',
             native_package: packageName, components: manifest.components, files,
             limitations: ['Native binary requires an x86-64-v3 compatible CPU and Ubuntu 24.04 system libraries.',
@@ -139,7 +139,7 @@ jobs:
 
           Explore tables and run real queries with the included Flask playground. It reuses authenticated connections and keeps them ready between visits. A runnable top-prices query shows how to get the same results with less work.
 
-          The same source commit passed 106 native/bootstrap checks, the actual FDW SQL tutorial, stock-driver examples, concurrent workloads and Docker tests on AMD64 and ARM64. Checksums and source pins are included.
+          The same source commit passed 112 native/bootstrap checks, the actual FDW SQL tutorial, stock-driver examples, concurrent workloads and Docker tests on AMD64 and ARM64. Checksums and source pins are included.
 
           The native binary is for Ubuntu 24.04 on x86-64-v3 CPUs. For ARM64, use Docker or build from the included source. Queries run in DuckDB; full PostgreSQL SQL/catalog/ORM compatibility is not promised.
           NOTES

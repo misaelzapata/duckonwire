@@ -1,10 +1,19 @@
 #include "duckonwire/json.hpp"
+#include "duckonwire/scram.hpp"
 #include "native_server.hpp"
 
+#include <openssl/ssl.h>
+#include <openssl/pem.h>
+#include <openssl/x509v3.h>
+#include <openssl/hmac.h>
+#include <openssl/rand.h>
+
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <fstream>
+#include <map>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -99,6 +108,80 @@ char State(const std::vector<Reply> &replies) {
 	return static_cast<char>(replies.back().body[0]);
 }
 
+std::string Base64(const std::string &bytes) {
+	std::string result(4 * ((bytes.size() + 2) / 3), '\0');
+	EVP_EncodeBlock(reinterpret_cast<unsigned char *>(result.data()),
+	                reinterpret_cast<const unsigned char *>(bytes.data()), static_cast<int>(bytes.size()));
+	return result;
+}
+std::string Unbase64(const std::string &text) {
+	std::string bytes(3 * (text.size() / 4), '\0');
+	int size = EVP_DecodeBlock(reinterpret_cast<unsigned char *>(bytes.data()),
+	                           reinterpret_cast<const unsigned char *>(text.data()), static_cast<int>(text.size()));
+	Require(size >= 0, "Invalid fixture SCRAM base64");
+	if (!text.empty() && text.back() == '=') --size;
+	if (text.size() > 1 && text[text.size() - 2] == '=') --size;
+	bytes.resize(static_cast<std::size_t>(size)); return bytes;
+}
+std::string Hmac(const std::string &key, const std::string &text) {
+	std::string output(32, '\0'); unsigned size = 0;
+	Require(HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()),
+	             reinterpret_cast<const unsigned char *>(text.data()), text.size(),
+	             reinterpret_cast<unsigned char *>(output.data()), &size) && size == 32, "Fixture HMAC failed");
+	return output;
+}
+std::string Digest(const std::string &text) {
+	std::string output(32, '\0'); unsigned size = 0;
+	Require(EVP_Digest(text.data(), text.size(), reinterpret_cast<unsigned char *>(output.data()), &size, EVP_sha256(), nullptr) && size == 32,
+	        "Fixture SHA256 failed"); return output;
+}
+std::pair<std::string, std::string> ScramProof(const std::string &password, const std::string &bare,
+                                            const std::string &challenge) {
+	std::map<char, std::string> attrs;
+	for (std::size_t at = 0; at < challenge.size();) {
+		auto end = challenge.find(',', at); if (end == std::string::npos) end = challenge.size();
+		Require(end > at + 2 && challenge[at + 1] == '=', "Malformed fixture SCRAM challenge");
+		attrs.emplace(challenge[at], challenge.substr(at + 2, end - at - 2)); at = end + 1;
+	}
+	auto salt = Unbase64(attrs.at('s')); std::string salted(32, '\0');
+	Require(PKCS5_PBKDF2_HMAC(password.data(), static_cast<int>(password.size()),
+	                         reinterpret_cast<const unsigned char *>(salt.data()), static_cast<int>(salt.size()),
+	                         std::stoi(attrs.at('i')), EVP_sha256(), 32,
+	                         reinterpret_cast<unsigned char *>(salted.data())) == 1, "Fixture PBKDF2 failed");
+	auto client = Hmac(salted, "Client Key"); const auto final = "c=biws,r=" + attrs.at('r');
+	const auto auth = bare + "," + challenge + "," + final; auto signature = Hmac(Digest(client), auth);
+	for (std::size_t i = 0; i < client.size(); ++i) client[i] ^= signature[i];
+	return {final + ",p=" + Base64(client), "v=" + Base64(Hmac(Hmac(salted, "Server Key"), auth))};
+}
+
+void FixtureCertificate(const std::filesystem::path &cert_path, const std::filesystem::path &key_path) {
+	std::unique_ptr<EVP_PKEY_CTX, decltype(&EVP_PKEY_CTX_free)> generator(EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, nullptr), EVP_PKEY_CTX_free);
+	Require(generator && EVP_PKEY_keygen_init(generator.get()) > 0 &&
+	        EVP_PKEY_CTX_set_rsa_keygen_bits(generator.get(), 2048) > 0, "Fixture key setup failed");
+	EVP_PKEY *raw = nullptr; Require(EVP_PKEY_keygen(generator.get(), &raw) > 0, "Fixture key generation failed");
+	std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> key(raw, EVP_PKEY_free);
+	std::unique_ptr<X509, decltype(&X509_free)> cert(X509_new(), X509_free);
+	Require(cert && X509_set_version(cert.get(), 2) && ASN1_INTEGER_set(X509_get_serialNumber(cert.get()), 1) &&
+	        X509_gmtime_adj(X509_getm_notBefore(cert.get()), -60) && X509_gmtime_adj(X509_getm_notAfter(cert.get()), 3600) &&
+	        X509_set_pubkey(cert.get(), key.get()), "Fixture certificate setup failed");
+	auto name = X509_get_subject_name(cert.get());
+	Require(X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
+	        reinterpret_cast<const unsigned char *>("localhost"), -1, -1, 0) && X509_set_issuer_name(cert.get(), name),
+	        "Fixture certificate name failed");
+	X509V3_CTX context {}; X509V3_set_ctx(&context, cert.get(), cert.get(), nullptr, nullptr, 0);
+	for (auto item : std::vector<std::pair<int, const char *>> {{NID_basic_constraints, "critical,CA:TRUE"},
+	        {NID_subject_alt_name, "DNS:localhost"}, {NID_ext_key_usage, "serverAuth"}}) {
+		std::unique_ptr<X509_EXTENSION, decltype(&X509_EXTENSION_free)> extension(
+		    X509V3_EXT_conf_nid(nullptr, &context, item.first, const_cast<char *>(item.second)), X509_EXTENSION_free);
+		Require(extension && X509_add_ext(cert.get(), extension.get(), -1), "Fixture certificate extension failed");
+	}
+	Require(X509_sign(cert.get(), key.get(), EVP_sha256()) > 0, "Fixture certificate signature failed");
+	std::unique_ptr<FILE, decltype(&fclose)> cert_file(fopen(cert_path.c_str(), "wb"), fclose), key_file(fopen(key_path.c_str(), "wb"), fclose);
+	Require(cert_file && key_file && chmod(key_path.c_str(), 0600) == 0 &&
+	        PEM_write_X509(cert_file.get(), cert.get()) && PEM_write_PrivateKey(key_file.get(), key.get(), nullptr, nullptr, 0, nullptr, nullptr),
+	        "Fixture certificate persistence failed");
+}
+
 class Wire {
 public:
 	explicit Wire(int port) {
@@ -118,10 +201,18 @@ public:
 	Wire(const Wire &) = delete;
 	Wire &operator=(const Wire &) = delete;
 	~Wire() { Close(); }
-	void Close() { if (fd_ >= 0) { shutdown(fd_, SHUT_RDWR); close(fd_); fd_ = -1; } }
+	void Close() {
+		if (tls_) { SSL_free(tls_); tls_ = nullptr; }
+		if (tls_context_) { SSL_CTX_free(tls_context_); tls_context_ = nullptr; }
+		if (fd_ >= 0) { shutdown(fd_, SHUT_RDWR); close(fd_); fd_ = -1; }
+	}
 	void Send(const Bytes &bytes) {
 		std::size_t at = 0;
 		while (at < bytes.size()) {
+			if (tls_) {
+				auto sent = SSL_write(tls_, bytes.data() + at, static_cast<int>(bytes.size() - at));
+				Require(sent > 0, "TLS protocol send failed"); at += static_cast<std::size_t>(sent); continue;
+			}
 #ifdef MSG_NOSIGNAL
 			auto sent = send(fd_, bytes.data() + at, bytes.size() - at, MSG_NOSIGNAL);
 #else
@@ -138,6 +229,11 @@ public:
 	bool Receive(void *output, std::size_t size) {
 		auto bytes = static_cast<unsigned char *>(output); std::size_t at = 0;
 		while (at < size) {
+			if (tls_) {
+				auto count = SSL_read(tls_, bytes + at, static_cast<int>(size - at));
+				if (!count && !at) return false;
+				Require(count > 0, "TLS protocol receive failed"); at += static_cast<std::size_t>(count); continue;
+			}
 			auto count = recv(fd_, bytes + at, size - at, 0);
 			if (count < 0 && errno == EINTR) continue;
 			if (!count && !at) return false;
@@ -178,6 +274,35 @@ public:
 		}
 		Require(id != 0, "Missing backend cancellation key");
 	}
+	void ProtectedLogin(const std::string &user, const std::string &password, const std::filesystem::path &cert) {
+		Bytes request; U32(request, 8); U32(request, 80877103); Send(request);
+		unsigned char answer = 0; Require(Receive(&answer, 1) && answer == 'S', "Protected TLS not accepted");
+		tls_context_ = SSL_CTX_new(TLS_client_method());
+		Require(tls_context_ && SSL_CTX_load_verify_locations(tls_context_, cert.c_str(), nullptr) &&
+		        SSL_CTX_set_min_proto_version(tls_context_, TLS1_2_VERSION), "Fixture TLS trust setup failed");
+		SSL_CTX_set_verify(tls_context_, SSL_VERIFY_PEER, nullptr); tls_ = SSL_new(tls_context_);
+		Require(tls_ && SSL_set_fd(tls_, fd_) && SSL_set_tlsext_host_name(tls_, "localhost") &&
+		        SSL_set1_host(tls_, "localhost") && SSL_connect(tls_) == 1 && SSL_get_verify_result(tls_) == X509_V_OK,
+		        "Fixture TLS hostname verification failed");
+		Bytes body; U32(body, 196608); String(body, "user"); String(body, user);
+		String(body, "database"); String(body, "duckonwire"); body.push_back(0);
+		Bytes frame; U32(frame, static_cast<std::uint32_t>(body.size() + 4)); frame.insert(frame.end(), body.begin(), body.end()); Send(frame);
+		auto auth = Next(); Require(auth && auth->type == 'R' && Read32(auth->body, 0) == 10, "Missing SCRAM mechanism challenge");
+		std::string random(18, '\0'); Require(RAND_bytes(reinterpret_cast<unsigned char *>(random.data()), static_cast<int>(random.size())) == 1,
+		                                        "Fixture nonce generation failed");
+		const auto bare = "n=,r=" + Base64(random), first = "n,," + bare;
+		body.clear(); String(body, "SCRAM-SHA-256"); U32(body, static_cast<std::uint32_t>(first.size()));
+		body.insert(body.end(), first.begin(), first.end()); Message('p', body);
+		auto continuation = Next(); Require(continuation && continuation->type == 'R' && Read32(continuation->body, 0) == 11,
+		                                    "Missing SCRAM continuation");
+		const auto proof = ScramProof(password, bare, std::string(continuation->body.begin() + 4, continuation->body.end()));
+		Message('p', Bytes(proof.first.begin(), proof.first.end()));
+		auto final = Next(); Require(final && final->type == 'R' && Read32(final->body, 0) == 12 &&
+		    std::string(final->body.begin() + 4, final->body.end()) == proof.second, "SCRAM server signature mismatch");
+		const auto replies = Until("Z"); Require(!Contains(replies, 'E') && State(replies) == 'I', "Protected login failed");
+		for (const auto &reply : replies) if (reply.type == 'K') { id = Read32(reply.body, 0); secret = Read32(reply.body, 4); }
+		Require(id != 0, "Missing protected cancellation key");
+	}
 	void QuerySend(const std::string &sql) { Bytes body; String(body, sql); Message('Q', body); }
 	std::vector<Reply> Query(const std::string &sql) { QuerySend(sql); return Until("Z"); }
 	void Parse(const std::string &name, const std::string &sql, const std::vector<std::uint32_t> &oids = {}) {
@@ -201,6 +326,8 @@ public:
 	std::uint32_t id = 0, secret = 0;
 private:
 	int fd_ = -1;
+	SSL_CTX *tls_context_ = nullptr;
+	SSL *tls_ = nullptr;
 };
 
 std::int64_t Scalar(Wire &wire, const std::string &sql) {
@@ -208,6 +335,71 @@ std::int64_t Scalar(Wire &wire, const std::string &sql) {
 	Require(!Contains(replies, 'E'), "Scalar query failed"); const auto rows = Rows(replies);
 	Require(rows.size() == 1 && rows[0].size() == 1 && rows[0][0], "Scalar result shape mismatch");
 	return std::stoll(*rows[0][0]);
+}
+
+class ProtectedFixture {
+public:
+	ProtectedFixture(const std::filesystem::path &parent, const std::filesystem::path &executable,
+	                 std::uint32_t timeout_ms = 30000) : root(parent), cert(root.path() / "ca.pem") {
+		const auto key = root.path() / "key.pem", access = root.path() / "access.tsv";
+		FixtureCertificate(cert, key);
+		{
+			std::ofstream file(access);
+			file << "database\tduckonwire\nuser\twriter\twrite\t" << duckonwire::MakeScramVerifier(password, 4096)
+			     << "\nuser\treader\tread\t" << duckonwire::MakeScramVerifier(password, 4096) << '\n';
+			Require(bool(file) && chmod(access.c_str(), 0600) == 0, "Cannot create protected fixture rules");
+		}
+		server = std::make_unique<test_support::NativeServer>(root.path(), root.path() / "protected.duckdb", executable,
+		    0, false, std::vector<std::string> {"--access-file", access.string(), "--tls-cert", cert.string(),
+		        "--tls-key", key.string(), "--query-timeout-ms", std::to_string(timeout_ms)});
+	}
+	std::unique_ptr<Wire> Client(const std::string &role = "writer") {
+		auto wire = std::make_unique<Wire>(server->pg_port()); wire->ProtectedLogin(role, password, cert); return wire;
+	}
+	void Cancel(const Wire &wire) {
+		Wire cancellation(server->pg_port()); Bytes request;
+		U32(request, 16); U32(request, 80877102); U32(request, wire.id); U32(request, wire.secret);
+		cancellation.Send(request); Require(!cancellation.Next(), "Protected cancellation socket remained open");
+	}
+	test_support::TempRoot root;
+	std::filesystem::path cert;
+	std::unique_ptr<test_support::NativeServer> server;
+private:
+	const std::string password = "fixture-only-password-not-a-real-credential";
+};
+
+std::string ValuesInsert(const std::string &table, std::size_t rows, std::size_t columns) {
+	std::string sql = "INSERT INTO " + table + " VALUES ";
+	for (std::size_t row = 0, parameter = 1; row < rows; ++row) {
+		if (row) sql += ',';
+		sql += '(';
+		for (std::size_t column = 0; column < columns; ++column, ++parameter) {
+			if (column) sql += ',';
+			sql += '$' + std::to_string(parameter);
+		}
+		sql += ')';
+	}
+	return sql;
+}
+
+// Start actual socket operations together. Exceptions are retained until every
+// thread has joined, so failed assertions cannot leave a fixture thread alive.
+void Concurrent(std::size_t count, const std::function<void(std::size_t)> &operation,
+                const std::function<void()> &during = {}) {
+	std::atomic<std::size_t> ready {0}; std::atomic<bool> start {false};
+	std::vector<std::string> errors(count); std::vector<std::thread> threads;
+	try {
+		for (std::size_t i = 0; i < count; ++i) threads.emplace_back([&, i] {
+			++ready; while (!start.load()) std::this_thread::yield();
+			try { operation(i); } catch (const std::exception &error) { errors[i] = error.what(); }
+		});
+		while (ready.load() < count) std::this_thread::yield();
+		start.store(true); if (during) during();
+	} catch (...) {
+		start.store(true); for (auto &thread : threads) if (thread.joinable()) thread.join(); throw;
+	}
+	for (auto &thread : threads) thread.join();
+	for (const auto &error : errors) Require(error.empty(), error);
 }
 } // namespace
 
@@ -558,6 +750,134 @@ int main(int argc, char **argv) {
 			Require(!cancel.Next() && Scalar(*wire, "SELECT 10") == 10, "Cancel socket or session recovery mismatch");
 		});
 		server.stop(); test("graceful_shutdown_with_protocol_sessions", [&] { Require(server.clean_shutdown(), "Native server required forced shutdown"); });
+		ProtectedFixture protected_fixture(fixture_parent, server_program);
+		test("protected_concurrent_positional_values_and_reader_denial", [&] {
+			auto observer = protected_fixture.Client();
+			Require(!Contains(observer->Query("CREATE TABLE template_batch(id BIGINT PRIMARY KEY,amount DECIMAL(18,2),label VARCHAR)"), 'E'), "Protected table setup failed");
+			const auto sql = ValuesInsert("template_batch", 1000, 3);
+			std::vector<std::unique_ptr<Wire>> writers;
+			for (unsigned i = 0; i < 4; ++i) writers.push_back(protected_fixture.Client());
+			Concurrent(4, [&](std::size_t worker) {
+				std::vector<std::optional<std::string>> values; std::vector<std::uint32_t> oids;
+				for (unsigned row = 0; row < 1000; ++row) {
+					values.emplace_back(std::to_string(worker * 1000 + row));
+					values.emplace_back(std::to_string(row) + ".25"); values.emplace_back("Coffee '日本' " + std::to_string(worker));
+					oids.insert(oids.end(), {20,1700,25});
+				}
+				auto &wire = *writers[worker]; wire.Parse("batch", sql, oids); wire.Bind("", "batch", values); wire.Execute(""); wire.Message('S');
+				const auto replies = wire.Until("Z");
+				Require(!Contains(replies, 'E') && State(replies) == 'I' && Command(replies) == "INSERT 0 1000", "Concurrent bound VALUES failed or lost affected count");
+			});
+			Require(Scalar(*observer, "SELECT count(*) FROM template_batch") == 4000 &&
+			        Scalar(*observer, "SELECT sum(id) FROM template_batch") == 7998000 &&
+			        Scalar(*observer, "SELECT sum(amount*100)::BIGINT FROM template_batch") == 199900000 &&
+			        Scalar(*observer, "SELECT count(DISTINCT label) FROM template_batch") == 4, "Concurrent VALUES integrity differs");
+			auto reader = protected_fixture.Client("reader"); reader->Parse("denied", sql); reader->Message('S');
+			const auto denied = reader->Until("Z");
+			Require(HasError(denied, "42501") && State(denied) == 'I' && Scalar(*reader, "SELECT count(*) FROM template_batch") == 4000,
+			        "Retained INSERT template bypassed reader permissions or poisoned reader");
+		});
+		test("protected_template_uses_current_catalog_and_bound_types", [&] {
+			const std::string sql = "INSERT INTO template_later VALUES ($1,$2)";
+			auto missing = protected_fixture.Client(); missing->Parse("missing", sql, {20,25}); missing->Message('S');
+			Require(HasError(missing->Until("Z"), "42P01"), "Missing table was accepted before CREATE");
+			Require(!Contains(missing->Query("CREATE TABLE template_later(id BIGINT,label VARCHAR)"), 'E'), "Missing-table fixture CREATE failed");
+			auto first = protected_fixture.Client(); first->Parse("fresh", sql, {20,25});
+			first->Bind("", "fresh", {std::string("1234567890123"),std::nullopt}); first->Execute(""); first->Message('S');
+			Require(!Contains(first->Until("Z"), 'E') && Scalar(*first, "SELECT id FROM template_later") == 1234567890123,
+			        "Native binding did not recover after catalog CREATE");
+			Require(!Contains(first->Query("ALTER TABLE template_later ALTER COLUMN id TYPE VARCHAR"), 'E'), "Template schema ALTER failed");
+			auto second = protected_fixture.Client(); second->Parse("new_types", sql, {25,23});
+			second->Bind("", "new_types", {std::string("current 'catalog'"),std::string("73")}); second->Execute(""); second->Message('S');
+			Require(!Contains(second->Until("Z"), 'E'), "Cached syntax retained old prepared parameter types");
+			const auto rows = Rows(second->Query("SELECT id,label FROM template_later ORDER BY id"));
+			Require(rows.size() == 2 && rows[0][0] == "1234567890123" && !rows[0][1] &&
+			        rows[1][0] == "current 'catalog'" && rows[1][1] == "73", "NULL, OIDs or altered schema changed bound values");
+		});
+		test("protected_template_replacement_preserves_native_semantics", [&] {
+			auto wire = protected_fixture.Client();
+			for (const auto &table : {std::string("template_a"),std::string("template_b")})
+				Require(!Contains(wire->Query("CREATE TABLE " + table + "(id INTEGER PRIMARY KEY,label VARCHAR)"), 'E'), "Template replacement table setup failed");
+			for (const auto &table : {std::string("template_a"),std::string("template_b"),std::string("template_a")}) {
+				const int id = table == "template_b" ? 2 : int(Scalar(*wire, "SELECT count(*) FROM template_a")) + 1;
+				wire->Parse("", "INSERT INTO " + table + " VALUES ($1,$2)", {23,25});
+				wire->Bind("", "", {std::to_string(id),table}); wire->Execute(""); wire->Message('S');
+				Require(!Contains(wire->Until("Z"), 'E'), "Replacing a syntax template changed destination table");
+			}
+			wire->Parse("bad", "INSERT INTO template_a VALUES ($1,", {23}); wire->Message('S');
+			Require(HasError(wire->Until("Z"), "42601"), "Malformed template SQL did not fail natively");
+			Require(State(wire->Query("BEGIN")) == 'T', "Template rollback BEGIN failed");
+			wire->Parse("", "INSERT INTO template_b VALUES ($1,$2)", {23,25}); wire->Bind("", "", {std::string("3"),std::string("rolled back")});
+			wire->Execute(""); wire->Message('S'); Require(!Contains(wire->Until("Z"), 'E'), "Bound transaction INSERT failed");
+			Require(State(wire->Query("ROLLBACK")) == 'I' && Scalar(*wire, "SELECT count(*) FROM template_b") == 1, "Syntax template bypassed native rollback");
+			wire->Parse("returning", "INSERT INTO template_b VALUES ($1::INTEGER,upper($2::VARCHAR)) RETURNING id,label", {23,25});
+			wire->Bind("", "returning", {std::string("4"),std::string("native expression")}); wire->Execute(""); wire->Message('S');
+			const auto returned = wire->Until("Z"); const auto rows = Rows(returned);
+			Require(!Contains(returned, 'E') && rows.size() == 1 && rows[0][0] == "4" && rows[0][1] == "NATIVE EXPRESSION", "Uncached expression/RETURNING INSERT lost native behavior");
+			Require(Scalar(*wire, "SELECT sum(id) FROM template_a") == 3 && Scalar(*wire, "SELECT sum(id) FROM template_b") == 6,
+			        "Template replacement or syntax failure corrupted earlier rows");
+		});
+		test("protected_declare_uses_fresh_native_prepare_and_permissions", [&] {
+			auto reader = protected_fixture.Client("reader"); Require(State(reader->Query("BEGIN")) == 'T', "Protected DECLARE BEGIN failed");
+			const auto declared = reader->Query("DECLARE admitted_cursor CURSOR FOR SELECT id,label FROM template_a ORDER BY id");
+			Require(!Contains(declared, 'E') && Command(declared) == "DECLARE CURSOR", "Protected native DECLARE failed");
+			const auto fetched = Rows(reader->Query("FETCH ALL FROM admitted_cursor"));
+			Require(fetched.size() == 2 && fetched[0][0] == "1" && fetched[1][0] == "2", "Protected cursor lost rows or ordering");
+			reader->Query("CLOSE admitted_cursor"); reader->Query("COMMIT");
+			auto writer = protected_fixture.Client();
+			Require(!Contains(writer->Query("CREATE SEQUENCE template_sequence"), 'E'), "Protected sequence setup failed");
+			reader->Parse("denied_function", "SELECT nextval('template_sequence')"); reader->Bind("", "denied_function"); reader->Execute(""); reader->Message('S');
+			Require(HasError(reader->Until("Z"), "42501") && Scalar(*reader, "SELECT 42") == 42 &&
+			        Scalar(*writer, "SELECT nextval('template_sequence')") == 1, "Fresh parse admission bypassed function permission policy");
+		});
+		test("protected_parse_contention_deadline_cancel_and_reuse", [&] {
+			ProtectedFixture limited(fixture_parent, server_program, 5);
+			std::vector<std::unique_ptr<Wire>> clients;
+			for (unsigned i = 0; i < 3; ++i) clients.push_back(limited.Client());
+			std::vector<std::vector<Reply>> replies(3);
+			Concurrent(3, [&](std::size_t i) {
+				clients[i]->Parse("cold", ValuesInsert("deadline_missing_" + std::to_string(i), 4000, 1)); clients[i]->Message('S');
+				replies[i] = clients[i]->Until("Z");
+			});
+			for (const auto &reply : replies)
+				Require((HasError(reply, "57014") || HasError(reply, "53300")) && State(reply) == 'I', "Cold parse or admission wait escaped the bounded deadline");
+			// A syntax failure must release admission even under the small budget.
+			clients[0]->Parse("syntax", "SELCT 1"); clients[0]->Message('S');
+			Require(HasError(clients[0]->Until("Z"), "42601"), "Parse deadline left the admission slot occupied");
+			limited.server->stop(); Require(limited.server->clean_shutdown(), "Deadline fixture could not stop gracefully");
+			std::vector<std::unique_ptr<Wire>> cancelled;
+			for (unsigned i = 0; i < 3; ++i) cancelled.push_back(protected_fixture.Client());
+			std::vector<std::vector<Reply>> outcomes(3);
+			Concurrent(3, [&](std::size_t i) {
+				cancelled[i]->Parse("cancelled", ValuesInsert("cancel_missing_" + std::to_string(i), 10000, 1)); cancelled[i]->Message('S');
+				outcomes[i] = cancelled[i]->Until("Z");
+			}, [&] {
+				std::this_thread::sleep_for(std::chrono::milliseconds(50));
+				for (const auto &wire : cancelled) protected_fixture.Cancel(*wire);
+			});
+			std::size_t interrupted = 0;
+			for (std::size_t i = 0; i < outcomes.size(); ++i) {
+				if (HasError(outcomes[i], "57014")) ++interrupted;
+				Require(State(outcomes[i]) == 'I' && Scalar(*cancelled[i], "SELECT 43") == 43, "Cancelled native parse could not recover after Sync");
+			}
+			Require(interrupted > 0, "Cold parse cancellation did not reach an active request");
+		});
+		test("protected_shutdown_releases_parse_waiters", [&] {
+			std::vector<std::unique_ptr<Wire>> clients;
+			for (unsigned i = 0; i < 3; ++i) clients.push_back(protected_fixture.Client());
+			Concurrent(3, [&](std::size_t i) {
+				try {
+					clients[i]->Parse("stopping", ValuesInsert("stop_missing_" + std::to_string(i), 10000, 1)); clients[i]->Message('S');
+					while (auto reply = clients[i]->Next()) if (reply->type == 'Z') break;
+				} catch (const std::exception &) {
+					// Stop shuts down authenticated sockets; truncated TLS is an
+					// expected client outcome, never a forced owner shutdown.
+				}
+			}, [&] {
+				std::this_thread::sleep_for(std::chrono::milliseconds(20)); protected_fixture.server->stop();
+			});
+			Require(protected_fixture.server->clean_shutdown(), "Active parsing or waiters required forced owner shutdown");
+		});
 	} catch (const std::exception &error) { checks.emplace_back("fixture_setup", error.what()); }
 	bool passed = !checks.empty();
 	for (auto &check : checks) {

@@ -4,6 +4,7 @@
 #include "duckonwire/access.hpp"
 #include "initialize.hpp"
 
+#include <algorithm>
 #include <cerrno>
 #include <csignal>
 #include <cstdlib>
@@ -83,7 +84,7 @@ struct Options {
 	int pg_port = 9496;
 	int max_queries = 8;
 	int query_timeout_ms = 30000;
-	int threads = 2;
+	int threads = 0;
 	bool init_demo = false;
 	std::int64_t demo_prices = 0;
 };
@@ -94,12 +95,12 @@ Options Parse(int argc, char **argv) {
 		std::string name(argv[i]);
 		if (name == "--init-demo") { options.init_demo = true; continue; }
 		if (name == "--help") {
-			std::cout << "duckonwire-server [--root DIRECTORY] [--database PATH] [--port 9495] [--pg-port 9496] [--state PATH] [--init-demo] [--demo-prices ROWS] [--threads 2]\n"
+			std::cout << "duckonwire-server [--root DIRECTORY] [--database PATH] [--port 9495] [--pg-port 9496] [--state PATH] [--init-demo] [--demo-prices ROWS] [--threads 1..64]\n"
 			          << "Quack uses --port; PostgreSQL drivers use --pg-port (0 selects a free port).\n"
 			          << "DUCKONWIRE_TOKEN sets local endpoint passwords; otherwise one is generated.\n"
 			          << "Public: --pg-host ADDRESS --access-file PATH --tls-cert PATH --tls-key PATH\n"
 			          << "PostgreSQL limits: --max-queries 8 --query-timeout-ms 30000\n"
-			          << "Engine: --threads 2 (1..64 worker threads).\n"
+			          << "Engine: --threads 1..64; default uses DuckDB's detected CPU capacity, capped at 2 workers.\n"
 			          << "Demo: --init-demo imports the catalog; --demo-prices 1000000 adds reproducible 30-day synthetic history instead of CSV prices (46462..10000000 rows).\n"
 			          << "Access rules select one database name and users with read/write permissions; TLS and SCRAM required.\n";
 			std::exit(0);
@@ -245,7 +246,8 @@ void Serve(const Options &options, const std::string &token) {
 	{
 		duckdb::DBConfig config;
 		config.SetOptionByName(duckdb::Identifier("temp_directory"), duckdb::Value((options.database.parent_path() / "native-spill").string()));
-		config.SetOptionByName(duckdb::Identifier("threads"), duckdb::Value::BIGINT(options.threads));
+		if (options.threads != 0)
+			config.SetOptionByName(duckdb::Identifier("threads"), duckdb::Value::BIGINT(options.threads));
 		const bool protected_mode = !options.access_file.empty();
 		duckonwire::AccessConfig rules;
 		if (protected_mode) {
@@ -254,11 +256,25 @@ void Serve(const Options &options, const std::string &token) {
 			config.SetOptionByName(duckdb::Identifier("allow_unsigned_extensions"), duckdb::Value(false));
 			config.SetOptionByName(duckdb::Identifier("allow_persistent_secrets"), duckdb::Value(false));
 			config.SetOptionByName(duckdb::Identifier("secret_directory"), duckdb::Value((options.root / ".runtime/engine-secrets").string()));
-			config.SetOptionByName(duckdb::Identifier("memory_limit"), duckdb::Value("1GiB"));
 			config.SetOptionByName(duckdb::Identifier("max_temp_directory_size"), duckdb::Value("1GiB"));
 		}
 		duckdb::DuckDB database(options.database.string(), &config);
 		duckdb::Connection owner(database);
+		if (protected_mode) {
+			// Leave headroom beyond DuckDB's buffers while retaining its quota detection.
+			constexpr duckdb::idx_t memory_cap = 1024ULL * 1024ULL * 1024ULL;
+			auto &actual = duckdb::DBConfig::GetConfig(*database.instance);
+			const auto budget = std::min(memory_cap, actual.options.maximum_memory - actual.options.maximum_memory / 4);
+			auto memory_option = duckdb::DBConfig::GetOptionByName(duckdb::Identifier("memory_limit"));
+			if (!memory_option) throw std::runtime_error("Native memory setting is unavailable");
+			actual.SetOption(database.instance.get(), *memory_option, duckdb::Value(std::to_string(budget) + "B"));
+		}
+		if (options.threads == 0) {
+			// Let DuckDB detect CPU quotas before applying our two-worker default cap.
+			auto detected = owner.Query("SELECT current_setting('threads')");
+			if (detected->HasError()) detected->ThrowError();
+			if (detected->GetValue<int64_t>(0, 0) > 2) Query(owner, "SET threads = 2");
+		}
 		if (options.init_demo) {
 			if (protected_mode) throw std::runtime_error("Initialize the demo locally before enabling access rules");
 			duckonwire::demo::Initialize(owner, options.root, options.demo_prices);

@@ -1,14 +1,14 @@
 {
   "project": "DuckOnWire",
   "version": "0.3.0",
-  "status": "Version0.3.0 published with current-source native, Neon, Flask, stock-driver and AMD64/ARM64 Docker acceptance; manual publication recovery is recorded explicitly.",
+  "status": "Version0.3.0 release acceptance is preserved below. Current performance changes have separate source and runtime evidence; fresh build and deployment acceptance remain pending.",
   "native_engine_version": "v2.1.0-dev0",
   "quack_protocol": 7,
   "patches_sha256": {
     "88e1f9030e355c82784b45646698b6c1ada4d885.patch": "e27a248dafa313eebc34f3852ec7466c1157553e663dc9f9aa2b326787161247",
     "duckdb-java.patch": "70e646f362b7c976a1103ff9708c26549020226664a0be3ff2e1299c1dfcbb05",
     "duckdb-python.patch": "652ffbaab5c5afeb04186523eb2a8a373273f704e86297a8917e14f659a1c6bc",
-    "duckdb.patch": "88a88808e8df55ee675c4f14e74d1e0cd3caddd190e617da3f623804ab7f6280",
+    "duckdb.patch": "62f0ad0faf0543d7e8c30591a6e5b0cb8e72398bc34fa8ef177b16df685de7d4",
     "f8e285333da4b30cacb02f69d6dee409d03b9452.patch": "55ce6d1d42e5ac4e18e3d88a3a28cb3e1e3c11fdaef2c094ce8f823ae6dafbf1",
     "httpfs.patch": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "quack.patch": "e63842a385e4ed48d7c0708d9f7c5a470e4638d8f9d25a1184f5cdc4d4a4d03c"
@@ -183,13 +183,13 @@
     {
       "name": "duckdb",
       "repository": "https://github.com/misaelzapata/duckdb",
-      "branch": "duckonwire/native",
-      "commit": "848126236a4a8879f232bed7ab5f702683a55300",
-      "git_tree": "1d03b4066149470a7d66ecd2ce1c0f51db003ac9",
+      "branch": "duckonwire/performance-20261010",
+      "commit": "0cfb63a5f712fadf06a0de33217b7b03666ae66b",
+      "git_tree": "d84e142da537e2ef8ad0c4b76c00c6ad632a3718",
       "source_mode": "COMMITTED",
       "upstream_repository": "https://github.com/duckdb/duckdb",
       "upstream_commit": "638b09261a334feb2f7deb742fe3996db3c974b1",
-      "canonical_patch_sha256": "88a88808e8df55ee675c4f14e74d1e0cd3caddd190e617da3f623804ab7f6280",
+      "canonical_patch_sha256": "62f0ad0faf0543d7e8c30591a6e5b0cb8e72398bc34fa8ef177b16df685de7d4",
       "apply_canonical_patch_during_build": false
     },
     {
@@ -214,10 +214,10 @@
   ],
   "fork_validation": {
     "status": "reported separately by GitHub Actions and release package manifests",
-    "source_byte_equivalence_to_recorded_build_verified": true,
+    "source_byte_equivalence_to_recorded_build_verified": false,
     "github_actions": "https://github.com/misaelzapata/duckonwire/actions",
     "release_package_manifests": "https://github.com/misaelzapata/duckonwire/releases",
-    "evidence_scope": "Match the source commit, platform and artifact hashes to its Actions run and release manifest. Compilation and acceptance evidence is generated after the source snapshot; this snapshot does not assert a binary test outcome."
+    "evidence_scope": "The current pinned tree is reproduced exactly by its canonical patch. Private incremental native builds passed local differential and server tests; historical release binaries use older pins. A fresh build of the current pin is still pending."
   },
   "recorded_qualification": {
     "version": "0.2.0-rc.3",
@@ -699,5 +699,31 @@
     "preset_count": 7,
     "top_prices_sql": "examples/postgres/queries/top-prices.sql"
   },
-  "updated_utc": "2026-10-10T16:46:50.422901+00:00"
+  "updated_utc": "2026-10-10T16:46:50.422901+00:00",
+  "performance_20261010": {
+    "status": "in progress",
+    "duckdb_fork_commit": "0cfb63a5f712fadf06a0de33217b7b03666ae66b",
+    "canonical_patch_sha256": "62f0ad0faf0543d7e8c30591a6e5b0cb8e72398bc34fa8ef177b16df685de7d4",
+    "native_tree_from_patch_verified": true,
+    "local_engine_differential_checks": 248,
+    "all_native_timing_evaluations_equal": 700,
+    "local_combined_server_checks": {
+      "Flask": 89,
+      "stock_Node_complex_queries": 10,
+      "client_insert_rows": 2000000,
+      "bound_values": 6000000,
+      "confirmed_commits": 2000,
+      "writers": 4,
+      "readers": 4,
+      "all_four_readers_overlapped": true,
+      "all_ten_complex_queries_overlapped": true,
+      "in_session_integrity_passed": true,
+      "two_million_durable_reopen_tested": false
+    },
+    "scope": "Apple M1 Pro, macOS ARM64, private incremental engine builds. The server used verified TLS and a read-only account. Fresh CI/current source and small-memory AWS mixed workload are pending. The protected parse-admission/template change is not covered yet.",
+    "all_queries_under_10ms": false,
+    "deployed": false,
+    "result_file": "performance.json",
+    "result_sha256": "4e2470bd479ce28a88125027f2f3bb86b8d19dd9250b9ae5896099a1007e1606"
+  }
 }

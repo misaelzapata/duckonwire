@@ -2,8 +2,10 @@
 #include "duckonwire/json.hpp"
 #include "native_server.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <exception>
 #include <functional>
 #include <fstream>
 #include <iostream>
@@ -131,6 +133,70 @@ int main(int argc, char **argv) {
 			Check(result);
 			Require(result->GetTypes()[0] == LogicalType::DATE && result->GetTypes()[1] == LogicalType::TIMESTAMP && result->GetTypes()[2] == LogicalType::DECIMAL(18, 2), "Native type metadata");
 			Require(result->GetNames()[0].GetIdentifierName() == "value" && result->GetNames()[1].GetIdentifierName() == "value" && result->GetValue(5, 0).IsNull(), "Native names/null");
+
+			// Sorting nested keys must preserve the native window's order, types and nulls.
+			const std::string window_sql = R"SQL(
+				WITH input(id, object, items, amount, label) AS (VALUES
+				  (1, struct_pack("MixedKey" := 1), [1,NULL::INTEGER], 9.50::DECIMAL(18,2), 'alpha'),
+				  (2, struct_pack("MixedKey" := 1), [1,NULL::INTEGER], NULL::DECIMAL(18,2), 'ALPHA'),
+				  (3, struct_pack("MixedKey" := 1), [2,NULL::INTEGER], 19.99::DECIMAL(18,2), 'beta'),
+				  (4, struct_pack("MixedKey" := 2), [1,NULL::INTEGER], 2.00::DECIMAL(18,2), 'gamma'))
+				SELECT id AS RowID, amount,
+				       lag(amount) OVER (ORDER BY object, items, label COLLATE nocase, id) AS previous,
+				       object, items
+				FROM input ORDER BY object, items, label COLLATE nocase, id
+			)SQL";
+			auto verify_window = [&](Connection &session, bool lowercase) {
+				auto sorted = session.Query(window_sql); Check(sorted);
+				Require(sorted->RowCount() == 4 && sorted->GetTypes()[0] == LogicalType::INTEGER &&
+				        sorted->GetTypes()[1] == LogicalType::DECIMAL(18, 2) &&
+				        sorted->GetTypes()[2] == LogicalType::DECIMAL(18, 2) &&
+				        sorted->GetTypes()[3].id() == LogicalTypeId::STRUCT &&
+				        sorted->GetTypes()[4] == LogicalType::LIST(LogicalType::INTEGER),
+				        "Sorted native window types or row count changed");
+				Require(sorted->GetNames()[0].GetIdentifierName() == (lowercase ? "rowid" : "RowID") &&
+				        StructType::GetChildName(sorted->GetTypes()[3], 0).GetIdentifierName() == "MixedKey",
+				        "Session identifier case changed: alias=" + sorted->GetNames()[0].GetIdentifierName() +
+				            ", field=" + StructType::GetChildName(sorted->GetTypes()[3], 0).GetIdentifierName());
+				const int64_t cents[] = {950, 0, 1999, 200};
+				for (idx_t row = 0; row < 4; ++row) {
+					Require(sorted->GetValue(0, row).GetValue<int32_t>() == int32_t(row + 1), "Nested/collated sort order changed");
+					const auto amount = sorted->GetValue(1, row), previous = sorted->GetValue(2, row);
+					Require(row == 1 ? amount.IsNull() : amount == Value::DECIMAL(cents[row], 18, 2), "Window decimal value changed");
+					Require(row == 0 || row == 2 ? previous.IsNull() : previous == Value::DECIMAL(cents[row - 1], 18, 2),
+					        "Window lost the preceding null or exact decimal");
+					const auto object = sorted->GetValue(3, row);
+					const auto &fields = StructValue::GetChildren(object);
+					Require(fields.size() == 1 && fields[0].GetValue<int32_t>() == (row == 3 ? 2 : 1), "Sorted struct value changed");
+					const auto list = sorted->GetValue(4, row);
+					const auto &items = ListValue::GetChildren(list);
+					Require(items.size() == 2 && items[0].GetValue<int32_t>() == (row == 2 ? 2 : 1) && items[1].IsNull(),
+					        "Sorted nested list/null changed");
+				}
+			};
+			verify_window(*con, false);
+			// Parser settings belong to the native contexts, independently of Quack's client metadata.
+			auto preserved = std::make_unique<Connection>(client), lower = std::make_unique<Connection>(client);
+			SQL(*preserved, "SET preserve_identifier_case='preserve_case'");
+			SQL(*lower, "SET preserve_identifier_case='lowercase'");
+			std::atomic<unsigned> ready {0}; std::atomic<bool> start {false};
+			std::exception_ptr first_error, second_error;
+			auto worker = [&](Connection &session, bool lowercase, std::exception_ptr &error) {
+				++ready; while (!start) std::this_thread::yield();
+				try { for (int repeat = 0; repeat < 3; ++repeat) verify_window(session, lowercase); }
+				catch (...) { error = std::current_exception(); }
+			};
+			std::thread first(worker, std::ref(*preserved), false, std::ref(first_error));
+			std::thread second(worker, std::ref(*lower), true, std::ref(second_error));
+			while (ready != 2) std::this_thread::yield(); start = true;
+			first.join(); second.join();
+			if (first_error) std::rethrow_exception(first_error);
+			if (second_error) std::rethrow_exception(second_error);
+			for (auto *session : {preserved.get(), lower.get()}) {
+				Require(session->Query("SELECT NULL::STRUCT(\"MixedKey\" TYPE_THAT_DOES_NOT_EXIST)")->HasError(),
+				        "Invalid nested type unexpectedly succeeded");
+				Require(Scalar(*session, "SELECT 42") == 42, "Session unusable after nested type error");
+			}
 		});
 		test("ddl_visibility_between_sessions", [&] {
 			auto writer = connection(), reader = connection();
@@ -140,6 +206,22 @@ int main(int argc, char **argv) {
 			Check(writer->Query("INSERT INTO ddl_test(id) VALUES (?)", Value::INTEGER(1)));
 			auto result = reader->Query("SELECT label FROM ddl_test"); Check(result);
 			Require(result->GetValue(0, 0).GetValue<std::string>() == "new", "ALTER invisible");
+			auto prepared = reader->Prepare("SELECT id,label,lag(id) OVER(ORDER BY id) AS previous FROM ddl_test WHERE id>=? ORDER BY id");
+			Require(!prepared->HasError(), "Window prepare failed before schema replacement");
+			auto original = prepared->Execute(Value::INTEGER(0)); Check(original);
+			Require(original->GetTypes()[0] == LogicalType::INTEGER && original->GetTypes()[2] == LogicalType::INTEGER,
+			        "Prepared window metadata changed");
+			Require(original->Fetch()->GetValue(0, 0).GetValue<int32_t>() == 1, "Initial prepared window changed");
+			SQL(*writer, "DROP TABLE ddl_test; CREATE TABLE ddl_test(id INTEGER,label VARCHAR); INSERT INTO ddl_test VALUES(3,'third'),(2,'replacement')");
+			auto replaced = prepared->Execute(Value::INTEGER(0)); Check(replaced);
+			Require(replaced->GetTypes()[0] == LogicalType::INTEGER && replaced->GetTypes()[2] == LogicalType::INTEGER,
+			        "Rebound window metadata changed");
+			auto rows = replaced->Fetch();
+			Require(rows && rows->size() == 2 && rows->GetValue(0, 0).GetValue<int32_t>() == 2 &&
+			        rows->GetValue(1, 0).GetValue<std::string>() == "replacement" && rows->GetValue(2, 0).IsNull() &&
+			        rows->GetValue(0, 1).GetValue<int32_t>() == 3 && rows->GetValue(2, 1).GetValue<int32_t>() == 2,
+			        "Prepared window retained stale catalog data or order");
+			Require(!replaced->Fetch(), "Rebound window returned extra rows");
 		});
 		test("sql_and_bind_errors_leave_session_usable", [&] {
 			auto con = connection();
@@ -219,6 +301,9 @@ int main(int argc, char **argv) {
 		});
 		test("real_cpp_transaction_flow", [&] { Require(RunFlow(flow, *server) == 0, "Native transaction-flow executable failed"); });
 		test("native_demo_initialization_and_existing_data_protection", [&] {
+			int64_t expected_default_threads;
+			{ DuckDB automatic(nullptr); Connection probe(automatic);
+			  expected_default_threads = std::min<int64_t>(2, Scalar(probe, "SELECT current_setting('threads')")); }
 			TempRoot demo; fs::create_directories(demo.path() / "examples/demo");
 			for (const auto *name : {"products.csv", "prices.csv"}) fs::copy_file(catalog / name, demo.path() / "examples/demo" / name);
 			const auto db = demo.path() / "demo.duckdb";
@@ -228,10 +313,13 @@ int main(int argc, char **argv) {
 			  Require(Scalar(con, "SELECT count(*) FROM products WHERE category='' OR size='' OR unit=''") == 32909 &&
 			          Scalar(con, "SELECT count(*) FROM products WHERE category IS NULL OR size IS NULL OR unit IS NULL") == 0,
 			          "CSV empty fields were not preserved as strings");
-			  Require(Scalar(con, "SELECT current_setting('threads')") == 2, "Default engine threads changed"); }
+			  Require(Scalar(con, "SELECT current_setting('threads')") == expected_default_threads,
+			          "Default engine threads did not respect DuckDB's detected CPU capacity"); }
 			bool rejected = false; try { NativeServer duplicate(demo.path(), db, executable, 0, true); } catch (const std::exception &error) { rejected = std::string(error.what()).find("requires an empty database") != std::string::npos; }
 			Require(rejected, "Demo initialization overwrote existing database");
-			{ NativeServer reopened(demo.path(), db, executable); Connection con(client); Connect(con, reopened.endpoint(), reopened.token()); Require(Scalar(con, "SELECT count(*) FROM products") == 46462, "Existing demo changed"); }
+			{ NativeServer reopened(demo.path(), db, executable, 0, false, {"--threads", "2"}); Connection con(client); Connect(con, reopened.endpoint(), reopened.token());
+			  Require(Scalar(con, "SELECT count(*) FROM products") == 46462, "Existing demo changed");
+			  Require(Scalar(con, "SELECT current_setting('threads')") == 2, "Explicit threads did not override the default cap"); }
 
 			// History uses native bound generation, not a million-row CSV. Compute independent exact checksums.
 			fs::remove(demo.path() / "examples/demo/prices.csv");

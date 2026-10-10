@@ -1,10 +1,12 @@
--- Top prices by country. Three highest price observations in each market.
--- Demo prices are synthetic.
+-- Three highest price observations in each market; demo prices are synthetic.
+-- The demo schema limits prices to 0.50..250.00; DECIMAL(9,2) keeps cents exact.
+-- One cent outweighs every INTEGER product id, preserving the id tie break.
 WITH grouped AS (
   SELECT p.country_code,
     arg_max(struct_pack(product_id := p.id, price := pr.price),
-      struct_pack(has_price := pr.price IS NOT NULL, price := pr.price,
-                  reverse_id := -CAST(p.id AS BIGINT)), 3) AS chosen
+      (CASE WHEN pr.price IS NULL THEN -1000000000::BIGINT
+            ELSE CAST(CAST(pr.price AS DECIMAL(9,2))*100::DECIMAL(3,0) AS BIGINT) END)
+      *4294967296::BIGINT - CAST(p.id AS BIGINT), 3) AS chosen
   FROM products p JOIN prices pr ON pr.product_id = p.id
   GROUP BY p.country_code
 ), expanded AS (

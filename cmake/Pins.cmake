@@ -1,11 +1,11 @@
 # Build commits are fixed. Forks contain the changes already; their patches and
 # original official revisions remain audit references, never a second replay.
 set(DUCKONWIRE_DUCKDB_REPOSITORY "https://github.com/misaelzapata/duckdb")
-set(DUCKONWIRE_DUCKDB_COMMIT "848126236a4a8879f232bed7ab5f702683a55300")
+set(DUCKONWIRE_DUCKDB_COMMIT "0cfb63a5f712fadf06a0de33217b7b03666ae66b")
 set(DUCKONWIRE_DUCKDB_SOURCE_MODE "COMMITTED")
 set(DUCKONWIRE_DUCKDB_UPSTREAM_REPOSITORY "https://github.com/duckdb/duckdb")
 set(DUCKONWIRE_DUCKDB_UPSTREAM_COMMIT "638b09261a334feb2f7deb742fe3996db3c974b1")
-set(DUCKONWIRE_DUCKDB_PATCH_SHA256 "88a88808e8df55ee675c4f14e74d1e0cd3caddd190e617da3f623804ab7f6280")
+set(DUCKONWIRE_DUCKDB_PATCH_SHA256 "62f0ad0faf0543d7e8c30591a6e5b0cb8e72398bc34fa8ef177b16df685de7d4")
 set(DUCKONWIRE_QUACK_REPOSITORY "https://github.com/misaelzapata/duckdb-quack")
 set(DUCKONWIRE_QUACK_COMMIT "a6e7cb9243ee3d7ec0e5371b720be3292a32061f")
 set(DUCKONWIRE_QUACK_SOURCE_MODE "COMMITTED")

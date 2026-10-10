@@ -6,11 +6,16 @@
 
 #include "duckdb.hpp"
 #include "duckdb/main/client_context.hpp"
+#include "duckdb/main/client_config.hpp"
 #include "duckdb/main/config.hpp"
 #include "duckdb/main/valid_checker.hpp"
 #include "duckdb/transaction/meta_transaction.hpp"
 #include "duckdb/transaction/transaction.hpp"
 #include "duckdb/parser/parser.hpp"
+#include "duckdb/parser/expression/parameter_expression.hpp"
+#include "duckdb/parser/expression/star_expression.hpp"
+#include "duckdb/parser/tableref/expressionlistref.hpp"
+#include "duckdb/parser/query_node/insert_query_node.hpp"
 #include "duckdb/parser/statement/execute_statement.hpp"
 #include "duckdb/parser/statement/create_statement.hpp"
 #include "duckdb/parser/statement/explain_statement.hpp"
@@ -863,6 +868,17 @@ struct PgWireServer::Impl {
     std::size_t max_active_queries = 8;
     std::uint32_t query_timeout_ms = 30000;
     std::atomic<std::size_t> active_queries {0};
+    // Parsing uses allocations outside the buffer manager. Serialize protected
+    // parses, including different SQL, rather than multiplying that working set.
+    std::mutex parse_lock;
+    std::condition_variable parse_wake;
+    bool parse_busy = false;
+    struct InsertTemplate {
+        std::string sql;
+        duckdb::ParserOptions options;
+        duckdb::unique_ptr<duckdb::SQLStatement> statement;
+    };
+    std::unique_ptr<InsertTemplate> insert_template;
     std::atomic<std::uint16_t> bound_port {0};
     std::atomic<bool> stopping {true};
     int listener = -1;
@@ -970,6 +986,35 @@ struct PgWireServer::Impl::Session {
         ExecutionGuard(const ExecutionGuard &) = delete;
         ExecutionGuard &operator=(const ExecutionGuard &) = delete;
     };
+    struct ParseAdmission {
+        Session &session;
+        std::uint64_t generation;
+        std::chrono::steady_clock::time_point deadline;
+        explicit ParseAdmission(Session &owner) : session(owner), generation(owner.cancel_generation.load()) {
+            std::unique_lock<std::mutex> lock(session.server.parse_lock);
+            deadline = std::chrono::steady_clock::now() +
+                std::chrono::milliseconds(std::min<std::uint32_t>(30000, session.server.query_timeout_ms));
+            if (!session.server.parse_wake.wait_until(lock, deadline, [&] {
+                return !session.server.parse_busy || session.server.stopping.load() ||
+                       session.cancel_generation.load() != generation;
+            })) throw WireError("53300", "Native parse capacity is full; retry after parsing completes");
+            Check();
+            session.server.parse_busy = true;
+        }
+        void Check() const {
+            if (session.server.stopping.load()) throw WireError("57P01", "Server is stopping", true);
+            if (session.cancel_generation.load() != generation)
+                throw WireError("57014", "Statement cancelled during native parsing");
+            if (std::chrono::steady_clock::now() >= deadline)
+                throw WireError("57014", "Native parsing exceeded the statement deadline");
+        }
+        ~ParseAdmission() {
+            { std::lock_guard<std::mutex> lock(session.server.parse_lock); session.server.parse_busy = false; }
+            session.server.parse_wake.notify_all();
+        }
+        ParseAdmission(const ParseAdmission &) = delete;
+        ParseAdmission &operator=(const ParseAdmission &) = delete;
+    };
     void Shutdown() {
         Interrupt();
         std::lock_guard<std::mutex> guard(socket_lock);
@@ -977,6 +1022,7 @@ struct PgWireServer::Impl::Session {
     }
     void Interrupt() {
         cancel_generation.fetch_add(1);
+        server.parse_wake.notify_all();
         duckdb::shared_ptr<duckdb::ClientContext> context;
         { std::lock_guard<std::mutex> guard(connection_lock); context = connection.context; }
         if (context) context->Interrupt();
@@ -1014,6 +1060,8 @@ struct PgWireServer::Impl::Session {
         sql_cursors.clear(); savepoints.clear();
     }
     void Parse(Reader &in);
+    duckdb::vector<duckdb::unique_ptr<duckdb::SQLStatement>> Extract(const std::string &sql,
+                                                                 ParseAdmission *admission = nullptr);
     void Bind(Reader &in);
     duckdb::StatementSignature BoundSignature(const Statement &statement, const duckdb::vector<Value> &parameters);
     void Describe(Reader &in);
@@ -1310,11 +1358,108 @@ void PgWireServer::Impl::Session::ResetConnection(bool preserve_statements) {
 }
 void PgWireServer::Impl::Session::EnsurePrepared(Statement &statement) {
     if (!statement.prepared && !statement.empty && !statement.setting && !statement.deallocate && statement.control.kind == FdwKind::NONE) {
-        statement.prepared = connection.Prepare(statement.sql);
+        if (server.protected_mode) {
+            ParseAdmission admission(*this);
+            auto parsed = Extract(statement.sql, &admission);
+            if (parsed.size() != 1) throw WireError("42601", "A prepared statement must contain a single command");
+            Authorize(*parsed[0]);
+            statement.prepared = statement.type == duckdb::StatementType::EXPLAIN_STATEMENT
+                ? connection.Prepare(statement.sql) : connection.Prepare(std::move(parsed[0]));
+            admission.Check();
+        } else statement.prepared = connection.Prepare(statement.sql);
         if (statement.prepared->HasError()) NativeError(statement.prepared->GetErrorObject());
         if (statement.prepared->GetParameterCount() != statement.parameter_oids.size())
             throw WireError("0A000", "Prepared statement parameter count changed after session reset");
     }
+}
+
+namespace {
+bool SameParserOptions(const duckdb::ParserOptions &a, const duckdb::ParserOptions &b) {
+    return a.identifier_case_mode == b.identifier_case_mode && a.integer_division == b.integer_division &&
+           a.heap_based_parser == b.heap_based_parser &&
+           a.regex_match_operator_semantics == b.regex_match_operator_semantics &&
+           a.max_expression_depth == b.max_expression_depth &&
+           a.parser_override_setting == b.parser_override_setting && a.extensions.get() == b.extensions.get() &&
+           a.compiled_grammar.get() == b.compiled_grammar.get();
+}
+bool TemplateParser(const duckdb::ParserOptions &options, const duckdb::ClientConfig &client) {
+    return options.parser_override_setting == duckdb::AllowParserOverride::DEFAULT_OVERRIDE &&
+           options.compiled_grammar && !client.cached_grammar && client.active_grammar_extensions.empty();
+}
+bool PositionalValuesTemplate(const duckdb::SQLStatement &statement, const std::string &sql) {
+    // Bound the retained shape, not just the SQL length. Every retained data cell
+    // is one parameter node; literals, expressions and catalog-derived trees stay
+    // on the ordinary native path. The single slot is replaced rather than grown.
+    if (FirstWord(sql) != "INSERT" || sql.size() > 128 * 1024 || sql.find('?') != std::string::npos ||
+        statement.type != duckdb::StatementType::INSERT_STATEMENT ||
+        !statement.has_anonymous_parameters || statement.named_param_map.empty() ||
+        statement.named_param_map.size() > 4096) return false;
+    const auto &insert = statement.Cast<duckdb::InsertStatement>();
+    const auto &node = *insert.node;
+    if (!node.cte_map.map.empty() || !node.modifiers.empty() || node.on_conflict_info ||
+        !node.returning_list.empty() || node.default_values || node.column_order != duckdb::InsertColumnOrder::INSERT_BY_POSITION || node.columns.size() > 64 ||
+        node.qualified_name.Path().size() > 4) return false;
+    std::size_t name_bytes = 0;
+    for (const auto &part : node.qualified_name.Path()) name_bytes += part.GetIdentifierName().size();
+    if (name_bytes > 512) return false;
+    for (const auto &column : node.columns) if (column.GetIdentifierName().size() > 128) return false;
+    // Inspect the native VALUES representation directly; the corresponding
+    // convenience helpers are not part of DuckDB's exported extension ABI.
+    if (!node.select_statement || node.select_statement->node->type != duckdb::QueryNodeType::SELECT_NODE) return false;
+    const auto &select = node.select_statement->node->Cast<duckdb::SelectNode>();
+    if (!select.modifiers.empty() || !select.cte_map.map.empty() || select.where_clause || select.having ||
+        select.qualify || select.sample || !select.groups.grouping_sets.empty() || !select.groups.group_expressions.empty() ||
+        select.aggregate_handling != duckdb::AggregateHandling::STANDARD_HANDLING || select.select_list.size() != 1 ||
+        select.select_list[0]->GetExpressionClass() != duckdb::ExpressionClass::STAR || !select.from_table ||
+        select.from_table->type != duckdb::TableReferenceType::EXPRESSION_LIST) return false;
+    const auto &star = select.select_list[0]->Cast<duckdb::StarExpression>();
+    if (!star.RelationName().empty() || !star.ExcludeList().empty() || !star.ReplaceList().empty() ||
+        !star.RenameList().empty() || star.Expression() || star.IsColumns()) return false;
+    const auto &values = select.from_table->Cast<duckdb::ExpressionListRef>();
+    if (!values.expected_types.empty() || !values.expected_names.empty() ||
+        values.values.empty() || values.values.size() > 4096) return false;
+    std::size_t cells = 0;
+    for (const auto &row : values.values) {
+        if (row.empty() || row.size() > 64) return false;
+        for (const auto &expression : row) {
+            if (++cells > 4096 || expression->GetExpressionClass() != duckdb::ExpressionClass::PARAMETER) return false;
+            const auto &name = expression->Cast<duckdb::ParameterExpression>().Identifier().GetIdentifierName();
+            if (name != std::to_string(cells)) return false;
+        }
+    }
+    return cells == statement.named_param_map.size();
+}
+} // namespace
+
+duckdb::vector<duckdb::unique_ptr<duckdb::SQLStatement>>
+PgWireServer::Impl::Session::Extract(const std::string &sql, ParseAdmission *admission) {
+    if (!server.protected_mode) return connection.ExtractStatements(sql);
+    std::unique_ptr<ParseAdmission> own_admission;
+    if (!admission) { own_admission = std::make_unique<ParseAdmission>(*this); admission = own_admission.get(); }
+    admission->Check();
+    const auto parser_options = connection.context->GetParserOptions();
+    const bool template_parser = TemplateParser(parser_options, duckdb::ClientConfig::GetConfig(*connection.context));
+    duckdb::vector<duckdb::unique_ptr<duckdb::SQLStatement>> result;
+    if (server.insert_template && sql == server.insert_template->sql && template_parser &&
+        SameParserOptions(parser_options, server.insert_template->options)) {
+        // No shared prepared/bound state: each caller owns its copy and is still
+        // authorized and prepared against its own current transaction/catalog.
+        result.push_back(server.insert_template->statement->Copy());
+    } else {
+        result = connection.ExtractStatements(sql);
+        admission->Check();
+        // DEFAULT_OVERRIDE skips parser overrides; a successful native INSERT
+        // cannot be a parse_function fallback (those are ExtensionStatement).
+        if (result.size() == 1 && template_parser && PositionalValuesTemplate(*result[0], sql)) {
+            // Publish the tuple only after every allocation succeeds. A failed
+            // replacement must never pair the old SQL key with a new AST.
+            auto next = std::make_unique<Impl::InsertTemplate>();
+            next->sql = sql; next->options = parser_options; next->statement = result[0]->Copy();
+            server.insert_template = std::move(next);
+        }
+    }
+    admission->Check();
+    return result;
 }
 void PgWireServer::Impl::Session::RecordFailure(const std::string &state, bool fatal) {
     if (connection.IsAutoCommit()) return;
@@ -1516,13 +1661,19 @@ bool PgWireServer::Impl::Session::FdwSimple(const std::string &sql) {
         Ready(); return true;
     }
     ReadOnlyTransaction();
-    auto parsed = connection.ExtractStatements(declaration.query);
+    std::unique_ptr<ParseAdmission> admission;
+    if (server.protected_mode) admission = std::make_unique<ParseAdmission>(*this);
+    auto parsed = Extract(declaration.query, admission.get());
     if (parsed.size() != 1 || parsed[0]->type != duckdb::StatementType::SELECT_STATEMENT)
         throw WireError("42501", "SQL cursors support one SELECT only");
     Authorize(*parsed[0]);
     Portal portal; portal.statement = std::make_shared<Statement>(); portal.statement->sql = declaration.query;
     portal.statement->type = parsed[0]->type; portal.statement->fdw_cursor_name = declaration.name;
-    portal.statement->prepared = connection.Prepare(declaration.query);
+    portal.statement->prepared = connection.Prepare(std::move(parsed[0]));
+    if (admission) admission->Check();
+    // Execution is separately admitted and timed; release the parse slot before
+    // running the cursor's SELECT.
+    admission.reset();
     if (portal.statement->prepared->HasError()) NativeError(portal.statement->prepared->GetErrorObject());
     if (portal.statement->prepared->GetParameterCount()) throw WireError("42P02", "DECLARE parameter requires extended Bind");
     FdwStore(std::move(portal)); Ready(); return true;
@@ -1586,7 +1737,7 @@ void PgWireServer::Impl::Session::Simple(const std::string &input_sql) {
         GuardTransaction(sql); portals.clear(); statements.clear();
         Buffer body; PutString(body, "DEALLOCATE"); Message(socket, 'C', body); Ready(); return;
     }
-    auto extracted = connection.ExtractStatements(sql);
+    auto extracted = Extract(sql);
     if (extracted.empty()) { Message(socket, 'I'); Ready(); return; }
     for (auto &statement : extracted) {
         if (statement->type != duckdb::StatementType::SET_STATEMENT || !SessionSetting(statement->ToString())) Authorize(*statement);
@@ -1657,7 +1808,11 @@ void PgWireServer::Impl::Session::Parse(Reader &in) {
     if (!name.empty() && statements.count(name)) throw WireError("42P05", "Prepared statement already exists");
     if (statements.size() >= MAX_OBJECTS && !statements.count(name)) throw WireError("54000", "Too many prepared statements");
     auto deallocate = DeallocateAll(sql);
-    auto extracted = deallocate || control.kind != FdwKind::NONE ? duckdb::vector<duckdb::unique_ptr<duckdb::SQLStatement>>() : connection.ExtractStatements(sql);
+    std::unique_ptr<ParseAdmission> admission;
+    if (server.protected_mode && !deallocate && control.kind == FdwKind::NONE)
+        admission = std::make_unique<ParseAdmission>(*this);
+    auto extracted = deallocate || control.kind != FdwKind::NONE
+        ? duckdb::vector<duckdb::unique_ptr<duckdb::SQLStatement>>() : Extract(sql, admission.get());
     if (!declaration.name.empty() && (extracted.size()!=1 || extracted[0]->type!=duckdb::StatementType::SELECT_STATEMENT)) throw WireError("42501","SQL cursors support one SELECT only");
     if (extracted.size() > 1) throw WireError("42601", "A prepared statement must contain a single command");
     auto statement = std::make_shared<Statement>(); statement->sql = sql; statement->fdw_cursor_name=declaration.name;
@@ -1671,6 +1826,7 @@ void PgWireServer::Impl::Session::Parse(Reader &in) {
         // The string path initializes the native EXPLAIN ANALYZE profiler.
         statement->prepared = statement->type == duckdb::StatementType::EXPLAIN_STATEMENT
             ? connection.Prepare(sql) : connection.Prepare(std::move(extracted[0]));
+        if (admission) admission->Check();
         if (statement->prepared->HasError()) NativeError(statement->prepared->GetErrorObject());
         auto parameters = statement->prepared->GetParameterCount();
         if (oids.size() > parameters) throw WireError("08P01", "Too many declared parameter types");
@@ -2032,6 +2188,7 @@ void PgWireServer::Impl::Cancel(std::uint32_t id, std::uint32_t secret) {
 void PgWireServer::Impl::Stop() noexcept {
     std::lock_guard<std::mutex> lifecycle(lifecycle_lock);
     if (stopping.exchange(true)) return;
+    parse_wake.notify_all();
     if (listener >= 0) shutdown(listener, SHUT_RDWR);
     std::vector<std::shared_ptr<Session>> active;
     { std::lock_guard<std::mutex> guard(sessions_lock); for (auto &item : sessions) active.push_back(item.second); }
@@ -2042,6 +2199,7 @@ void PgWireServer::Impl::Stop() noexcept {
     for (auto &session : active) { try { session->Shutdown(); } catch (...) {} }
     for (auto &job : jobs) if (job.thread.joinable()) job.thread.join();
     jobs.clear();
+    insert_template.reset();
     if (listener >= 0) { close(listener); listener = -1; }
     bound_port.store(0);
 }

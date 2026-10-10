@@ -220,6 +220,20 @@ def run():
     for name, prefix in TOPK_FIXTURES:
         check("actual TopK/window equivalence for " + name,
               answer(prefix + top.removeprefix("WITH ")) == answer(prefix + WINDOW_TOP3.removeprefix("WITH ")))
+    boundaries = (
+        "WITH products(id,country_code,name,brand) AS (VALUES "
+        "(2147483647,'AR','Higher price','A'),(-2147483648,'AR','Lower price','B'),"
+        "(0,'AR','Middle id','C'),(1,'AR','Other middle id','D')), "
+        "prices(product_id,price) AS (VALUES "
+        "(2147483647,CAST(250.00 AS DECIMAL(18,2))),(-2147483648,249.99),(0,250.00),(1,250.00)), "
+    )
+    check("TopK cents outweigh the full signed product-id range",
+          answer(boundaries + top.removeprefix("WITH ")) ==
+          answer(boundaries + WINDOW_TOP3.removeprefix("WITH ")))
+    ties = boundaries.replace("249.99", "250.00")
+    check("TopK equal prices retain signed product-id ordering",
+          answer(ties + top.removeprefix("WITH ")) ==
+          answer(ties + WINDOW_TOP3.removeprefix("WITH ")))
     histories = (
         "WITH products(id,name,brand,country_code) AS (VALUES (1,'One','A','AR'),(2,'Two','A','AR')), "
         "prices(id,product_id,price,day) AS (VALUES "
@@ -241,6 +255,33 @@ def run():
     movement = answer(histories + complex_presets["brand_movement"].removeprefix("WITH "))
     check("brand movement counts products and compares first and last prices",
           movement["rows"] == [["AR", "A", 2, 10.0, "2"]])
+    movement_reference = (
+        "WITH ranked AS (SELECT product_id,price,"
+        "row_number() OVER(PARTITION BY product_id ORDER BY day ASC NULLS LAST,id ASC) AS first_row,"
+        "row_number() OVER(PARTITION BY product_id ORDER BY day DESC NULLS LAST,id DESC) AS last_row "
+        "FROM prices), samples AS (SELECT product_id,"
+        "max(price) FILTER(WHERE first_row=1) AS first_price,"
+        "max(price) FILTER(WHERE last_row=1) AS last_price FROM ranked GROUP BY product_id) "
+        "SELECT p.country_code,p.brand,count(*) AS products_with_history,"
+        "round(avg(s.last_price-s.first_price),2) AS average_change,"
+        "count_if(s.last_price>s.first_price) AS products_increased "
+        "FROM samples s JOIN products p ON p.id=s.product_id GROUP BY p.country_code,p.brand "
+        "ORDER BY average_change DESC NULLS LAST,p.country_code ASC NULLS LAST,p.brand ASC NULLS LAST"
+    )
+    movement_edges = (
+        "WITH products(id,name,brand,country_code) AS (VALUES (1,'One','A','AR'),(2,'Two','B','ES')), "
+        "prices(id,product_id,price,day) AS (VALUES "
+        "(CAST('-9223372036854775808' AS BIGINT),1,CAST(1.00 AS DECIMAL(18,2)),DATE '-infinity'),"
+        "(9223372036854775807,1,2.00,DATE '-infinity'),(0,1,4.00,DATE 'infinity'),"
+        "(1,1,8.00,NULL),(2,2,3.00,DATE '1970-01-01'),(3,2,NULL,DATE 'infinity')), "
+    )
+    for name, prefix in (("infinite dates and extreme ids", movement_edges),
+                         ("null dates and prices", movement_edges.replace("DATE '-infinity'", "CAST(NULL AS DATE)")
+                          .replace("DATE 'infinity'", "CAST(NULL AS DATE)")
+                          .replace("DATE '1970-01-01'", "CAST(NULL AS DATE)"))):
+        check("brand movement matches ordered history for " + name,
+              answer(prefix + complex_presets["brand_movement"].removeprefix("WITH ")) ==
+              answer(prefix + movement_reference.removeprefix("WITH ")))
     response = client.post("/query", json={"sql": "SELECT i FROM range(10000) t(i)", "limit": 200})
     body = response.get_json()
     check("database-side cap preserves exactly 200 requested rows", response.status_code == 200
