@@ -1,0 +1,169 @@
+name: Qualify native release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Native release filename version
+        required: true
+        default: 0.2.0-rc.5
+        type: string
+permissions:
+  contents: read
+  actions: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  qualify-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DUCKONWIRE_TOKEN: ci-local-test-password
+      PGPASSWORD: ci-local-test-password
+      PGPORT: '19496'
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Qualification dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake gcc libpq-dev libcurl4t64 libssl3t64 python3-venv
+      - name: Download the immutable qualified Linux artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          github-token: ${{ github.token }}
+          repository: misaelzapata/duckonwire
+          run-id: 38002689125
+          artifact-ids: 11650951437
+          path: build/qualified-input
+          merge-multiple: true
+      - name: Verify exact runtime inputs and requalify installed package
+        run: |
+          cmake -DSOURCE_DIR="$PWD" \
+            -DQUALIFIED_ARCHIVE="$PWD/build/qualified-input/duckonwire-0.2.0-rc.5-linux-x86_64-v3.tar.gz" \
+            -DQUALIFIED_MANIFEST="$PWD/build/qualified-input/duckonwire-0.2.0-rc.5-linux-x86_64-v3.manifest.json" \
+            -DOUTPUT_DIR="$PWD/build/packages" -DVERSION="$RELEASE_VERSION" \
+            -P cmake/QualifiedPackage.cmake
+          mkdir -p build/qualified-runtime build/test-results
+          (cd build/packages && sha256sum --check "duckonwire-$RELEASE_VERSION-linux-x86_64-v3.sha256")
+          tar -xzf "build/packages/duckonwire-$RELEASE_VERSION-linux-x86_64-v3.tar.gz" -C build/qualified-runtime --strip-components=1
+          git rev-parse HEAD > build/test-results/source-head.txt
+          cp build/packages/*.manifest.json build/test-results/
+          cp build/qualified-runtime/share/duckonwire/*acceptance.json build/test-results/
+          cp build/qualified-runtime/share/duckonwire/documentation.json build/test-results/
+          cp build/qualified-runtime/share/duckonwire/package-smoke.json build/test-results/
+          sha256sum build/qualified-runtime/bin/duckonwire-server build/qualified-runtime/lib/libduckdb.so > build/test-results/runtime.sha256
+      - name: Compile the current ordinary libpq example
+        run: |
+          mkdir -p build/bin
+          cc -I"$(pg_config --includedir)" build/qualified-runtime/examples/postgres/c/crud.c -L"$(pg_config --libdir)" -lpq -o build/bin/pg-crud
+      - name: Install ordinary drivers
+        run: |
+          npm ci --prefix build/qualified-runtime/examples/postgres/node --ignore-scripts
+          python3 -m venv build/pg-python
+          build/pg-python/bin/pip install -r build/qualified-runtime/examples/postgres/python/requirements.txt
+      - name: Stock drivers and two million rows with complex reads
+        run: |
+          mkdir -p build/pg-fixture
+          build/qualified-runtime/bin/duckonwire-server --root "$PWD/build/pg-fixture" --port 19495 --pg-port "$PGPORT" > build/test-results/server.log 2>&1 &
+          owner_pid=$!
+          trap 'kill -TERM "$owner_pid" 2>/dev/null || true; wait "$owner_pid" || true' EXIT
+          for attempt in {1..100}; do
+            if test -s build/pg-fixture/.runtime/native.json; then break; fi
+            kill -0 "$owner_pid"
+            sleep 0.1
+          done
+          test -s build/pg-fixture/.runtime/native.json
+          build/bin/pg-crud | tee build/test-results/libpq-crud.json
+          build/pg-python/bin/python build/qualified-runtime/examples/postgres/python/crud.py | tee build/test-results/psycopg-crud.json
+          node build/qualified-runtime/examples/postgres/node/crud.mjs | tee build/test-results/node-crud.json
+          node build/qualified-runtime/examples/postgres/node/bulk.mjs | tee build/test-results/node-bulk.json
+          kill -TERM "$owner_pid"
+          wait "$owner_pid"
+          trap - EXIT
+          test ! -e build/pg-fixture/.runtime/native.json
+      - name: TLS and SCRAM with ordinary drivers
+        run: |
+          mkdir -p build/tls-fixture
+          chmod 700 build/tls-fixture
+          openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 1 -subj '/CN=DuckOnWire isolated test CA' -addext 'basicConstraints=critical,CA:TRUE' -keyout build/tls-fixture/ca-key.pem -out build/tls-fixture/ca.pem 2>build/tls-fixture/cert-generation.log
+          openssl req -new -newkey rsa:2048 -nodes -sha256 -subj /CN=localhost -keyout build/tls-fixture/key.pem -out build/tls-fixture/server.csr 2>>build/tls-fixture/cert-generation.log
+          cat > build/tls-fixture/server.ext <<'CERT'
+          basicConstraints=critical,CA:FALSE
+          keyUsage=critical,digitalSignature,keyEncipherment
+          extendedKeyUsage=serverAuth
+          subjectAltName=DNS:localhost,IP:127.0.0.1
+          CERT
+          openssl x509 -req -sha256 -days 1 -in build/tls-fixture/server.csr -CA build/tls-fixture/ca.pem -CAkey build/tls-fixture/ca-key.pem -CAcreateserial -extfile build/tls-fixture/server.ext -out build/tls-fixture/cert.pem 2>>build/tls-fixture/cert-generation.log
+          chmod 600 build/tls-fixture/key.pem build/tls-fixture/ca-key.pem
+          export PGPASSWORD='isolated-ci-credential-with-at-least-thirty-two-characters'
+          verifier=$(printf '%s\n' "$PGPASSWORD" | build/qualified-runtime/bin/duckonwire-password)
+          export PGREADER_USER=reader PGREADER_PASSWORD='isolated-ci-reader-with-at-least-thirty-two-characters'
+          reader_verifier=$(printf '%s\n' "$PGREADER_PASSWORD" | build/qualified-runtime/bin/duckonwire-password)
+          printf 'database\tduckonwire\nuser\tduckonwire\twrite\t%s\nuser\treader\tread\t%s\n' "$verifier" "$reader_verifier" > build/tls-fixture/access.tsv
+          chmod 600 build/tls-fixture/access.tsv
+          build/qualified-runtime/bin/duckonwire-server --root "$PWD/build/tls-fixture" --port 19495 --pg-port "$PGPORT" --access-file access.tsv --tls-cert cert.pem --tls-key key.pem > build/test-results/tls-server.log 2>&1 &
+          owner_pid=$!
+          trap 'kill -TERM "$owner_pid" 2>/dev/null || true; wait "$owner_pid" || true' EXIT
+          for attempt in {1..100}; do
+            if test -s build/tls-fixture/.runtime/native.json; then break; fi
+            kill -0 "$owner_pid"
+            sleep 0.1
+          done
+          test -s build/tls-fixture/.runtime/native.json
+          export PGSSLMODE=verify-full PGSSLROOTCERT="$PWD/build/tls-fixture/ca.pem"
+          build/bin/pg-crud | tee build/test-results/tls-libpq-crud.json
+          build/pg-python/bin/python build/qualified-runtime/examples/postgres/python/crud.py | tee build/test-results/tls-psycopg-crud.json
+          node build/qualified-runtime/examples/postgres/node/crud.mjs | tee build/test-results/tls-node-crud.json
+          # Normal username/password login through the standard pg driver.
+          # The actual reader account must query and must not insert a row.
+          (
+            cd build/qualified-runtime/examples/postgres/node
+            node --input-type=module <<'NODE'
+          import { Client } from 'pg';
+          import { readFileSync } from 'node:fs';
+          const config = { host: process.env.PGHOST ?? '127.0.0.1', port: Number(process.env.PGPORT),
+            user: process.env.PGUSER ?? 'duckonwire', database: process.env.PGDATABASE ?? 'duckonwire',
+            password: process.env.PGPASSWORD, ssl: { ca: readFileSync(process.env.PGSSLROOTCERT), rejectUnauthorized: true } };
+          const writer = new Client(config);
+          const reader = new Client({ ...config, user: process.env.PGREADER_USER, password: process.env.PGREADER_PASSWORD });
+          const label = 'PostgreSQL CI reader denial';
+          try {
+            await writer.connect(); await reader.connect();
+            const existing = await reader.query('SELECT count(*) AS n FROM pg_demo_products');
+            if (BigInt(existing.rows[0].n) < 1n) throw new Error('Reader could not query writer-created rows');
+            let rejected = false;
+            try { await reader.query('INSERT INTO pg_demo_products VALUES($1,$2,$3,$4,$5)', [label, 1, 'Denied row', '1.00', 1]); }
+            catch (error) { if (error.code !== '42501') throw error; rejected = true; }
+            if (!rejected) throw new Error('Reader inserted a row');
+            const state = await writer.query('SELECT count(*) AS n FROM pg_demo_products WHERE client=$1', [label]);
+            if (BigInt(state.rows[0].n) !== 0n) throw new Error('Denied insert changed shared state');
+            console.log(JSON.stringify({ passed: true, driver: 'pg', sslmode: 'verify-full',
+              readerSelectAllowed: true, readerInsertSqlstate: '42501', sharedStateUnchanged: true }));
+          } finally { await Promise.allSettled([reader.end(), writer.end()]); }
+          NODE
+          ) | tee build/test-results/tls-reader-permissions.json
+          # Every price value is constructed by the client and bound over TLS.
+          PG_INGEST_ROWS=100000 node build/qualified-runtime/examples/postgres/node/ingest.mjs | tee build/test-results/tls-values-ingestion.json
+          node build/qualified-runtime/examples/postgres/node/bulk.mjs | tee build/test-results/tls-node-bulk.json
+          kill -TERM "$owner_pid"
+          wait "$owner_pid"
+          trap - EXIT
+          test ! -e build/tls-fixture/.runtime/native.json
+      - name: Verify archives remain unchanged after stock-driver acceptance
+        run: |
+          (cd build/packages && sha256sum --check "duckonwire-$RELEASE_VERSION-linux-x86_64-v3.sha256")
+          test ! -e build/pg-fixture/.runtime/native.json
+          test ! -e build/tls-fixture/.runtime/native.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: qualified-native-linux-x86_64-v3
+          path: |
+            build/packages/*.tar.gz
+            build/packages/*.manifest.json
+            build/packages/*.sha256
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: release-qualification-linux
+          path: build/test-results/
+          if-no-files-found: warn

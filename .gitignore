@@ -3,7 +3,11 @@
 /dist/
 /.cache/
 /data/
-/.runtime/
+.runtime/
+/workspace/
+/access.tsv
+*.key
+*.pem
 /.native/
 __pycache__/
 *.pyc

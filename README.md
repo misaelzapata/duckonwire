@@ -12,7 +12,7 @@ Share one persistent DuckDB database through a C++ server. Connect with a normal
 - **Read while writers work:** independent sessions and snapshot isolation.
 - **Keep your data:** commits persist; disconnecting rolls back pending writes.
 
-[Tutorial](#tutorial) · [Examples](#examples-and-tests) · [Quack-only rc.4 bundles](https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.4) · [MIT](LICENSE)
+[Download rc.5](https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.5) · [Tutorial](#tutorial) · [Examples](#examples-and-tests) · [MIT](LICENSE)
 
 ## Tutorial
 
@@ -30,7 +30,7 @@ Start with the local example. The protected option uses the same ordinary **user
 
 ## Connect
 
-**1. Start the server.** The PostgreSQL server is available from current source; rc.4 downloads provide Quack. [Build instructions](#build-from-source) are below. From the installed server folder, create a password and start the demo:
+**1. Start the server.** Download the [rc.5 bundle](https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.5) for your platform, extract it and open its folder. It includes the server, paired native engine and examples. [Building from source](#build-from-source) is optional. Create a password and start the demo:
 
 ```sh
 openssl rand -hex 32
@@ -140,7 +140,7 @@ To connect as the reader, use `PGUSER=reader` and that account's password. `SELE
 | Connection | Client requirement | Status |
 | --- | --- | --- |
 | PostgreSQL protocol 3.0 | Ordinary PostgreSQL driver; no client DuckDB needed | Current-source tests recorded below |
-| Native Quack `CONNECT` | DuckOnWire DuckDB `v2.1.0-dev0` + Quack protocol **7** | Fresh C/C++ rc.4 qualification on macOS and Linux |
+| Native Quack `CONNECT` | DuckOnWire DuckDB `v2.1.0-dev0` + Quack protocol **7** | C/C++ package acceptance on macOS and Linux |
 | Stock DuckDB Node engine `v1.5.6` + our extension | Different engine/extension ABI | Tested combination rejected the extension |
 | Other DuckDB/Quack versions | Matching remote protocol and native extension ABI | Not qualified by this project |
 
@@ -168,7 +168,7 @@ PostgreSQL compatibility means the connection protocol and supported data types.
 
 | Language | Binding/version | Evidence |
 | --- | --- | --- |
-| C / C++ | DuckDB `v2.1.0-dev0`, fork `848126236a` | Fresh rc.4 macOS/Linux native acceptance |
+| C / C++ | DuckDB `v2.1.0-dev0`, fork `848126236a` | rc.4/rc.5 macOS/Linux native package acceptance |
 | Python | duckdb `2.1.0.dev0+duckonwire.638b09261a`, CPython 3.12 | Historical rc.3 macOS |
 | Node.js | `@duckdb/node-api` `1.5.6-r.1`, rebuilt addon | Historical rc.3 macOS |
 | Java | DuckDB JDBC source `5b624bb72a88`, patched JNI | Historical rc.3 macOS |
@@ -391,8 +391,8 @@ DuckOnWire permite compartir una base DuckDB mediante un servidor C++. Puedes us
 4. **Leer y escribir a la vez:** cada trabajador abre su conexión. `COMMIT` confirma, `ROLLBACK` descarta y cerrar una conexión revierte cambios pendientes. Un lector conserva su vista de los datos hasta terminar su transacción; dos escritores que cambian la misma fila pueden entrar en conflicto.
 5. **Probar carga real:** `ingest.mjs` envía valores desde Node; `bulk.mjs` genera filas dentro de DuckDB. Los resultados muestran velocidad, latencia y comprobaciones de integridad. S3/R2 se usan desde conexiones locales de confianza; el acceso público protegido bloquea esas lecturas externas.
 
-Todas las opciones del servidor están en la [referencia desplegable](#server-options); las instrucciones de compilación quedan al final para quien las necesite. Hay una [guía para agentes](AGENTS.md) y un workflow que ejecuta los ejemplos. El servidor PostgreSQL está en el código actual; los paquetes rc.4 anteriores contienen sólo Quack. Proyecto experimental, MIT; demo público de Argentina y España con precios ficticios.
+Todas las opciones del servidor están en la [referencia desplegable](#server-options); las instrucciones de compilación quedan al final para quien las necesite. Hay una [guía para agentes](AGENTS.md) y un workflow que ejecuta los ejemplos. [Descarga rc.5](https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.5) para usar el servidor PostgreSQL o Quack sin compilarlo. Proyecto experimental, MIT; demo público de Argentina y España con precios ficticios.
 
 ## 中文
 
-DuckOnWire 通过原生 C++ 服务器共享 DuckDB。普通 PostgreSQL 驱动无需更换客户端 DuckDB；Quack 原生连接需要匹配的引擎与协议 7。两种连接共享数据库，各自保持独立事务。兼容表区分实测版本与历史结果；新版 PostgreSQL 接口需从当前源码编译。公开接口使用 TLS 与 SCRAM，并提供数据库读写权限和查询限制。SQL 与存储仍使用 DuckDB。实验项目，MIT 许可。
+DuckOnWire 通过原生 C++ 服务器共享 DuckDB。普通 PostgreSQL 驱动无需更换客户端 DuckDB；Quack 原生连接需要匹配的引擎与协议 7。两种连接共享数据库，各自保持独立事务。兼容表区分实测版本与历史结果。rc.5 下载包包含 PostgreSQL 和 Quack，无需自行编译。公开接口使用 TLS 与 SCRAM，并提供数据库读写权限和查询限制。SQL 与存储仍使用 DuckDB。实验项目，MIT 许可。

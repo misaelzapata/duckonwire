@@ -12,6 +12,7 @@ on:
       - 'examples/demo/**'
       - 'cmake/**'
       - '!cmake/DocumentationTests.cmake'
+      - '!cmake/QualifiedPackage.cmake'
       - 'patches/**'
       - 'CMakeLists.txt'
   pull_request:
@@ -25,6 +26,7 @@ on:
       - 'examples/demo/**'
       - 'cmake/**'
       - '!cmake/DocumentationTests.cmake'
+      - '!cmake/QualifiedPackage.cmake'
       - 'patches/**'
       - 'CMakeLists.txt'
   workflow_dispatch:

@@ -1,6 +1,6 @@
 {
   "project": "DuckOnWire",
-  "version": "0.2.0-rc.5-source",
+  "version": "0.2.0-rc.5",
   "status": "native server qualified on macOS and Linux; ten stock PostgreSQL drivers qualified on macOS and C/Python/Node on Linux; immutable rc.4 remains separate",
   "native_engine_version": "v2.1.0-dev0",
   "quack_protocol": 7,
@@ -278,10 +278,10 @@
   },
   "recorded_results_scope": "The result files and benchmark runs below belong to the qualified 0.2.0-rc.3 upstream-plus-patch build. They do not qualify the new fork-source build.",
   "release": {
-    "version": "0.2.0-rc.4",
-    "status": "publication and acceptance reported by GitHub Actions and release package manifests",
-    "download_page": "https://github.com/misaelzapata/duckonwire/releases",
-    "other_language_bindings": "The other eight official bindings are paired separately; their binaries are not included in the native bundles.",
+    "version": "0.2.0-rc.5",
+    "status": "acceptance and publication are recorded by the attached platform manifests and release.json",
+    "download_page": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.5",
+    "other_language_bindings": "PostgreSQL clients use stock language drivers. Historical native Quack bindings outside C/C++ are paired separately; their binaries are not included.",
     "bundle_types": [
       "source",
       "macOS ARM64 native C/C++",
@@ -291,21 +291,35 @@
     "package_workflow": {
       "script": "cmake/Package.cmake",
       "requirements": "Clean committed tracked Git tree and completed native CMake build with BUILD_TESTING=ON",
-      "command": "cmake -DSOURCE_DIR=\"$PWD\" -DBUILD_DIR=\"$PWD/build\" -DVERSION=0.2.0-rc.4 -DPLATFORM=macos26-arm64 -DOUTPUT_DIR=\"$PWD/build/packages\" -P cmake/Package.cmake",
+      "command": "cmake -DSOURCE_DIR=\"$PWD\" -DBUILD_DIR=\"$PWD/build\" -DVERSION=0.2.0-rc.5 -DPLATFORM=macos26-arm64 -DOUTPUT_DIR=\"$PWD/build/packages\" -P cmake/Package.cmake",
       "linux_platform_label": "linux-x86_64-v3",
       "outputs": [
-        "duckonwire-0.2.0-rc.4-PLATFORM.tar.gz",
-        "duckonwire-0.2.0-rc.4-PLATFORM.manifest.json",
-        "duckonwire-0.2.0-rc.4-PLATFORM.sha256"
+        "duckonwire-0.2.0-rc.5-PLATFORM.tar.gz",
+        "duckonwire-0.2.0-rc.5-PLATFORM.manifest.json",
+        "duckonwire-0.2.0-rc.5-PLATFORM.sha256"
       ],
       "post_install_checks": [
-        "native acceptance",
-        "10000-row embedded and Quack loopback smoke with reopen verification"
+        "native21 and transaction flow14",
+        "PostgreSQL protocol22",
+        "access rules13 and SCRAM12",
+        "10000-row embedded and Quack loopback smoke with reopen verification",
+        "documentation and CLI help",
+        "stock-driver login/CRUD and complex concurrent VALUES ingestion recorded by release CI"
       ],
       "extra_driver_binaries_included": false,
       "native_archive_contents": "Git HEAD project sources/examples plus installed native C/C++ programs, paired engine and headers; Package.cmake does not emit a separate source archive."
     },
-    "source_archives": "Provided by GitHub at the release tag"
+    "source_archives": "Provided by GitHub at the release tag",
+    "endpoints": [
+      "PostgreSQL protocol",
+      "Native Quack CONNECT"
+    ],
+    "normal_postgres_drivers": true,
+    "qualified_runtime_reuse": {
+      "script": "cmake/QualifiedPackage.cmake",
+      "workflow": "https://github.com/misaelzapata/duckonwire/actions/workflows/release.yml",
+      "scope": "A verified unchanged Linux native runtime may be reused only when compiled project sources/pins match its manifest; current tracked source is archived and installed acceptance is repeated"
+    }
   },
   "quack_paired_drivers_required": true,
   "postgres_client_duckdb_required": false,
@@ -340,7 +354,7 @@
       "https://github.com/misaelzapata/duckonwire/actions/workflows/postgres.yml",
       "https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml"
     ],
-    "release_scope": "The existing rc.4 bundles do not include this PostgreSQL endpoint.",
+    "release_scope": "rc.5 native bundles include the PostgreSQL endpoint; rc.4 bundles remain Quack-only",
     "additional_validation": {
       "dummy_products": "English Coffee/Rice labels; ten CRUD examples revalidated on macOS",
       "client_ingestion_rows": 2000000,
@@ -376,7 +390,7 @@
     "scram_checks": 12,
     "bootstrap_checks": 17,
     "concurrent_smoke_rows_per_mode": 10000,
-    "binary_release": "macOS and Linux rc.5 candidate packages qualified; no rc.5 binary release published; immutable rc.4 unchanged",
+    "binary_release": "rc.5 package acceptance and publication are recorded in attached platform manifests and release.json",
     "linux_current_source": {
       "passed": true,
       "source_head": "83ac192fc1e437f6c7ca2efd82db44d456b97381",
@@ -408,5 +422,10 @@
       "own_fixture_removed": true,
       "original_database_accessed": false
     }
+  },
+  "previous_release": {
+    "version": "0.2.0-rc.4",
+    "download_page": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.2.0-rc.4",
+    "scope": "Quack-only native bundles; immutable assets remain unchanged"
   }
 }
