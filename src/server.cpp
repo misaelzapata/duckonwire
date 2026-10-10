@@ -83,7 +83,9 @@ struct Options {
 	int pg_port = 9496;
 	int max_queries = 8;
 	int query_timeout_ms = 30000;
+	int threads = 2;
 	bool init_demo = false;
+	std::int64_t demo_prices = 0;
 };
 
 Options Parse(int argc, char **argv) {
@@ -92,11 +94,13 @@ Options Parse(int argc, char **argv) {
 		std::string name(argv[i]);
 		if (name == "--init-demo") { options.init_demo = true; continue; }
 		if (name == "--help") {
-			std::cout << "duckonwire-server [--root DIRECTORY] [--database PATH] [--port 9495] [--pg-port 9496] [--state PATH] [--init-demo]\n"
+			std::cout << "duckonwire-server [--root DIRECTORY] [--database PATH] [--port 9495] [--pg-port 9496] [--state PATH] [--init-demo] [--demo-prices ROWS] [--threads 2]\n"
 			          << "Quack uses --port; PostgreSQL drivers use --pg-port (0 selects a free port).\n"
 			          << "DUCKONWIRE_TOKEN sets local endpoint passwords; otherwise one is generated.\n"
 			          << "Public: --pg-host ADDRESS --access-file PATH --tls-cert PATH --tls-key PATH\n"
 			          << "PostgreSQL limits: --max-queries 8 --query-timeout-ms 30000\n"
+			          << "Engine: --threads 2 (1..64 worker threads).\n"
+			          << "Demo: --init-demo imports the catalog; --demo-prices 1000000 adds reproducible 30-day synthetic history instead of CSV prices (46462..10000000 rows).\n"
 			          << "Access rules select one database name and users with read/write permissions; TLS and SCRAM required.\n";
 			std::exit(0);
 		}
@@ -109,6 +113,18 @@ Options Parse(int argc, char **argv) {
 		else if (name == "--tls-cert") options.tls_cert = value;
 		else if (name == "--tls-key") options.tls_key = value;
 		else if (name == "--pg-host") options.pg_host = value;
+		else if (name == "--threads") {
+			size_t consumed = 0;
+			options.threads = std::stoi(value, &consumed);
+			if (consumed != value.size() || options.threads < 1 || options.threads > 64)
+				throw std::runtime_error("Threads must be between 1 and 64");
+		}
+		else if (name == "--demo-prices") {
+			size_t consumed = 0;
+			options.demo_prices = std::stoll(value, &consumed);
+			if (consumed != value.size() || options.demo_prices < 46462 || options.demo_prices > 10000000)
+				throw std::runtime_error("Demo price rows must be between 46462 and 10000000");
+		}
 		else if (name == "--max-queries" || name == "--query-timeout-ms") {
 			size_t consumed = 0;
 			const int number = std::stoi(value, &consumed);
@@ -132,6 +148,8 @@ Options Parse(int argc, char **argv) {
 			}
 		} else throw std::runtime_error("Unknown option: " + name);
 	}
+	if (options.demo_prices != 0 && !options.init_demo)
+		throw std::runtime_error("--demo-prices requires --init-demo");
 	if (options.root.empty()) options.root = fs::current_path();
 	options.root = fs::canonical(options.root);
 	if (!fs::is_directory(options.root)) throw std::runtime_error("--root must be a directory");
@@ -227,7 +245,7 @@ void Serve(const Options &options, const std::string &token) {
 	{
 		duckdb::DBConfig config;
 		config.SetOptionByName(duckdb::Identifier("temp_directory"), duckdb::Value((options.database.parent_path() / "native-spill").string()));
-		config.SetOptionByName(duckdb::Identifier("threads"), duckdb::Value::BIGINT(2));
+		config.SetOptionByName(duckdb::Identifier("threads"), duckdb::Value::BIGINT(options.threads));
 		const bool protected_mode = !options.access_file.empty();
 		duckonwire::AccessConfig rules;
 		if (protected_mode) {
@@ -243,7 +261,7 @@ void Serve(const Options &options, const std::string &token) {
 		duckdb::Connection owner(database);
 		if (options.init_demo) {
 			if (protected_mode) throw std::runtime_error("Initialize the demo locally before enabling access rules");
-			duckonwire::demo::Initialize(owner, options.root);
+			duckonwire::demo::Initialize(owner, options.root, options.demo_prices);
 		}
 		std::unique_ptr<duckonwire::PgWireServer> pg_owner;
 		if (protected_mode) {

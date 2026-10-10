@@ -1,7 +1,8 @@
 // Ordinary pg clients send every id/product_id/amount value over the wire.
 // Four writers commit 1,000-row prepared VALUES batches; four readers run concurrently.
 import { Client } from 'pg';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 
 const sslMode = process.env.PGSSLMODE ?? 'disable';
@@ -41,14 +42,39 @@ try {
     'WITH newest AS (SELECT product_id,amount,ROW_NUMBER() OVER(PARTITION BY product_id ORDER BY id DESC) r FROM pg_client_ingest_prices WHERE product_id<256) SELECT count(*) AS n,sum(amount) AS total FROM newest WHERE r=1',
     'SELECT count(*),sum(id),sum(amount) FROM pg_client_ingest_prices',
   ];
+  const demoQueries = process.env.PG_DEMO_READS === '1'
+    ? readdirSync(new URL('../queries/', import.meta.url)).filter(name => name.endsWith('.sql')).sort().map(name => {
+      const source = readFileSync(new URL('../queries/' + name, import.meta.url), 'utf8').trim().replace(/;$/, '');
+      return { name, text: `SELECT * FROM (${source}) AS demo_result LIMIT $1 OFFSET $2` };
+    }) : [];
+  const fingerprint = response => createHash('sha256').update(JSON.stringify({
+    fields: response.fields.map(field => [field.name, field.dataTypeID]), rows: response.rows,
+  })).digest('hex');
+  // These public demo tables remain unchanged while the owned ingestion tables grow.
+  const demoChecksums = new Map();
+  for (const query of demoQueries) {
+    const response = await readers[0].query({ text: query.text, values: [101, 0], rowMode: 'array' });
+    demoChecksums.set(query.name, fingerprint(response));
+  }
+  const perQuerySamples = new Map();
+  const perQueryOverlap = new Map();
   const started = performance.now();
   const readTasks = readers.map(async (client, index) => {
     let query = index, overlap = 0, count = 0;
     do {
-      const selected = query++ % workload.length;
+      const selected = query++ % (workload.length + demoQueries.length);
       const start = performance.now();
-      await client.query(workload[selected], selected === 0 ? [Math.floor(rows / 2)] : undefined);
-      readSamples.push(performance.now() - start); count++;
+      const demo = demoQueries[selected - workload.length];
+      const response = demo
+        ? await client.query({ text: demo.text, values: [101, 0], rowMode: 'array' })
+        : await client.query(workload[selected], selected === 0 ? [Math.floor(rows / 2)] : undefined);
+      const elapsed = performance.now() - start;
+      if (demo && fingerprint(response) !== demoChecksums.get(demo.name)) throw new Error('Demo results changed during concurrent ingestion');
+      const queryName = demo?.name ?? ['lookup', 'grouped-join', 'latest-window', 'integrity-scan'][selected];
+      if (!perQuerySamples.has(queryName)) perQuerySamples.set(queryName, []);
+      perQuerySamples.get(queryName).push(elapsed);
+      if (pendingWriters > 0) perQueryOverlap.set(queryName, (perQueryOverlap.get(queryName) ?? 0) + 1);
+      readSamples.push(elapsed); count++;
       if (pendingWriters > 0) overlap++;
     } while (pendingWriters > 0);
     return { queries: count, overlappingQueries: overlap };
@@ -91,11 +117,21 @@ try {
   if (!read.every(reader => reader.overlappingQueries > 0)) throw new Error('A reader did not complete during writes');
   readSamples.sort((a, b) => a - b);
   const rank = fraction => readSamples[Math.max(0, Math.ceil(readSamples.length * fraction) - 1)];
+  const queryLatency = Array.from(perQuerySamples, ([query, values]) => {
+    values.sort((a, b) => a - b);
+    return { query, samples: values.length, overlappingWrites: perQueryOverlap.get(query) ?? 0,
+      meanMs: values.reduce((a, b) => a + b) / values.length,
+      p50Ms: values[Math.max(0, Math.ceil(values.length * .5) - 1)],
+      p95Ms: values[Math.max(0, Math.ceil(values.length * .95) - 1)] };
+  });
   console.log(JSON.stringify({ passed: true, driver: 'pg', rows, writers: 4, readers: 4,
     commits: written.reduce((sum, writer) => sum + writer.commits, 0), batchRows: batch, boundParametersPerBatch: batch * 3, boundParametersSent: rows * 3, writeSeconds, separateReadOnlyRole: Boolean(process.env.PGREADER_USER),
     rowsPerSecond: rows / writeSeconds, readerProgress: read, integrity, complexResultsVerified: true, engine, engineConfig,
     readLatency: { samples: readSamples.length, meanMs: readSamples.reduce((a, b) => a + b) / readSamples.length, p50Ms: rank(.5), p95Ms: rank(.95) },
-    scope: 'One stock Node process and eight independent network connections. Timing includes client numeric row construction, bound VALUES transport and confirmed commits; authentication, table creation and final integrity checks excluded. In-session integrity; no server restart.' }));
+    queryLatency, demoReferenceQueries: demoQueries.length,
+    demoQueriesVerified: demoQueries.filter(query => perQuerySamples.has(query.name)).length,
+    demoQueriesOverlappingWrites: demoQueries.filter(query => (perQueryOverlap.get(query.name) ?? 0) > 0).length,
+    scope: 'One stock Node process and eight independent network connections. Timing includes client numeric row construction, bound VALUES transport and confirmed commits; authentication, table creation, demo reference reads and final integrity checks excluded. Optional demo reads query unchanged public tables in the same database while separate ingestion tables grow. In-session integrity; no server restart.' }));
 } finally {
   await Promise.allSettled([...writers.slice(1), ...readers].map(client => client.end()));
   try {

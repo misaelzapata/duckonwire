@@ -199,6 +199,10 @@ def run():
     for preset in PRESETS:
         response = client.post("/query", json={"sql": preset["sql"], "limit": 5})
         body = response.get_json()
+        if preset["id"] in ("history_lag", "seven_day_average", "brand_movement"):
+            check("actual catalog preset " + preset["id"], response.status_code == 200
+                  and 1 <= body["row_count"] <= 5 and body["read_only"])
+            continue
         check("actual catalog preset " + preset["id"], response.status_code == 200
               and body["row_count"] == (2 if preset["id"] == "countries" else 5)
               and body["truncated"] == (preset["id"] != "countries") and body["read_only"])
@@ -216,6 +220,27 @@ def run():
     for name, prefix in TOPK_FIXTURES:
         check("actual TopK/window equivalence for " + name,
               answer(prefix + top.removeprefix("WITH ")) == answer(prefix + WINDOW_TOP3.removeprefix("WITH ")))
+    histories = (
+        "WITH products(id,name,brand,country_code) AS (VALUES (1,'One','A','AR'),(2,'Two','A','AR')), "
+        "prices(id,product_id,price,day) AS (VALUES "
+        "(1,1,CAST(10.00 AS DECIMAL(18,2)),DATE '2026-01-01'),"
+        "(2,1,14.00,DATE '2026-01-03'),(3,1,20.00,DATE '2026-01-10'),"
+        "(4,2,40.00,DATE '2026-01-01'),(5,2,50.00,DATE '2026-01-03')), "
+    )
+    complex_presets = {preset["id"]: preset["sql"] for preset in PRESETS}
+    history = answer(histories + complex_presets["history_lag"].removeprefix("WITH "))
+    check("history compares each sample with its actual previous observation",
+          history["rows"] == [[1, "One", "A", "2026-01-01", "10.00", None, None],
+                              [2, "One", "A", "2026-01-03", "14.00", "10.00", "4.00"],
+                              [3, "One", "A", "2026-01-10", "20.00", "14.00", "6.00"]])
+    trend = answer(histories + complex_presets["seven_day_average"].removeprefix("WITH "))
+    check("seven-day average weights observations and excludes calendar gaps",
+          trend["rows"] == [["AR", "2026-01-01", 2, 25.0, 25.0],
+                            ["AR", "2026-01-03", 2, 32.0, 28.5],
+                            ["AR", "2026-01-10", 1, 20.0, 20.0]])
+    movement = answer(histories + complex_presets["brand_movement"].removeprefix("WITH "))
+    check("brand movement counts products and compares first and last prices",
+          movement["rows"] == [["AR", "A", 2, 10.0, "2"]])
     response = client.post("/query", json={"sql": "SELECT i FROM range(10000) t(i)", "limit": 200})
     body = response.get_json()
     check("database-side cap preserves exactly 200 requested rows", response.status_code == 200
@@ -224,6 +249,28 @@ def run():
     for limit in (0, 201, True, "200"):
         check("invalid row limit rejected " + str(limit),
               client.post("/query", json={"sql": "SELECT 42", "limit": limit}).status_code == 400)
+    paginated = "SELECT i FROM range(23) t(i) ORDER BY i"
+    page_rows = []
+    for offset, size, next_offset in ((0, 10, 10), (10, 10, 20), (20, 3, None)):
+        response = client.post("/query", json={"sql": paginated, "limit": 10, "offset": offset})
+        body = response.get_json()
+        check("bound pagination returns the exact ordered page at " + str(offset),
+              response.status_code == 200 and body["rows"] == [[i] for i in range(offset, offset + size)]
+              and body["row_count"] == size and body["limit"] == 10 and body["offset"] == offset
+              and body["next_offset"] == next_offset and body["truncated"] == (next_offset is not None))
+        page_rows.extend(body["rows"])
+    check("successive pages contain all rows without duplicates or gaps", page_rows == [[i] for i in range(23)])
+    response = client.post("/query", json={"sql": paginated, "limit": 10, "offset": 23})
+    check("an exhausted page is empty and has no next page", response.status_code == 200
+          and response.get_json()["rows"] == [] and response.get_json()["next_offset"] is None)
+    for offset in (-1, 1_000_001, True, "10", 1.5, None):
+        check("invalid pagination offset rejected " + str(offset),
+              client.post("/query", json={"sql": "SELECT 42", "offset": offset}).status_code == 400)
+    response = client.post("/query", json={"sql": "SELECT i FROM range(1000210) t(i) ORDER BY i",
+                                         "limit": 200, "offset": 1_000_000})
+    check("the pagination boundary retains the row cap and ends navigation", response.status_code == 200
+          and response.get_json()["row_count"] == 200 and response.get_json()["truncated"]
+          and response.get_json()["next_offset"] is None)
     response = client.post("/query", json={"sql": "SELECT 19.99::DECIMAL(18,2), "
                           "DATE '2026-10-09', true, 42::BIGINT, from_hex('0001ff'), "
                           "'<script>alert(1)</script>'"})
@@ -257,6 +304,14 @@ def run():
     try:
         app.config["MAX_RESULT_BYTES"] = 100
         check("serialized result bytes are bounded", client.post("/query", json={"sql": "SELECT repeat('x',200)"}).status_code == 400)
+        app.config["MAX_RESULT_BYTES"] = 600
+        check("Unicode escaping cannot exceed the actual response byte cap",
+              client.post("/query", json={"sql": "SELECT repeat('é',100) AS value"}).status_code == 400)
+        app.config["MAX_RESULT_BYTES"] = 1500
+        unicode_response = client.post("/query", json={"sql": "SELECT repeat('é',100) AS value"})
+        check("bounded Unicode results retain their values after actual JSON encoding",
+              unicode_response.status_code == 200 and len(unicode_response.data) <= 1500
+              and unicode_response.get_json()["rows"] == [["é" * 100]])
     finally:
         app.config["MAX_RESULT_BYTES"] = original_bytes
     # Exercise the actual reset callback with an official one-slot pool: it must never

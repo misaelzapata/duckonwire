@@ -117,7 +117,7 @@ inline int AvailablePort() {
 class NativeServer {
 public:
 	NativeServer(const fs::path &root, const fs::path &database, const fs::path &executable, int port = 0,
-	             bool init_demo = false)
+	             bool init_demo = false, const std::vector<std::string> &extra_arguments = {})
 	    : root_(fs::canonical(root)), database_(fs::weakly_canonical(database)),
 	      executable_(fs::canonical(executable)) {
 		Require(access(executable_.c_str(), X_OK) == 0, "Native server executable is unavailable");
@@ -134,6 +134,7 @@ public:
 		std::vector<std::string> words {executable_.string(), "--root", root_.string(),
 		    "--database", database_.string(), "--state", state_.string(), "--port", std::to_string(selected_port), "--pg-port", "0"};
 		if (init_demo) words.push_back("--init-demo");
+		words.insert(words.end(), extra_arguments.begin(), extra_arguments.end());
 		std::vector<char *> arguments;
 		for (auto &word : words) arguments.push_back(word.data());
 		arguments.push_back(nullptr);

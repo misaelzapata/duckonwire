@@ -5,6 +5,7 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <sys/wait.h>
@@ -221,10 +222,96 @@ int main(int argc, char **argv) {
 			TempRoot demo; fs::create_directories(demo.path() / "examples/demo");
 			for (const auto *name : {"products.csv", "prices.csv"}) fs::copy_file(catalog / name, demo.path() / "examples/demo" / name);
 			const auto db = demo.path() / "demo.duckdb";
-			{ NativeServer initialized(demo.path(), db, executable, 0, true); Connection con(client); Connect(con, initialized.endpoint(), initialized.token()); Require(Scalar(con, "SELECT count(*) FROM products") == 46462 && Scalar(con, "SELECT count(*) FROM prices") == 46462, "Native demo counts"); Require(Scalar(con, "SELECT count(DISTINCT brand) FROM products") == 178, "Demo brands"); }
+			{ NativeServer initialized(demo.path(), db, executable, 0, true); Connection con(client); Connect(con, initialized.endpoint(), initialized.token());
+			  Require(Scalar(con, "SELECT count(*) FROM products") == 46462 && Scalar(con, "SELECT count(*) FROM prices") == 46462, "Native demo counts");
+			  Require(Scalar(con, "SELECT count(DISTINCT brand) FROM products") == 178, "Demo brands");
+			  Require(Scalar(con, "SELECT count(*) FROM products WHERE category='' OR size='' OR unit=''") == 32909 &&
+			          Scalar(con, "SELECT count(*) FROM products WHERE category IS NULL OR size IS NULL OR unit IS NULL") == 0,
+			          "CSV empty fields were not preserved as strings");
+			  Require(Scalar(con, "SELECT current_setting('threads')") == 2, "Default engine threads changed"); }
 			bool rejected = false; try { NativeServer duplicate(demo.path(), db, executable, 0, true); } catch (const std::exception &error) { rejected = std::string(error.what()).find("requires an empty database") != std::string::npos; }
 			Require(rejected, "Demo initialization overwrote existing database");
-			NativeServer reopened(demo.path(), db, executable); Connection con(client); Connect(con, reopened.endpoint(), reopened.token()); Require(Scalar(con, "SELECT count(*) FROM products") == 46462, "Existing demo changed");
+			{ NativeServer reopened(demo.path(), db, executable); Connection con(client); Connect(con, reopened.endpoint(), reopened.token()); Require(Scalar(con, "SELECT count(*) FROM products") == 46462, "Existing demo changed"); }
+
+			// History uses native bound generation, not a million-row CSV. Compute independent exact checksums.
+			fs::remove(demo.path() / "examples/demo/prices.csv");
+			constexpr int64_t rows = 1000000;
+			int64_t product_sum = 0, cents_sum = 0, days_sum = 0;
+			for (int64_t id = 1; id <= rows; ++id) {
+				product_sum += 1 + (id - 1) % 46462;
+				cents_sum += 50 + (id * 48271 + 12345) % 24951;
+				days_sum += ((id * 1103515245 + 12345) % 2147483648) % 30;
+			}
+			auto verify_history = [&](Connection &con) {
+				Require(Scalar(con, "SELECT count(*) FROM prices") == rows &&
+				        Scalar(con, "SELECT count(DISTINCT id) FROM prices") == rows &&
+				        Scalar(con, "SELECT min(id) FROM prices") == 1 && Scalar(con, "SELECT max(id) FROM prices") == rows &&
+				        Scalar(con, "SELECT sum(id)::BIGINT FROM prices") == rows * (rows + 1) / 2 &&
+				        Scalar(con, "SELECT sum(product_id)::BIGINT FROM prices") == product_sum &&
+				        Scalar(con, "SELECT sum(price*100)::BIGINT FROM prices") == cents_sum &&
+				        Scalar(con, "SELECT sum(day-DATE '2026-01-01')::BIGINT FROM prices") == days_sum,
+				        "Synthetic history count, domain or checksum mismatch");
+				Require(Scalar(con, "SELECT count(DISTINCT product_id) FROM prices") == 46462 &&
+				        Scalar(con, "SELECT count(DISTINCT day) FROM prices") == 30 &&
+				        Scalar(con, "SELECT count(*) FROM prices WHERE price NOT BETWEEN 0.50 AND 250.00 OR day NOT BETWEEN DATE '2026-01-01' AND DATE '2026-01-30'") == 0 &&
+				        Scalar(con, "SELECT count(*) FROM prices r LEFT JOIN products p ON p.id=r.product_id WHERE p.id IS NULL") == 0,
+				        "Synthetic history countries, days, prices or references differ");
+			};
+			const auto history_db = demo.path() / "history.duckdb";
+			{ NativeServer initialized(demo.path(), history_db, executable, 0, true, {"--demo-prices", "1000000", "--threads", "1"});
+			  Connection con(client); Connect(con, initialized.endpoint(), initialized.token()); verify_history(con);
+			  Require(Scalar(con, "SELECT current_setting('threads')") == 1, "Configured engine threads ignored");
+			  for (const auto *invalid : {
+			      "INSERT INTO products VALUES(46463,'','Brand','','','','AR')",
+			      "INSERT INTO products VALUES(46463,'Name','','','','','AR')",
+			      "INSERT INTO products VALUES(46463,NULL,'Brand','','','','AR')",
+			      "INSERT INTO products VALUES(46463,'Name','Brand',NULL,'','','AR')",
+			      "INSERT INTO products VALUES(46463,'Name','Brand','',NULL,'','AR')",
+			      "INSERT INTO products VALUES(46463,'Name','Brand','','',NULL,'AR')",
+			      "INSERT INTO products VALUES(46463,'Name','Brand','','','','ZZ')",
+			      "INSERT INTO prices VALUES(1000001,0,1.00,DATE '2026-01-01')",
+			      "INSERT INTO prices VALUES(1000001,NULL,1.00,DATE '2026-01-01')",
+			      "INSERT INTO prices VALUES(1000001,1,NULL,DATE '2026-01-01')",
+			      "INSERT INTO prices VALUES(1000001,1,0.49,DATE '2026-01-01')",
+			      "INSERT INTO prices VALUES(1000001,1,250.01,DATE '2026-01-01')",
+			      "INSERT INTO prices VALUES(1000001,1,1.00,NULL)",
+			      "INSERT INTO prices VALUES(1,1,1.00,DATE '2026-01-01')",
+			      "DELETE FROM products WHERE id=1"}) {
+				con.BeginTransaction(); auto result = con.Query(invalid);
+				const bool denied = result->HasError() && result->GetErrorObject().Type() == ExceptionType::CONSTRAINT;
+				con.Rollback(); Require(denied, "Initialized demo did not retain a schema constraint");
+			  }
+			  con.BeginTransaction(); SQL(con, "INSERT INTO prices VALUES(1000001,1,1.00,DATE '2026-01-01'),(1000002,1,2.00,DATE '2026-01-02')");
+			  Require(Scalar(con, "SELECT count(*) FROM prices WHERE id>1000000") == 2, "Multiple prices for one product rejected");
+			  con.Rollback(); verify_history(con); }
+			{ NativeServer reopened(demo.path(), history_db, executable, 0, false, {"--threads", "64"});
+			  Connection con(client); Connect(con, reopened.endpoint(), reopened.token()); verify_history(con);
+			  Require(Scalar(con, "SELECT current_setting('threads')") == 64, "Maximum engine threads rejected"); }
+
+			int invalid_number = 0;
+			for (const auto &arguments : std::vector<std::vector<std::string>>{
+			    {"--demo-prices", "1000000"}, {"--init-demo", "--demo-prices", "46461"},
+			    {"--init-demo", "--demo-prices", "10000001"}, {"--init-demo", "--demo-prices", "1000000junk"},
+			    {"--threads", "0"}, {"--threads", "65"}, {"--threads", "2junk"}}) {
+				const auto invalid_db = demo.path() / ("invalid-" + std::to_string(++invalid_number) + ".duckdb");
+				bool denied = false; try { NativeServer bad(demo.path(), invalid_db, executable, 0, false, arguments); }
+				catch (const std::exception &) { denied = true; }
+				Require(denied && !fs::exists(invalid_db), "Invalid demo/thread arguments created a database");
+			}
+
+			// A bad CSV must roll back both table creation and data loading.
+			TempRoot bad; fs::create_directories(bad.path() / "examples/demo");
+			std::ifstream csv(catalog / "products.csv"); std::string contents((std::istreambuf_iterator<char>(csv)), {});
+			const auto position = contents.find(",AR\n"); Require(position != std::string::npos, "Country fixture unavailable");
+			contents.replace(position, 4, ",ZZ\n");
+			{ std::ofstream output(bad.path() / "examples/demo/products.csv"); output << contents; }
+			const auto bad_db = bad.path() / "rollback.duckdb";
+			bool failed = false; try { NativeServer invalid(bad.path(), bad_db, executable, 0, true, {"--demo-prices", "1000000"}); }
+			catch (const std::exception &) { failed = true; }
+			Require(failed, "Invalid CSV initialized successfully");
+			DuckDB rolled_back(bad_db.c_str()); Connection local(rolled_back);
+			Require(Scalar(local, "SELECT count(*) FROM duckdb_tables() WHERE NOT internal AND NOT temporary") == 0,
+			        "Failed initialization committed partial schema or data");
 		});
 		server->stop(); Require(!server->forced_stop(), "Final server shutdown timed out");
 		Require(passed.size() == 21, "Not all required native checks ran");

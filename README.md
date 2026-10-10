@@ -259,6 +259,8 @@ node examples/postgres/node/ingest.mjs
 
 The second command sends two million rows. Use a test database and run one copy at a time. For protected access, set `PGREADER_USER` and `PGREADER_PASSWORD`; otherwise readers use the writer's login. The JSON reports throughput, read latency, commits and each reader's progress.
 
+With the public demo loaded, add `PG_DEMO_READS=1` to also run its ten queries while inserts arrive. These reads check the unchanged demo tables; inserts go into separate test tables in the same database. The output reports each query's latency and verifies its results.
+
 One local Apple M1 Pro run sent **two million client rows at 313,781 rows/s**, with reads averaging **5.24 ms**. Timing included row creation, transport and 2,000 confirmed commits; login, setup and final checks were excluded. Counts, checksums and complex queries passed in-session. This small numeric loopback workload is not a WAN estimate. [Full results](tests/results/postgres-compatibility.json).
 
 `bulk.mjs` and the native benchmark generate rows inside DuckDB with `INSERT SELECT range`. Those results measure database-side generation and writes, not client-data transport. See their distinct conditions in the [result index](tests/results/index.json).
@@ -267,11 +269,50 @@ One local Apple M1 Pro run sent **two million client rows at 313,781 rows/s**, w
 
 The sample contains **46,462 manufacturer-brand products** from Argentina and Spain, with **synthetic prices**. It has no stores, private-label brands or private identifiers. [CSV](examples/demo/products.csv) and [schema](examples/demo/schema.sql) are included for `--init-demo`. Benchmarks use separate tables. Own code is MIT; see [third-party notices](THIRD_PARTY_NOTICES.txt).
 
+Current source builds can also create **one million price observations over 30 days**. Start with an empty demo database:
+
+```sh
+./build/bin/duckonwire-server --init-demo --demo-prices 1000000
+```
+
+The data is repeatable and generated inside DuckDB; there is no large CSV to download. Try [price history](examples/postgres/queries/product-history.sql), [seven-day trends](examples/postgres/queries/seven-day-average.sql) or [changes by brand](examples/postgres/queries/brand-movement.sql). The default sample still has one price per product.
+
+<details>
+<summary>Paging and measuring queries</summary>
+
+Use a stable order when requesting pages:
+
+```sql
+SELECT id, product_id, price, day FROM prices
+ORDER BY id LIMIT 100 OFFSET 200;
+```
+
+For deeper pages, continue after the last ID instead of skipping earlier rows:
+
+```sql
+SELECT id, product_id, price, day FROM prices
+WHERE id > 300 ORDER BY id LIMIT 100;
+```
+
+Each web request sees a fresh snapshot. For an unchanged view across several pages, use one client connection and keep its transaction open while reading them.
+
+With the same `PG*` connection settings as other examples, measure all ten [demo queries](examples/postgres/queries):
+
+```sh
+PG_LATENCY_SAMPLES=30 node examples/postgres/node/latency.mjs
+```
+
+The JSON records averages, median, 95th percentile, row checksums and database settings. It measures complete client query round trips after warmup, including returned rows. Run it without other builds or writes; the default pause between queries avoids a continuous load. Set `PG_LATENCY_OFFSET` to compare pages, or `PG_LATENCY_PAUSE_MS=0` to measure sustained traffic. `--threads` controls engine parallelism; its default is two. Measure on your hardware before changing it.
+
+</details>
+
 ## Flask playground
 
-Try the [live playground](https://dow.ofertasya.app/), or run the included [Flask example](examples/postgres/flask). Browse tables, inspect columns, preview rows and run your own SQL. Example queries cover products, brands, countries and price comparisons. Its source is included under MIT.
+Try the [live playground](https://dow.ofertasya.app/), or run the included [Flask example](examples/postgres/flask). Browse tables, inspect columns, preview rows and run your own SQL. Choose a page size and use Previous/Next to explore results. Ten example queries cover the catalog, price history, market trends and brands. Its source is included under MIT.
 
 Run it with a protected **read-only account**. Connection settings stay on the backend; results are capped at 200 rows and long queries are cancelled. Connections are reused for quicker queries, with a fresh transaction for every request. The reader rule prevents writes.
+
+The displayed time measures work on the web server. Your Internet connection adds travel time; it is not included in that number.
 
 <details>
 <summary>Run the web example</summary>
@@ -313,6 +354,8 @@ Protected accounts cannot read external objects or create cloud secrets; import 
 | `--database PATH` | Open or create the database inside the root. | `data/demo.duckdb` |
 | `--state PATH` | Store the private descriptor, including the local token. Must differ from the database path. | `.runtime/native.json` |
 | `--init-demo` | Import the public sample into an empty database. Omit on restart. | Off |
+| `--demo-prices NUMBER` | Generate this many synthetic price observations; requires `--init-demo`. | CSV sample; 46462–10000000 |
+| `--threads NUMBER` | DuckDB worker threads. | `2`; 1–64 |
 | `--port NUMBER` | Quack loopback port. | `9495`; 1–65535 |
 | `--pg-port NUMBER` | PostgreSQL port; `0` selects a free port recorded in the descriptor. | `9496`; 0–65535 |
 | `--pg-host ADDRESS` | PostgreSQL listen address. Non-loopback requires protected access. | `127.0.0.1` |

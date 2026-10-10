@@ -2,7 +2,6 @@
 import atexit
 import datetime
 import decimal
-import json
 import math
 import os
 import threading
@@ -16,35 +15,70 @@ from psycopg_pool import ConnectionPool, PoolClosed, PoolTimeout, TooManyRequest
 
 app = Flask(__name__)
 app.config.update(MAX_CONTENT_LENGTH=16_384, QUERY_TIMEOUT_SECONDS=28,
-                  MAX_RESULT_BYTES=2_000_000, MAX_RESULT_COLUMNS=128)
+                  MAX_RESULT_BYTES=2_000_000, MAX_RESULT_COLUMNS=128,
+                  MAX_RESULT_OFFSET=1_000_000)
 
 PRESETS = [
-    {"id": "products", "name": "Browse products", "hint": "Public brands from Argentina and Spain",
-     "sql": "SELECT id, name, brand, country_code, size, unit\nFROM products\nORDER BY id"},
-    {"id": "prices", "name": "See sample prices", "hint": "Generated prices, not retail offers",
-     "sql": "SELECT p.name, p.brand, p.country_code, pr.price, pr.day\nFROM products p\nJOIN prices pr ON pr.product_id = p.id\nORDER BY p.id"},
-    {"id": "brands", "name": "Compare brands", "hint": "A grouped join over the catalog",
-     "sql": "SELECT p.country_code, p.brand, count(*) AS products,\n       round(avg(pr.price), 2) AS average_price\nFROM products p JOIN prices pr ON pr.product_id = p.id\nGROUP BY p.country_code, p.brand\nORDER BY products DESC, p.brand"},
-    {"id": "window", "name": "Market comparison", "hint": "Window functions over sample prices",
-     "sql": "SELECT p.name, p.brand, p.country_code, pr.price,\n       round(avg(pr.price) OVER (PARTITION BY p.country_code), 2) AS market_average\nFROM products p JOIN prices pr ON pr.product_id = p.id\nORDER BY p.id"},
-    {"id": "latest", "name": "Latest prices", "hint": "A join with the newest sample price per product",
-     "sql": "WITH latest AS (\n  SELECT product_id, price, day,\n         row_number() OVER (PARTITION BY product_id ORDER BY day DESC, id DESC) AS position\n  FROM prices WHERE product_id <= 500\n)\nSELECT p.id, p.name, p.brand, r.price, r.day\nFROM products p JOIN latest r ON r.product_id = p.id AND r.position = 1\nWHERE p.id <= 500 ORDER BY p.id"},
-    {"id": "countries", "name": "Products by country", "hint": "Count the catalog's two markets",
-     "sql": "SELECT country_code, count(*) AS products\nFROM products GROUP BY country_code ORDER BY country_code"},
-    {"id": "top", "name": "Top prices by country", "hint": "Native TopK over generated prices",
-     "sql": "WITH grouped AS (\n"
-            "  SELECT p.country_code,\n"
-            "    arg_max(struct_pack(name := p.name, brand := p.brand, price := pr.price),\n"
-            "      struct_pack(has_price := pr.price IS NOT NULL, price := pr.price,\n"
-            "                  reverse_id := -CAST(p.id AS BIGINT)), 3) AS chosen\n"
-            "  FROM products p JOIN prices pr ON pr.product_id = p.id\n"
-            "  GROUP BY p.country_code\n"
-            "), expanded AS (\n"
-            "  SELECT country_code, unnest(chosen) AS item FROM grouped\n"
-            ")\n"
-            "SELECT country_code, item.name AS name, item.brand AS brand, item.price AS price\n"
-            "FROM expanded\n"
-            "ORDER BY country_code ASC NULLS LAST, price DESC NULLS LAST, name ASC NULLS LAST"},
+    {
+        "id": "products",
+        "name": "Browse products",
+        "hint": "Public brands from Argentina and Spain",
+        "sql": "SELECT id, name, brand, country_code, size, unit\nFROM products\nORDER BY id"
+    },
+    {
+        "id": "prices",
+        "name": "See sample prices",
+        "hint": "Generated prices, not retail offers",
+        "sql": "SELECT p.name, p.brand, p.country_code, pr.price, pr.day\nFROM products p\nJOIN prices pr ON pr.product_id = p.id\nORDER BY p.id, pr.id"
+    },
+    {
+        "id": "brands",
+        "name": "Compare brands",
+        "hint": "Count price observations and average them by brand",
+        "sql": "SELECT p.country_code, p.brand, count(*) AS observations,\n       round(avg(pr.price), 2) AS average_price\nFROM products p JOIN prices pr ON pr.product_id = p.id\nGROUP BY p.country_code, p.brand\nORDER BY observations DESC, p.brand, p.country_code"
+    },
+    {
+        "id": "window",
+        "name": "Market comparison",
+        "hint": "Compare each sample with its whole-market average",
+        "sql": "WITH market_average AS (\n  SELECT p.country_code, round(avg(pr.price), 2) AS market_average\n  FROM products p JOIN prices pr ON pr.product_id = p.id\n  GROUP BY p.country_code\n)\nSELECT p.name, p.brand, p.country_code, pr.price, a.market_average\nFROM products p JOIN prices pr ON pr.product_id = p.id\nJOIN market_average a ON a.country_code IS NOT DISTINCT FROM p.country_code\nORDER BY p.id, pr.id"
+    },
+    {
+        "id": "latest",
+        "name": "Latest prices",
+        "hint": "A join with the newest sample price per product",
+        "sql": "WITH latest AS (\n  SELECT product_id,\n    arg_max(struct_pack(price := price, day := day),\n      struct_pack(has_day := day IS NOT NULL, day := day, id := id)) AS item\n  FROM prices WHERE product_id <= 500\n  GROUP BY product_id\n)\nSELECT p.id, p.name, p.brand, r.item.price AS price, r.item.day AS day\nFROM products p JOIN latest r ON r.product_id = p.id\nWHERE p.id <= 500 ORDER BY p.id"
+    },
+    {
+        "id": "countries",
+        "name": "Products by country",
+        "hint": "Count the catalog's two markets",
+        "sql": "SELECT country_code, count(*) AS products\nFROM products GROUP BY country_code ORDER BY country_code"
+    },
+    {
+        "id": "top",
+        "name": "Top prices by country",
+        "hint": "Three highest price observations in each market",
+        "sql": "WITH grouped AS (\n  SELECT p.country_code,\n    arg_max(struct_pack(product_id := p.id, price := pr.price),\n      struct_pack(has_price := pr.price IS NOT NULL, price := pr.price,\n                  reverse_id := -CAST(p.id AS BIGINT)), 3) AS chosen\n  FROM products p JOIN prices pr ON pr.product_id = p.id\n  GROUP BY p.country_code\n), expanded AS (\n  SELECT country_code, unnest(chosen) AS item FROM grouped\n)\nSELECT e.country_code, p.name AS name, p.brand AS brand, e.item.price AS price\nFROM expanded e JOIN products p ON p.id = e.item.product_id\nORDER BY e.country_code ASC NULLS LAST, price DESC NULLS LAST, name ASC NULLS LAST"
+    },
+    {
+        "id": "history_lag",
+        "name": "Product price history",
+        "hint": "See each change from the previous sample",
+        "sql": "WITH selected_history AS MATERIALIZED (SELECT id,product_id,price,day FROM prices WHERE product_id=1), history AS (\n SELECT id,product_id,price,day,\n        lag(price) OVER(PARTITION BY product_id ORDER BY day ASC NULLS LAST,id) AS previous_price\n FROM selected_history\n)\nSELECT h.id,p.name,p.brand,h.day,h.price,h.previous_price,\n       round(h.price-h.previous_price,2) AS price_change\nFROM history h JOIN products p ON p.id=h.product_id\nORDER BY h.day ASC NULLS LAST,h.id"
+    },
+    {
+        "id": "seven_day_average",
+        "name": "Seven-day market trends",
+        "hint": "A calendar-week average weighted by price observations",
+        "sql": "WITH daily AS (\n SELECT p.country_code,pr.day,count(*) AS samples,\n        sum(pr.price) AS price_total,count(pr.price) AS priced_samples,\n        avg(pr.price) AS daily_average\n FROM products p JOIN prices pr ON pr.product_id=p.id\n GROUP BY p.country_code,pr.day\n), rolling AS (\n SELECT country_code,day,samples,daily_average,\n        sum(price_total) OVER week /\n        nullif(sum(priced_samples) OVER week,0) AS seven_day_average\n FROM daily\n WINDOW week AS (PARTITION BY country_code ORDER BY day\n                 RANGE BETWEEN INTERVAL 6 DAY PRECEDING AND CURRENT ROW)\n)\nSELECT country_code,day,samples,round(daily_average,2) AS daily_average,\n       round(seven_day_average,2) AS seven_day_average\nFROM rolling ORDER BY country_code ASC NULLS LAST,day"
+    },
+    {
+        "id": "brand_movement",
+        "name": "Changes by brand",
+        "hint": "Compare the first and latest price of each product",
+        "sql": "WITH samples AS (\n SELECT product_id,\n  arg_min(struct_pack(price:=price,day:=day),\n          struct_pack(missing_day:=day IS NULL,day:=day,id:=id)) AS first_sample,\n  arg_max(struct_pack(price:=price,day:=day),\n          struct_pack(has_day:=day IS NOT NULL,day:=day,id:=id)) AS last_sample\n FROM prices GROUP BY product_id\n)\nSELECT p.country_code,p.brand,count(*) AS products_with_history,\n       round(avg(s.last_sample.price-s.first_sample.price),2) AS average_change,\n       count_if(s.last_sample.price>s.first_sample.price) AS products_increased\nFROM samples s JOIN products p ON p.id=s.product_id\nGROUP BY p.country_code,p.brand\nORDER BY average_change DESC NULLS LAST,p.country_code ASC NULLS LAST,p.brand ASC NULLS LAST"
+    }
 ]
 
 
@@ -164,22 +198,25 @@ def query():
     if request.headers.get("Sec-Fetch-Site") not in (None, "none", "same-origin"):
         return jsonify(error="Send queries from this page."), 403
     payload = request.get_json(silent=True)
-    if not isinstance(payload, dict) or set(payload) - {"sql", "limit"}:
-        return jsonify(error="Send a JSON object with sql and an optional limit."), 400
+    if not isinstance(payload, dict) or set(payload) - {"sql", "limit", "offset"}:
+        return jsonify(error="Send a JSON object with sql, an optional limit and offset."), 400
     source = payload.get("sql", "")
     limit = payload.get("limit", 100)
+    offset = payload.get("offset", 0)
     if not isinstance(source, str) or not source.strip() or len(source) > 8_000:
         return jsonify(error="Enter a SELECT query of up to 8,000 characters."), 400
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 200:
         return jsonify(error="The result limit must be between 1 and 200."), 400
+    if isinstance(offset, bool) or not isinstance(offset, int) or not 0 <= offset <= app.config["MAX_RESULT_OFFSET"]:
+        return jsonify(error="The row offset must be between 0 and 1,000,000."), 400
 
     # SQL is user-authored code; data values and the result cap stay bound.
-    statement = sql.SQL("SELECT * FROM ({}) AS query_result LIMIT %s").format(
+    statement = sql.SQL("SELECT * FROM ({}) AS query_result LIMIT %s OFFSET %s").format(
         sql.SQL(source.strip().removesuffix(";")))
-    return respond(lambda connection: result_rows(connection, statement, (limit + 1,), limit))
+    return respond(lambda connection: result_rows(connection, statement, (limit + 1, offset), limit, offset))
 
 
-def result_rows(connection, statement, parameters, limit):
+def result_rows(connection, statement, parameters, limit, offset=0):
     with connection.cursor() as cursor:
         cursor.execute(statement, parameters)
         if len(cursor.description) > app.config["MAX_RESULT_COLUMNS"]:
@@ -188,9 +225,10 @@ def result_rows(connection, statement, parameters, limit):
         records = cursor.fetchall()
     rows = [[cell(value) for value in row] for row in records[:limit]]
     body = {"columns": columns, "rows": rows, "row_count": min(len(records), limit),
-            "truncated": len(records) > limit, "read_only": True}
-    if len(json.dumps(body, ensure_ascii=False).encode()) > app.config["MAX_RESULT_BYTES"]:
-        raise ResultTooLarge()
+            "truncated": len(records) > limit, "read_only": True,
+            "limit": limit, "offset": offset,
+            "next_offset": offset + limit if len(records) > limit and
+            offset + limit <= app.config["MAX_RESULT_OFFSET"] else None}
     return body
 
 
@@ -224,15 +262,8 @@ def respond(callback):
         timer.daemon = True
         timer.start()
         body = callback(connection)
-        if len(json.dumps(body, ensure_ascii=False).encode()) > app.config["MAX_RESULT_BYTES"]:
-            raise ResultTooLarge()
         if expired.is_set():
             return jsonify(error="The query reached its time limit."), 408
-        elapsed = round((time.monotonic() - started) * 1_000, 2)
-        body.update(elapsed_ms=elapsed, read_only=True)
-        if "preview" in body:
-            body["preview"]["elapsed_ms"] = elapsed
-        return jsonify(body)
     except ResultTooLarge:
         return jsonify(error="The result is too wide. Select fewer columns or smaller values."), 400
     except TableNotFound:
@@ -267,6 +298,18 @@ def respond(callback):
                 connection.close()
             finally:
                 pool.putconn(connection)
+    # Include synchronous cleanup in the displayed server time. The pool keeps
+    # the session unavailable until its separate background reset has finished.
+    elapsed = round((time.monotonic() - started) * 1_000, 2)
+    body.update(elapsed_ms=elapsed, read_only=True)
+    if "preview" in body:
+        body["preview"]["elapsed_ms"] = elapsed
+    response = jsonify(body)
+    # Bound the actual encoded response, including metadata and Unicode escaping.
+    # Reuse it so successful results are serialized only once.
+    if len(response.get_data()) > app.config["MAX_RESULT_BYTES"]:
+        return jsonify(error="The result is too wide. Select fewer columns or smaller values."), 400
+    return response
 
 
 @app.get("/tables")

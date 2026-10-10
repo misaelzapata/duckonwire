@@ -21,7 +21,7 @@
           <h1>Query the catalog.</h1>
           <p class="intro">Pick a table, explore its columns, or try a useful query. Real public products, sample prices, and your normal SQL tools.</p>
         </div>
-        <div class="facts"><span class="fact"><b>Read only</b> by design</span><span class="fact"><b>200 rows</b> max</span></div>
+        <div class="facts"><span class="fact"><b>Read only</b> by design</span><span class="fact"><b>200 rows</b> per page</span></div>
       </section>
       <div class="workspace">
         <aside class="sidebar">
@@ -42,7 +42,7 @@
             <form id="query-form">
               <div class="editor-head"><strong>SQL editor</strong><span>SELECT · WITH · JOIN · WINDOW</span></div>
               <textarea id="sql" spellcheck="false" maxlength="8000" aria-label="SQL query">{{ presets[0].sql }}</textarea>
-              <div class="editor-bottom"><span class="shortcut">⌘ / Ctrl + Enter to run</span><button class="run" id="run" type="submit">Run query →</button></div>
+              <div class="editor-bottom"><label class="page-size" for="page-size">Rows per page <select id="page-size"><option>10</option><option>25</option><option>50</option><option selected>100</option><option>200</option></select></label><span class="shortcut">⌘ / Ctrl + Enter</span><button class="run" id="run" type="submit">Run query →</button></div>
             </form>
           </div>
           <div class="card details" id="details">
@@ -53,6 +53,11 @@
             <div class="result-head"><h2 id="result-title">Results</h2><span class="result-meta" id="result-meta">Ready when you are</span></div>
             <div class="notice" id="notice" role="status" aria-live="polite"></div>
             <div class="results" id="results"><div class="empty">Choose a table to preview its rows.</div></div>
+            <div class="pagination" id="pagination" hidden>
+              <span id="page-range"></span>
+              <div><button class="secondary" type="button" id="previous-page" disabled>← Previous</button><button class="secondary" type="button" id="next-page" disabled>Next →</button></div>
+              <span class="page-note">Use ORDER BY for a predictable row order.</span>
+            </div>
           </div>
         </section>
       </div>

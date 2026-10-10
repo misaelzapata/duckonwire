@@ -139,7 +139,7 @@ jobs:
           # Protected accounts cannot import external files.
           mkdir -p build/tls-fixture/examples/demo
           cp examples/demo/products.csv examples/demo/prices.csv build/tls-fixture/examples/demo/
-          build/bin/duckonwire-server --root "$PWD/build/tls-fixture" --port 19495 --pg-port "$PGPORT" --init-demo > build/test-results/tls-catalog-init.log 2>&1 &
+          build/bin/duckonwire-server --root "$PWD/build/tls-fixture" --port 19495 --pg-port "$PGPORT" --init-demo --demo-prices 1000000 > build/test-results/tls-catalog-init.log 2>&1 &
           owner_pid=$!
           trap 'kill -TERM "$owner_pid" 2>/dev/null || true; wait "$owner_pid" || true' EXIT
           for attempt in {1..100}; do
@@ -211,7 +211,10 @@ jobs:
           NODE
           ) | tee build/test-results/tls-reader-permissions.json
           # Every price value is constructed by the client and bound over TLS.
-          PG_INGEST_ROWS=100000 node examples/postgres/node/ingest.mjs | tee build/test-results/tls-values-ingestion.json
+          PGUSER="$PGREADER_USER" PGPASSWORD="$PGREADER_PASSWORD" PG_LATENCY_SAMPLES=3 PG_LATENCY_WARMUPS=1 PG_LATENCY_PAUSE_MS=20 node examples/postgres/node/latency.mjs | tee build/test-results/tls-query-latency.json
+          jq -e '.passed and (.data.prices | tonumber == 1000000) and (.results | length == 10) and all(.results[]; .samples == 3)' build/test-results/tls-query-latency.json
+          PG_DEMO_READS=1 PG_INGEST_ROWS=2000000 node examples/postgres/node/ingest.mjs | tee build/test-results/tls-values-ingestion.json
+          jq -e '.passed and .rows == 2000000 and .demoReferenceQueries == 10 and .demoQueriesVerified == 10 and .demoQueriesOverlappingWrites == 10' build/test-results/tls-values-ingestion.json
           node examples/postgres/node/bulk.mjs | tee build/test-results/tls-node-bulk.json
           kill -TERM "$owner_pid"
           wait "$owner_pid"

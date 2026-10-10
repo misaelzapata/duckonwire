@@ -4,8 +4,13 @@ const run = document.querySelector('#run');
 const notice = document.querySelector('#notice');
 const meta = document.querySelector('#result-meta');
 const results = document.querySelector('#results');
+const pagination = document.querySelector('#pagination');
+const pageSize = document.querySelector('#page-size');
+const previousPage = document.querySelector('#previous-page');
+const nextPage = document.querySelector('#next-page');
 let selected = null;
 let selection = 0;
+let queryPage = null;
 
 function showNotice(text, error = false) {
   notice.textContent = text;
@@ -44,10 +49,23 @@ function renderRows(data, title) {
   });
   results.replaceChildren(table);
   document.querySelector('#result-title').textContent = title;
-  meta.textContent = `${data.row_count} rows · ${data.elapsed_ms} ms`;
+  meta.textContent = `${data.row_count} rows · ${data.elapsed_ms} ms on server`;
   showNotice(data.truncated
-    ? `Showing the first ${data.row_count} rows. Narrow the query to explore more.`
+    ? data.next_offset === null
+      ? 'Narrow the query or use an ID filter to explore further.'
+      : 'More rows are available.'
     : data.row_count ? '' : 'The query returned no rows.');
+}
+
+function updatePagination(data) {
+  pagination.hidden = !queryPage;
+  if (!queryPage) return;
+  const first = data.row_count ? data.offset + 1 : 0;
+  const last = data.row_count ? data.offset + data.row_count : 0;
+  document.querySelector('#page-range').textContent = data.row_count
+    ? `Rows ${first.toLocaleString()}–${last.toLocaleString()}` : 'No rows on this page';
+  previousPage.disabled = data.offset === 0;
+  nextPage.disabled = data.next_offset === null;
 }
 
 function quoteIdentifier(value) {
@@ -57,6 +75,8 @@ function quoteIdentifier(value) {
 async function selectTable(table, button) {
   const current = ++selection;
   selected = table;
+  queryPage = null;
+  pagination.hidden = true;
   document.querySelectorAll('.table-button').forEach(item => item.classList.remove('active'));
   button.classList.add('active');
   meta.textContent = 'Loading table preview…';
@@ -92,7 +112,7 @@ async function selectTable(table, button) {
 
 document.querySelector('#use-table').addEventListener('click', () => {
   if (!selected) return;
-  editor.value = 'SELECT *\nFROM ' + quoteIdentifier(selected.schema) + '.' + quoteIdentifier(selected.name) + '\nLIMIT 100';
+  editor.value = 'SELECT *\nFROM ' + quoteIdentifier(selected.schema) + '.' + quoteIdentifier(selected.name);
   editor.focus();
 });
 
@@ -103,27 +123,50 @@ document.querySelectorAll('[data-preset]').forEach(button => {
   });
 });
 
-document.querySelector('#query-form').addEventListener('submit', async event => {
-  event.preventDefault();
+async function executePage(source, limit, offset) {
   if (run.disabled) return;
+  const current = ++selection;
   run.disabled = true;
+  previousPage.disabled = true;
+  nextPage.disabled = true;
   run.textContent = 'Running…';
   showNotice('');
   meta.textContent = 'Query in progress';
   try {
     const data = await api('/query', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sql: editor.value, limit: 100 }),
+      body: JSON.stringify({ sql: source, limit, offset }),
     });
+    if (current !== selection) return;
+    queryPage = { source, limit, offset: data.offset, nextOffset: data.next_offset };
     renderRows(data, 'Query results');
+    updatePagination(data);
   } catch (error) {
-    showNotice(error.name === 'AbortError'
-      ? 'The request reached its time limit. Try a smaller query.' : error.message, true);
-    meta.textContent = 'Query not completed';
+    if (current === selection) {
+      showNotice(error.name === 'AbortError'
+        ? 'The request reached its time limit. Try a smaller query.' : error.message, true);
+      meta.textContent = 'Query not completed';
+      if (queryPage) {
+        previousPage.disabled = queryPage.offset === 0;
+        nextPage.disabled = queryPage.nextOffset === null;
+      }
+    }
   } finally {
     run.disabled = false;
     run.textContent = 'Run query →';
   }
+}
+
+document.querySelector('#query-form').addEventListener('submit', event => {
+  event.preventDefault();
+  executePage(editor.value, Number(pageSize.value), 0);
+});
+
+previousPage.addEventListener('click', () => {
+  if (queryPage) executePage(queryPage.source, queryPage.limit, Math.max(0, queryPage.offset - queryPage.limit));
+});
+nextPage.addEventListener('click', () => {
+  if (queryPage && queryPage.nextOffset !== null) executePage(queryPage.source, queryPage.limit, queryPage.nextOffset);
 });
 
 editor.addEventListener('keydown', event => {
@@ -145,7 +188,6 @@ editor.addEventListener('keydown', event => {
       button.className = 'table-button';
       const icon = document.createElement('span');
       icon.className = 'table-icon';
-      icon.textContent = '▦';
       icon.setAttribute('aria-hidden', 'true');
       const label = document.createElement('span');
       const name = document.createElement('strong');

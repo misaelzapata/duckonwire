@@ -10,7 +10,7 @@ CREATE TABLE products (
 
 CREATE TABLE prices (
     id INTEGER PRIMARY KEY,
-    product_id INTEGER NOT NULL UNIQUE REFERENCES products(id),
+    product_id INTEGER NOT NULL REFERENCES products(id),
     price DECIMAL(18,2) NOT NULL CHECK (price BETWEEN 0.50 AND 250.00),
     day DATE NOT NULL
 );

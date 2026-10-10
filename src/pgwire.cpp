@@ -222,9 +222,14 @@ void Send(WireSocket &socket, const void *data, std::size_t size) {
 }
 void Message(WireSocket &socket, char type, const Buffer &body = {}) {
     if (body.size() > MAX_FRAME - 4) throw WireError("54000", "Result field exceeds the PGwire frame limit");
-    Buffer header {static_cast<unsigned char>(type)}; Put32(header, static_cast<std::uint32_t>(body.size() + 4));
-    Send(socket, header.data(), header.size());
-    if (!body.empty()) Send(socket, body.data(), body.size());
+    // Keep each protocol message immediately visible, while sending its header
+    // and payload in one write instead of two small TLS records.
+    Buffer frame;
+    frame.reserve(body.size() + 5);
+    frame.push_back(static_cast<unsigned char>(type));
+    Put32(frame, static_cast<std::uint32_t>(body.size() + 4));
+    frame.insert(frame.end(), body.begin(), body.end());
+    Send(socket, frame.data(), frame.size());
 }
 void ErrorMessage(WireSocket &socket, const WireError &error) {
     Buffer body;
@@ -1663,7 +1668,9 @@ void PgWireServer::Impl::Session::Parse(Reader &in) {
     statement->setting = !statement->empty && SessionSetting(sql);
     if (!extracted.empty() && !statement->setting) Authorize(*extracted[0]);
     if (!statement->empty && !statement->setting && !statement->deallocate && control.kind == FdwKind::NONE) {
-        statement->prepared = connection.Prepare(sql);
+        // The string path initializes the native EXPLAIN ANALYZE profiler.
+        statement->prepared = statement->type == duckdb::StatementType::EXPLAIN_STATEMENT
+            ? connection.Prepare(sql) : connection.Prepare(std::move(extracted[0]));
         if (statement->prepared->HasError()) NativeError(statement->prepared->GetErrorObject());
         auto parameters = statement->prepared->GetParameterCount();
         if (oids.size() > parameters) throw WireError("08P01", "Too many declared parameter types");

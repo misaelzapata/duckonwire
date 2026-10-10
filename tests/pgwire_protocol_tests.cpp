@@ -439,6 +439,12 @@ int main(int argc, char **argv) {
 			const auto no_file = wire->Until("Z"); Require(HasError(no_file, "0A000") && !Contains(no_file, 'T') && State(no_file) == 'I', "Dynamic Statement Describe invented metadata without a bound filename");
 			wire->Parse("explicit_cast", "SELECT $1::INTEGER"); wire->Describe('S', "explicit_cast"); wire->Bind("explicit_cast", "explicit_cast", {std::string("43")}, true); wire->Execute("explicit_cast"); wire->Message('S');
 			const auto recovered = wire->Until("Z"); Require(!Contains(recovered, 'E') && Description(recovered).size() == 1 && Description(recovered)[0].second == 23 && Rows(recovered).size() == 1, "Explicit cast did not recover unresolved metadata session");
+			wire->Parse("profiled", "EXPLAIN ANALYZE SELECT sum(i) FROM range($1::BIGINT) t(i)", {20});
+			wire->Bind("profiled", "profiled", {std::string("1000")}); wire->Describe('P', "profiled"); wire->Execute("profiled"); wire->Message('S');
+			const auto profiled = wire->Until("Z"); const auto profile_rows = Rows(profiled);
+			Require(!Contains(profiled, 'E') && Description(profiled).size() == 2 && profile_rows.size() == 1 && profile_rows[0].size() == 2 && profile_rows[0][1], "Prepared EXPLAIN ANALYZE failed");
+			Require(profile_rows[0][1]->find("Total Time:") != std::string::npos && profile_rows[0][1]->find("profiling is disabled") == std::string::npos, "Prepared EXPLAIN ANALYZE lost native profiling");
+			Require(State(profiled) == 'I' && Scalar(*wire, "SELECT 44") == 44, "Prepared EXPLAIN ANALYZE left session unusable");
 		});
 		test("sql_cursor_requires_explicit_transaction", [&] {
 			auto wire = client();
