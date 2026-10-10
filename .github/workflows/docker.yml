@@ -57,11 +57,11 @@ jobs:
           docker compose exec -T duckonwire /opt/duckonwire/bin/duckonwire-benchmark \
             --server /opt/duckonwire/bin/duckonwire-server --mode both --rows 10000 --batch 250 \
             --environment 'Native Docker ${{ matrix.architecture }}' --output /tmp/native-smoke.json
-          docker compose cp duckonwire:/tmp/native-smoke.json test-results/native-smoke.json
+          docker compose exec -T duckonwire cat /tmp/native-smoke.json > test-results/native-smoke.json
       - name: Ordinary verified TLS login, CRUD, snapshots, reader rules and client ingestion
         run: |
           npm ci --prefix examples/postgres/node --ignore-scripts
-          docker compose cp duckonwire:/var/lib/duckonwire/.runtime/tls/ca.pem test-results/ca.pem
+          docker compose exec -T duckonwire cat /var/lib/duckonwire/.runtime/tls/ca.pem > test-results/ca.pem
           export PGHOST=127.0.0.1 PGPORT=9496 PGUSER=writer PGDATABASE=duckonwire
           export PGSSLMODE=verify-full PGSSLROOTCERT="$PWD/test-results/ca.pem"
           export PGPASSWORD="$(docker compose exec -T duckonwire cat /var/lib/duckonwire/.runtime/writer.password)"
