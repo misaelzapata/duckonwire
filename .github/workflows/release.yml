@@ -109,7 +109,7 @@ jobs:
           const crypto = require('node:crypto');
           const required = (ok, text) => { if (!ok) throw new Error(text); };
           const version = process.env.VERSION, head = process.env.GITHUB_SHA;
-          const summary = JSON.parse(fs.readFileSync('proof/native/test-summary.json', 'utf8'));
+          const summary = JSON.parse(fs.readFileSync('proof/native/test-results/test-summary.json', 'utf8'));
           const fdw = JSON.parse(fs.readFileSync('proof/postgres/postgres-fdw.json', 'utf8'));
           const packageName = `duckonwire-${version}-linux-x86_64-v3`;
           const manifest = JSON.parse(fs.readFileSync(`dist/${packageName}.manifest.json`, 'utf8'));

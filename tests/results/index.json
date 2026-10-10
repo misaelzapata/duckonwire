@@ -1,7 +1,7 @@
 {
   "project": "DuckOnWire",
   "version": "0.3.0",
-  "status": "Current-source native, Neon and Flask functional acceptance passed; binary release qualification is recorded independently per platform",
+  "status": "Version0.3.0 published with current-source native, Neon, Flask, stock-driver and AMD64/ARM64 Docker acceptance; manual publication recovery is recorded explicitly.",
   "native_engine_version": "v2.1.0-dev0",
   "quack_protocol": 7,
   "patches_sha256": {
@@ -44,7 +44,7 @@
     },
     {
       "path": "neon-integration.json",
-      "sha256": "5f91fbfbdfe233dd5546d649abd7c719304cfd22bf193912f395779b9819c505"
+      "sha256": "3c085d84623e6d8302bb1bfe819a2aa16b0d02a537faaa2068da405103f24370"
     }
   ],
   "benchmark_runs": [
@@ -287,7 +287,7 @@
   "recorded_results_scope": "Historical native and benchmark files retain their original source and platform qualifications. PostgreSQL, ATTACH, Neon and Flask results identify their own tested source hashes and workload scopes.",
   "release": {
     "version": "0.3.0",
-    "status": "Current-source functional acceptance passed; fresh package and publication receipts are recorded by the release workflow and versioned release manifest",
+    "status": "published",
     "workflow": ".github/workflows/release.yml",
     "download_page": "https://github.com/misaelzapata/duckonwire/releases",
     "bundle_types": [
@@ -305,7 +305,51 @@
     "driver_gate": "Fresh same-run package with 20 real postgres_fdw cases and stock C/Python/Node driver checks",
     "docker_gate": "Native AMD64 and ARM64 source builds and runtime acceptance",
     "experimental": true,
-    "manifest": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/release.json"
+    "manifest": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/release.json",
+    "url": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.3.0",
+    "tag": "v0.3.0",
+    "source_head": "806c500f963bff258fc04677e9bafe98c65cdc0a",
+    "prerelease": true,
+    "published_at": "2026-10-10T16:42:39Z",
+    "method": "verified_manual_replay_of_same_run_publication",
+    "original_run_id": 38065703779,
+    "original_run_conclusion": "failure",
+    "original_failure": "Publication receipt path omitted the test-results subdirectory; all qualification jobs passed.",
+    "tag_source_verified": true,
+    "all_uploaded_api_digests_verified": true,
+    "manifest_url": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/release.json",
+    "manifest_sha256": "044e78dbef019d592070ee2d396f6d08a4c69e945604a752e9ed3df3388265b0",
+    "workflow_run": "https://github.com/misaelzapata/duckonwire/actions/runs/38065703779",
+    "qualification_jobs_passed": true,
+    "source_platform": "Ubuntu24.04 x86-64-v3 native C/C++; Docker validated separately on native AMD64 and ARM64",
+    "current_source_checks": {
+      "source_head": "806c500f963bff258fc04677e9bafe98c65cdc0a",
+      "native": {
+        "run_id": 38065694223,
+        "url": "https://github.com/misaelzapata/duckonwire/actions/runs/38065694223",
+        "conclusion": "success"
+      },
+      "documentation": {
+        "run_id": 38065694521,
+        "url": "https://github.com/misaelzapata/duckonwire/actions/runs/38065694521",
+        "conclusion": "success",
+        "postgres_fdw_checks": 20,
+        "flask_checks": 62
+      },
+      "docker": {
+        "run_id": 38065694292,
+        "url": "https://github.com/misaelzapata/duckonwire/actions/runs/38065694292",
+        "conclusion": "success",
+        "architectures": [
+          "amd64",
+          "arm64"
+        ]
+      }
+    },
+    "asset_count": 6,
+    "published_asset_downloads_verified": true,
+    "details": "neon-integration.json#/ci/publication",
+    "result_sha256": "3c085d84623e6d8302bb1bfe819a2aa16b0d02a537faaa2068da405103f24370"
   },
   "quack_paired_drivers_required": true,
   "postgres_client_duckdb_required": false,
@@ -382,12 +426,30 @@
     "verified_anchors": 14,
     "verified_fences": 24,
     "source_sha256": {
-      "README.md": "c5bfd2d4a095065401e8c0136937f0b89249be10b1ca25f08c9b4cf2036f6abc",
+      "README.md": "1eae3282e9064ddcd75a83c03f1dae1e53d9eb28e73ba927f7d60fc58fa862ff",
       "AGENTS.md": "bb3d9c8faaf8a24f05076b0753f3e8ba39fd171145b0161e7aaa845d9a9463b3",
       "docs/neon.md": "e0fbff12f58d3aeba49f619126c6c1a3c1949972145cd94747e7c7169f1d168e",
       "cmake/DocumentationTests.cmake": "67a8bd6d22f1ce10dade9a4ac744884ca71c19cfbbf52af8d4c8ed0c684e99e2"
     },
-    "passed": true
+    "passed": true,
+    "metadata_followup": {
+      "base_source_head": "806c500f963bff258fc04677e9bafe98c65cdc0a",
+      "scope": "Documentation wording, publication receipt-path fix and result metadata only; tested native and application source hashes remain unchanged.",
+      "readme_sha256": "1eae3282e9064ddcd75a83c03f1dae1e53d9eb28e73ba927f7d60fc58fa862ff",
+      "release_workflow_sha256": "72e63ff436090bd3cbfa2170e5a9e9a8f79c6028f190a218066e128bcbaceef0",
+      "local_documentation": {
+        "passed": true,
+        "server_help_checked": true,
+        "supported_server_options": 13,
+        "documents": 3,
+        "links": 80,
+        "anchors": 14,
+        "fences": 24
+      },
+      "github_documentation_at_projection_time": "Not run yet for this follow-up working tree; its own workflow reports that separate check.",
+      "documentation_workflow": "https://github.com/misaelzapata/duckonwire/actions/workflows/documentation.yml",
+      "native_or_application_sources_changed": false
+    }
   },
   "previous_release": {
     "version": "0.2.0-rc.5",
@@ -537,7 +599,7 @@
   "current_source_qualification": {
     "result": "neon-integration.json",
     "passed": true,
-    "scope": "Native106 and postgres_fdw20 runtime qualification preserved on unchanged native sources; current Flask65 local,62 deployed,18 HTTPS and genuine311-second idle maintenance pass, with seven presets and exact TopK equivalence. Fresh package CI remains independent.",
+    "scope": "Current sources passed native106, FDW20, Flask65 local/62 deployed/18 HTTPS, real Neon10 and actual311-second idle maintenance. The same-run fresh package and both Docker architectures passed; version0.3.0 was published by verified manual recovery of a metadata-path failure.",
     "source_sha256": {
       "src/pgwire.cpp": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
       "tests/pgwire_protocol_tests.cpp": "d1a90c03169aa6652c30e27f54bf31d4c5c83eeb5d37e74d8fcc77b6440848ab",
@@ -559,10 +621,37 @@
     "manual_web_review": "passed",
     "deployed_flask_checks": 62,
     "public_https_checks": 18,
-    "result_sha256": "5f91fbfbdfe233dd5546d649abd7c719304cfd22bf193912f395779b9819c505",
+    "result_sha256": "3c085d84623e6d8302bb1bfe819a2aa16b0d02a537faaa2068da405103f24370",
     "postgres_fdw_qualification_receipt_sha256": "c203aa408b3f3d1ac862d64d508f01ca3a614eba69cf1d12235748b33cfadf95",
     "actual_live_idle_seconds": 311.2574726017192,
-    "idle_maintenance_passed": true
+    "idle_maintenance_passed": true,
+    "runtime_qualification_source_head": "806c500f963bff258fc04677e9bafe98c65cdc0a",
+    "same_run_package_checks": {
+      "source_head": "806c500f963bff258fc04677e9bafe98c65cdc0a",
+      "run_id": 38065703779,
+      "url": "https://github.com/misaelzapata/duckonwire/actions/runs/38065703779",
+      "qualification_jobs_conclusion": "success",
+      "original_workflow_conclusion": "failure",
+      "native_checks": 106,
+      "postgres_fdw_checks": 20,
+      "flask_checks": 62,
+      "docker_architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "details": "neon-integration.json#/ci/same_run_package_checks",
+      "result_sha256": "3c085d84623e6d8302bb1bfe819a2aa16b0d02a537faaa2068da405103f24370"
+    },
+    "publication": {
+      "status": "published",
+      "url": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.3.0",
+      "source_head": "806c500f963bff258fc04677e9bafe98c65cdc0a",
+      "method": "verified_manual_replay_of_same_run_publication",
+      "original_workflow_conclusion": "failure",
+      "six_published_asset_downloads_verified": true,
+      "details": "neon-integration.json#/ci/publication",
+      "result_sha256": "3c085d84623e6d8302bb1bfe819a2aa16b0d02a537faaa2068da405103f24370"
+    }
   },
   "neon": {
     "result": "neon-integration.json",
@@ -610,5 +699,5 @@
     "preset_count": 7,
     "top_prices_sql": "examples/postgres/queries/top-prices.sql"
   },
-  "updated_utc": "2026-10-10T15:55:48.869633+00:00"
+  "updated_utc": "2026-10-10T16:46:50.422901+00:00"
 }

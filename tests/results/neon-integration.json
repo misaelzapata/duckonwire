@@ -1,8 +1,8 @@
 {
   "project": "DuckOnWire",
   "version": "0.3.0",
-  "status": "Current source functional acceptance passed locally, on the isolated AWS owner and through real Neon; fresh CI and package qualification are reported independently",
-  "source_snapshot": "Current working tree based on 6f5fddd64c4904beee6506704e773b49f6056944; exact tested file hashes below",
+  "status": "Current native/application acceptance passed; version0.3.0 published from the same-run qualified source and package with verified manual publication recovery.",
+  "source_snapshot": "Native and application sources qualified and released at 806c500f963bff258fc04677e9bafe98c65cdc0a; this follow-up working tree changes documentation/CI/result metadata only.",
   "source_sha256": {
     "src/pgwire.cpp": "decb1daaf5f5f5f6f02c7cbb01d2dab10a02b8b5e67cca273160709f1be06d23",
     "tests/pgwire_protocol_tests.cpp": "d1a90c03169aa6652c30e27f54bf31d4c5c83eeb5d37e74d8fcc77b6440848ab",
@@ -711,11 +711,12 @@
     "workflow": ".github/workflows/release.yml",
     "scope": "Fresh paired engine and package, 106 native checks, 20 real postgres_fdw integration checks, C/Python/Node, AMD64/ARM64 Docker",
     "results": "https://github.com/misaelzapata/duckonwire/actions",
-    "status": "Recorded native, Docker and tutorial CI passed at the preceding commit; the idle-maintenance sources passed the local/deployed/live checks above and require their own fresh package pipeline.",
+    "status": "Native, documentation/stock drivers and AMD64/ARM64 Docker passed for the release source. The original publication job failed on a receipt path; verified manual publication then completed.",
     "package_release": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.3.0",
     "package_manifest": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/release.json",
     "workflow_source_sha256": {
-      ".github/workflows/postgres.yml": "289bc5700897f9e548867757c4853efd7d1fb929da786ff1dc90885c108a41e0"
+      ".github/workflows/postgres.yml": "289bc5700897f9e548867757c4853efd7d1fb929da786ff1dc90885c108a41e0",
+      ".github/workflows/release.yml": "72e63ff436090bd3cbfa2170e5a9e9a8f79c6028f190a218066e128bcbaceef0"
     },
     "previous_source_checks": {
       "head": "6f5fddd64c4904beee6506704e773b49f6056944",
@@ -727,6 +728,323 @@
       "release_run": 38062250534,
       "release_conclusion": "cancelled_before_publish",
       "reason": "Idle-pool defect found before publishing; these prior receipts do not qualify the maintenance fix."
+    },
+    "current_source_checks": {
+      "source_head": "806c500f963bff258fc04677e9bafe98c65cdc0a",
+      "native": {
+        "run_id": 38065694223,
+        "url": "https://github.com/misaelzapata/duckonwire/actions/runs/38065694223",
+        "conclusion": "success"
+      },
+      "documentation": {
+        "run_id": 38065694521,
+        "url": "https://github.com/misaelzapata/duckonwire/actions/runs/38065694521",
+        "conclusion": "success",
+        "postgres_fdw_checks": 20,
+        "flask_checks": 62
+      },
+      "docker": {
+        "run_id": 38065694292,
+        "url": "https://github.com/misaelzapata/duckonwire/actions/runs/38065694292",
+        "conclusion": "success",
+        "architectures": [
+          "amd64",
+          "arm64"
+        ]
+      }
+    },
+    "same_run_package_checks": {
+      "source_head": "806c500f963bff258fc04677e9bafe98c65cdc0a",
+      "run_id": 38065703779,
+      "url": "https://github.com/misaelzapata/duckonwire/actions/runs/38065703779",
+      "qualification_jobs_conclusion": "success",
+      "original_workflow_conclusion": "failure",
+      "native_checks": 106,
+      "ctest_suites": 7,
+      "postgres_fdw_checks": 20,
+      "flask_checks": 62,
+      "native_server_sha256": "f2f8e2ba26cd36587290b0b905b8db23bbfbc662f448007772b16df5e928a971",
+      "native_library_sha256": "09f483318725618bc007352ec7c4cd7ad22f321c53559ba82bf9bcb32d838db3",
+      "fdw_tested_the_packaged_server": true,
+      "native_benchmarks": {
+        "concurrent-smoke.json": {
+          "passed": true,
+          "results": [
+            {
+              "mode": "embedded",
+              "rows": 10000,
+              "writers": 4,
+              "readers": 4,
+              "commits": 40,
+              "readers_with_overlap": 3,
+              "durable_exact_checksums": true,
+              "fixture_removed": true
+            },
+            {
+              "mode": "quack_loopback",
+              "rows": 10000,
+              "writers": 4,
+              "readers": 4,
+              "commits": 40,
+              "readers_with_overlap": 4,
+              "durable_exact_checksums": true,
+              "fixture_removed": true
+            }
+          ],
+          "sha256": "acf64b5611a4c4fcd4984e032f236b74b0849ea583a62ce1159c9d8abd15e20a"
+        },
+        "benchmark.json": {
+          "passed": true,
+          "results": [
+            {
+              "mode": "embedded",
+              "rows": 2000000,
+              "writers": 4,
+              "readers": 4,
+              "commits": 80,
+              "readers_with_overlap": 4,
+              "durable_exact_checksums": true,
+              "fixture_removed": true
+            },
+            {
+              "mode": "quack_loopback",
+              "rows": 2000000,
+              "writers": 4,
+              "readers": 4,
+              "commits": 80,
+              "readers_with_overlap": 4,
+              "durable_exact_checksums": true,
+              "fixture_removed": true
+            }
+          ],
+          "sha256": "4a88ad5d02397965fdf84a10d9716cb42379b4a29a01ae744636dc821c0b3c13"
+        }
+      },
+      "stock_driver_workloads": {
+        "node-bulk.json": {
+          "rows": 2000000,
+          "writers": 4,
+          "readers": 4,
+          "commits": 80,
+          "separate_reader_role": false,
+          "exact_integrity": true,
+          "all_readers_overlap": true,
+          "scope": "Client connections and table setup excluded; one stock Node process and eight independent network connections; completed writes and in-session integrity, no server restart."
+        },
+        "tls-node-bulk.json": {
+          "rows": 2000000,
+          "writers": 4,
+          "readers": 4,
+          "commits": 80,
+          "separate_reader_role": true,
+          "exact_integrity": true,
+          "all_readers_overlap": true,
+          "scope": "Client connections and table setup excluded; one stock Node process and eight independent network connections; completed writes and in-session integrity, no server restart."
+        },
+        "tls-values-ingestion.json": {
+          "rows": 100000,
+          "writers": 4,
+          "readers": 4,
+          "commits": 100,
+          "separate_reader_role": true,
+          "exact_integrity": true,
+          "all_readers_overlap": true,
+          "scope": "One stock Node process and eight independent network connections. Timing includes client numeric row construction, bound VALUES transport and confirmed commits; authentication, table creation and final integrity checks excluded. In-session integrity; no server restart."
+        }
+      },
+      "docker": {
+        "arm64": {
+          "conclusion": "success",
+          "architecture": "aarch64",
+          "artifact_zip_sha256": "06fb18d9e55011cf43b116c6284b02a856e1e96d3ac586ef059fd4df6d943489",
+          "native_checks": 89,
+          "embedded_flow_checks_excluded": 14,
+          "native_smoke": [
+            {
+              "mode": "embedded",
+              "rows": 10000,
+              "writers": 4,
+              "readers": 4,
+              "commits": 40,
+              "durable_exact_checksums": true,
+              "readers_with_overlap": 4,
+              "all_readers_overlap": true,
+              "owned_fixture_removed": true
+            },
+            {
+              "mode": "quack_loopback",
+              "rows": 10000,
+              "writers": 4,
+              "readers": 4,
+              "commits": 40,
+              "durable_exact_checksums": true,
+              "readers_with_overlap": 4,
+              "all_readers_overlap": true,
+              "owned_fixture_removed": true
+            }
+          ],
+          "actual_client_values": {
+            "rows": 100000,
+            "writers": 4,
+            "readers": 4,
+            "commits": 100,
+            "batch_rows": 1000,
+            "bound_parameters_sent": 300000,
+            "separate_read_only_role": true,
+            "exact_integrity": true,
+            "all_readers_overlap": true,
+            "scope": "One stock Node process and eight independent network connections. Timing includes client numeric row construction, bound VALUES transport and confirmed commits; authentication, table creation and final integrity checks excluded. In-session integrity; no server restart."
+          },
+          "reader_write_denial_sqlstate": "42501"
+        },
+        "amd64": {
+          "conclusion": "success",
+          "architecture": "x86_64",
+          "artifact_zip_sha256": "ad9e8fc8953fa4d23822951926b5114413b79404d3d9f691abe4834915998e1b",
+          "native_checks": 89,
+          "embedded_flow_checks_excluded": 14,
+          "native_smoke": [
+            {
+              "mode": "embedded",
+              "rows": 10000,
+              "writers": 4,
+              "readers": 4,
+              "commits": 40,
+              "durable_exact_checksums": true,
+              "readers_with_overlap": 4,
+              "all_readers_overlap": true,
+              "owned_fixture_removed": true
+            },
+            {
+              "mode": "quack_loopback",
+              "rows": 10000,
+              "writers": 4,
+              "readers": 4,
+              "commits": 40,
+              "durable_exact_checksums": true,
+              "readers_with_overlap": 4,
+              "all_readers_overlap": true,
+              "owned_fixture_removed": true
+            }
+          ],
+          "actual_client_values": {
+            "rows": 100000,
+            "writers": 4,
+            "readers": 4,
+            "commits": 100,
+            "batch_rows": 1000,
+            "bound_parameters_sent": 300000,
+            "separate_read_only_role": true,
+            "exact_integrity": true,
+            "all_readers_overlap": true,
+            "scope": "One stock Node process and eight independent network connections. Timing includes client numeric row construction, bound VALUES transport and confirmed commits; authentication, table creation and final integrity checks excluded. In-session integrity; no server restart."
+          },
+          "reader_write_denial_sqlstate": "42501"
+        }
+      }
+    },
+    "release_workflow": {
+      "run_id": 38065703779,
+      "url": "https://github.com/misaelzapata/duckonwire/actions/runs/38065703779",
+      "source_head": "806c500f963bff258fc04677e9bafe98c65cdc0a",
+      "conclusion": "failure",
+      "qualification_jobs_conclusion": "success",
+      "failed_job": "publish",
+      "failed_step": "Verify current-run provenance and prepare release files",
+      "failure_kind": "artifact_receipt_path_mismatch",
+      "recovery": {
+        "method": "manual_preparation_after_metadata_path_failure",
+        "original_run_id": 38065703779,
+        "original_run_conclusion": "failure",
+        "all_required_qualification_jobs_passed": true,
+        "original_failed_step": "Verify current-run provenance and prepare release files",
+        "original_publication_step_skipped": true,
+        "corrected_guard_change": {
+          "from": "proof/native/test-summary.json",
+          "to": "proof/native/test-results/test-summary.json",
+          "substitutions": 1
+        },
+        "native_package_rebuilt": false,
+        "tests_repeated": false,
+        "prepared_from_immutable_source_head": "806c500f963bff258fc04677e9bafe98c65cdc0a",
+        "prepared_at_utc": "2026-10-10T16:36:24.834396+00:00",
+        "independent_package_review_required_before_publication": true
+      }
+    },
+    "publication": {
+      "status": "published",
+      "url": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.3.0",
+      "tag": "v0.3.0",
+      "source_head": "806c500f963bff258fc04677e9bafe98c65cdc0a",
+      "prerelease": true,
+      "published_at": "2026-10-10T16:42:39Z",
+      "method": "verified_manual_replay_of_same_run_publication",
+      "original_run_id": 38065703779,
+      "original_run_conclusion": "failure",
+      "original_failure": "Publication receipt path omitted the test-results subdirectory; all qualification jobs passed.",
+      "tag_source_verified": true,
+      "all_uploaded_api_digests_verified": true,
+      "manifest_url": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/release.json",
+      "manifest_sha256": "044e78dbef019d592070ee2d396f6d08a4c69e945604a752e9ed3df3388265b0",
+      "assets": {
+        "duckonwire-0.3.0-linux-x86_64-v3.manifest.json": {
+          "sha256": "e73b1e7bb5829e8a076a44e81da73706811fe307040206c4b5bf37373aef4ad2",
+          "bytes": 245911,
+          "url": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/duckonwire-0.3.0-linux-x86_64-v3.manifest.json"
+        },
+        "duckonwire-0.3.0-linux-x86_64-v3.sha256": {
+          "sha256": "6bd69f8b0ac5475086657b6d711fefa79eac0d08132280501f7e7ed9ed35ab93",
+          "bytes": 219,
+          "url": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/duckonwire-0.3.0-linux-x86_64-v3.sha256"
+        },
+        "duckonwire-0.3.0-linux-x86_64-v3.tar.gz": {
+          "sha256": "50f43d9dd4154ec206c500ac560190e78fc4f9472048a03850dd2228367c94f7",
+          "bytes": 73027970,
+          "url": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/duckonwire-0.3.0-linux-x86_64-v3.tar.gz"
+        },
+        "duckonwire-0.3.0-source.tar.gz": {
+          "sha256": "7e703e87e3ec1580c3aedc7cff423e2a39e376414ded660da656aab8d3e9822c",
+          "bytes": 3161783,
+          "url": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/duckonwire-0.3.0-source.tar.gz"
+        },
+        "release.json": {
+          "sha256": "044e78dbef019d592070ee2d396f6d08a4c69e945604a752e9ed3df3388265b0",
+          "bytes": 3292,
+          "url": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/release.json"
+        },
+        "SHA256SUMS": {
+          "sha256": "6b85991d2517738445cc8e42e326ddbda20c516fd7c99912d6953bbd1d358336",
+          "bytes": 395,
+          "url": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/SHA256SUMS"
+        }
+      },
+      "publication_receipt_sha256": "34d7470785e40ad93dbfa514e5b63aa6dd6e3e86beebdc229c47446e54d965ac",
+      "independent_prepublication_review_sha256": "e400d939163d8834c57cbd6d83a171a1a664998a64251498a6845a1d58f53772",
+      "download_verification": {
+        "passed": true,
+        "asset_count": 6,
+        "scope": "Published release assets downloaded and hashed in streaming; all byte counts and SHA256 match the uploaded API digests and independently reviewed package files.",
+        "receipt_sha256": "716b09003be96174cb4dafbf68fa96d4e4d1209b5ce65151052602699a450792",
+        "archives_extracted_again": false
+      }
+    },
+    "metadata_and_documentation_followup": {
+      "base_source_head": "806c500f963bff258fc04677e9bafe98c65cdc0a",
+      "scope": "Documentation wording, publication receipt-path fix and result metadata only; tested native and application source hashes remain unchanged.",
+      "readme_sha256": "1eae3282e9064ddcd75a83c03f1dae1e53d9eb28e73ba927f7d60fc58fa862ff",
+      "release_workflow_sha256": "72e63ff436090bd3cbfa2170e5a9e9a8f79c6028f190a218066e128bcbaceef0",
+      "local_documentation": {
+        "passed": true,
+        "server_help_checked": true,
+        "supported_server_options": 13,
+        "documents": 3,
+        "links": 80,
+        "anchors": 14,
+        "fences": 24
+      },
+      "github_documentation_at_projection_time": "Not run yet for this follow-up working tree; its own workflow reports that separate check.",
+      "documentation_workflow": "https://github.com/misaelzapata/duckonwire/actions/workflows/documentation.yml",
+      "native_or_application_sources_changed": false
     }
   },
   "limitations": [
@@ -935,6 +1253,49 @@
         "receipt_sha256": "49173b2c20496f1c21be5d045f9bb921c4305f72bd33510e360c5166e9f723ee",
         "first_loopback_api_ms": 1044.17
       }
+    },
+    "before_publication_metadata": {
+      "source_snapshot": "Current working tree based on 6f5fddd64c4904beee6506704e773b49f6056944; exact tested file hashes below",
+      "ci": {
+        "workflow": ".github/workflows/release.yml",
+        "scope": "Fresh paired engine and package, 106 native checks, 20 real postgres_fdw integration checks, C/Python/Node, AMD64/ARM64 Docker",
+        "results": "https://github.com/misaelzapata/duckonwire/actions",
+        "status": "Recorded native, Docker and tutorial CI passed at the preceding commit; the idle-maintenance sources passed the local/deployed/live checks above and require their own fresh package pipeline.",
+        "package_release": "https://github.com/misaelzapata/duckonwire/releases/tag/v0.3.0",
+        "package_manifest": "https://github.com/misaelzapata/duckonwire/releases/download/v0.3.0/release.json",
+        "workflow_source_sha256": {
+          ".github/workflows/postgres.yml": "289bc5700897f9e548867757c4853efd7d1fb929da786ff1dc90885c108a41e0"
+        },
+        "previous_source_checks": {
+          "head": "6f5fddd64c4904beee6506704e773b49f6056944",
+          "native_run": 38063021191,
+          "documentation_run": 38062241437,
+          "docker_run": 38062241301,
+          "conclusion": "success",
+          "flask_checks_in_previous_tutorial": 42,
+          "release_run": 38062250534,
+          "release_conclusion": "cancelled_before_publish",
+          "reason": "Idle-pool defect found before publishing; these prior receipts do not qualify the maintenance fix."
+        }
+      },
+      "documentation": {
+        "passed": true,
+        "server_help_checked": true,
+        "supported_server_options": 13,
+        "documents": 3,
+        "links": 80,
+        "anchors": 14,
+        "fences": 24,
+        "checked_utc": "2026-10-10T15:47:05.999971+00:00",
+        "source_sha256": {
+          "README.md": "c5bfd2d4a095065401e8c0136937f0b89249be10b1ca25f08c9b4cf2036f6abc",
+          "AGENTS.md": "bb3d9c8faaf8a24f05076b0753f3e8ba39fd171145b0161e7aaa845d9a9463b3",
+          "docs/neon.md": "e0fbff12f58d3aeba49f619126c6c1a3c1949972145cd94747e7c7169f1d168e",
+          "cmake/DocumentationTests.cmake": "67a8bd6d22f1ce10dade9a4ac744884ca71c19cfbbf52af8d4c8ed0c684e99e2"
+        },
+        "server_sha256": "e00b783423f517f33b54dfc83c70328e79d2cb4df4fd79589735a16ec4bc32f4"
+      },
+      "public_result_sha256": "5f91fbfbdfe233dd5546d649abd7c719304cfd22bf193912f395779b9819c505"
     }
   },
   "flask_pool": {
@@ -997,14 +1358,15 @@
     "links": 80,
     "anchors": 14,
     "fences": 24,
-    "checked_utc": "2026-10-10T15:47:05.999971+00:00",
+    "checked_utc": "2026-10-10T16:46:50.422901+00:00",
     "source_sha256": {
-      "README.md": "c5bfd2d4a095065401e8c0136937f0b89249be10b1ca25f08c9b4cf2036f6abc",
+      "README.md": "1eae3282e9064ddcd75a83c03f1dae1e53d9eb28e73ba927f7d60fc58fa862ff",
       "AGENTS.md": "bb3d9c8faaf8a24f05076b0753f3e8ba39fd171145b0161e7aaa845d9a9463b3",
       "docs/neon.md": "e0fbff12f58d3aeba49f619126c6c1a3c1949972145cd94747e7c7169f1d168e",
       "cmake/DocumentationTests.cmake": "67a8bd6d22f1ce10dade9a4ac744884ca71c19cfbbf52af8d4c8ed0c684e99e2"
     },
-    "server_sha256": "e00b783423f517f33b54dfc83c70328e79d2cb4df4fd79589735a16ec4bc32f4"
+    "server_sha256": "e00b783423f517f33b54dfc83c70328e79d2cb4df4fd79589735a16ec4bc32f4",
+    "scope": "Local documentation and actual current Mac server --help passed for the metadata follow-up; published runtime docs remain qualified at source806."
   },
   "public_playground_performance": {
     "passed": true,
@@ -1496,7 +1858,7 @@
       }
     }
   },
-  "updated_utc": "2026-10-10T15:55:48.869633+00:00",
+  "updated_utc": "2026-10-10T16:46:50.422901+00:00",
   "idle_maintenance": {
     "passed": true,
     "receipt_sha256": "925952aa13f968efc6eaa44cae598dffe97f69269ce1f0f70b894ac394c3b952",

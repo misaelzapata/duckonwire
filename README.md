@@ -269,7 +269,7 @@ The sample contains **46,462 manufacturer-brand products** from Argentina and Sp
 
 ## Flask playground
 
-Try the [live playground](https://dow.ofertasya.app/), or run the included [Flask example](examples/postgres/flask). Browse tables, inspect columns, preview rows and run your own SQL. Six example queries cover products, brands, countries and price comparisons. Its source is included under MIT.
+Try the [live playground](https://dow.ofertasya.app/), or run the included [Flask example](examples/postgres/flask). Browse tables, inspect columns, preview rows and run your own SQL. Example queries cover products, brands, countries and price comparisons. Its source is included under MIT.
 
 Run it with a protected **read-only account**. Connection settings stay on the backend; results are capped at 200 rows and long queries are cancelled. Connections are reused for quicker queries, with a fresh transaction for every request. The reader rule prevents writes.
 
