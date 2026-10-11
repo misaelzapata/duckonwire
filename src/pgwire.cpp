@@ -869,6 +869,7 @@ struct PgWireServer::Impl {
     struct Session;
     struct Job { std::thread thread; std::shared_ptr<std::atomic<bool>> done; };
     duckdb::DuckDB &database;
+    std::vector<PgDatabase> databases;
     std::string host, password;
     bool protected_mode = false;
     PgWireOptions options;
@@ -925,17 +926,21 @@ struct PgWireServer::Impl {
     std::unordered_map<std::uint32_t, std::shared_ptr<Session>> sessions;
     std::atomic<std::uint32_t> next_id {1};
     Impl(duckdb::DuckDB &db, std::string bind, std::uint16_t port, std::string credential,
-         std::size_t maximum, std::uint32_t timeout)
-        : database(db), host(std::move(bind)), password(std::move(credential)), requested_port(port),
+         std::size_t maximum, std::uint32_t timeout, std::vector<PgDatabase> routes)
+        : database(db), databases(std::move(routes)), host(std::move(bind)), password(std::move(credential)), requested_port(port),
           max_active_queries(maximum), query_timeout_ms(timeout) {}
     Impl(duckdb::DuckDB &db, PgWireOptions config)
-        : database(db), host(config.host), protected_mode(true), options(std::move(config)), requested_port(options.port),
+        : database(db), databases(config.databases), host(config.host), protected_mode(true), options(std::move(config)), requested_port(options.port),
           max_active_queries(options.max_active_queries), query_timeout_ms(options.query_timeout_ms) {}
     ~Impl() { Stop(); if (tls_context) SSL_CTX_free(tls_context); }
     void Start();
     void Stop() noexcept;
     void Accept();
     void Cancel(std::uint32_t id, std::uint32_t secret);
+    duckdb::DuckDB *FindDatabase(const std::string &name) const {
+        for (const auto &route : databases) if (route.name == name) return route.database;
+        return nullptr;
+    }
 };
 
 struct PgWireServer::Impl::Session {
@@ -965,6 +970,7 @@ struct PgWireServer::Impl::Session {
         std::string tag;
     };
     Impl &server;
+    duckdb::DuckDB *selected_database;
     duckdb::Connection connection;
     std::mutex connection_lock;
     WireSocket socket;
@@ -984,7 +990,7 @@ struct PgWireServer::Impl::Session {
     std::unordered_map<std::string, Portal> portals;
     std::unordered_map<std::string, Portal> sql_cursors;
     Session(Impl &owner, int socket_p, std::uint32_t id_p)
-        : server(owner), connection(owner.database), socket(socket_p), id(id_p), cancel_secret(0) {
+        : server(owner), selected_database(&owner.database), connection(owner.database), socket(socket_p), id(id_p), cancel_secret(0) {
         if (RAND_bytes(reinterpret_cast<unsigned char *>(&cancel_secret), sizeof(cancel_secret)) != 1)
             throw std::runtime_error("Cannot generate cancellation key");
     }
@@ -1082,6 +1088,13 @@ struct PgWireServer::Impl::Session {
     void Authorize(duckdb::SQLStatement &statement, const std::string &source_sql = {});
     void AuthorizeBound(duckdb::StatementProperties properties);
     void InitializeTypeCatalog();
+    void SelectDatabase(duckdb::DuckDB &database) {
+        if (selected_database == &database) return;
+        duckdb::Connection replacement(database);
+        std::lock_guard<std::mutex> guard(connection_lock);
+        connection = std::move(replacement);
+        selected_database = &database;
+    }
     void ResetConnection(bool preserve_statements);
     void EnsurePrepared(Statement &statement);
     void Handle(char type, const Buffer &body);
@@ -1246,8 +1259,11 @@ Buffer PgWireServer::Impl::Session::AuthenticationResponse() {
 void PgWireServer::Impl::Session::Authenticate(const std::map<std::string, std::string> &startup) {
     const auto user = startup.find("user"), database = startup.find("database");
     const PgUser *selected = nullptr;
-    if (user != startup.end() && database != startup.end() && database->second == server.options.database_name)
-        for (const auto &candidate : server.options.users) if (candidate.name == user->second) { selected = &candidate; break; }
+    if (user != startup.end() && database != startup.end() && server.FindDatabase(database->second))
+        for (const auto &candidate : server.options.users) {
+            const auto &grant_database = candidate.database.empty() ? server.options.database_name : candidate.database;
+            if (candidate.name == user->second && grant_database == database->second) { selected = &candidate; break; }
+        }
     const auto identity = (user == startup.end() ? std::string() : user->second) + '\0' +
                           (database == startup.end() ? std::string() : database->second);
     const auto verifier = selected ? selected->scram_verifier : MockScramVerifier(server.fake_verifier, identity);
@@ -1264,6 +1280,7 @@ void PgWireServer::Impl::Session::Authenticate(const std::map<std::string, std::
         const auto final = AuthenticationResponse();
         const auto response = exchange.Finish(std::string(final.begin(), final.end()));
         if (!selected) throw std::invalid_argument("Unknown credentials");
+        SelectDatabase(*server.FindDatabase(database->second));
         authenticated_user = selected->name; read_only = selected->read_only;
         body.clear(); Put32(body, 12); body.insert(body.end(), response.begin(), response.end()); Message(socket, 'R', body);
     } catch (const std::invalid_argument &) { throw WireError("28P01", "Authentication failed", true); }
@@ -1311,6 +1328,10 @@ bool PgWireServer::Impl::Session::Startup() {
                 difference |= (i < password.size() ? static_cast<unsigned char>(password[i]) : 0) ^
                               (i < server.password.size() ? static_cast<unsigned char>(server.password[i]) : 0);
             if (difference) throw WireError("28P01", "Password authentication failed", true);
+            const auto requested_database = options.find("database");
+            auto *route = requested_database == options.end() ? nullptr : server.FindDatabase(requested_database->second);
+            if (server.databases.size() > 1 && !route) throw WireError("28P01", "Authentication failed", true);
+            if (route) SelectDatabase(*route);
         }
         InitializeTypeCatalog();
         auth.clear(); Put32(auth, 0); Message(socket, 'R', auth);
@@ -1416,7 +1437,7 @@ void PgWireServer::Impl::Session::ResetConnection(bool preserve_statements) {
     if (!connection.IsAutoCommit()) connection.Rollback();
     if (preserve_statements) for (auto &entry : statements) entry.second->prepared.reset();
     else statements.clear();
-    duckdb::Connection replacement(server.database);
+    duckdb::Connection replacement(*selected_database);
     { std::lock_guard<std::mutex> guard(connection_lock); connection = std::move(replacement); }
     failed_transaction = false; implicit_extended_transaction = false;
     InitializeTypeCatalog();
@@ -2254,12 +2275,34 @@ void PgWireServer::Impl::Start() {
     if (!stopping.load()) throw std::runtime_error("PGwire server is already running");
     if (!max_active_queries || max_active_queries > MAX_OBJECTS || !query_timeout_ms || query_timeout_ms > 86400000)
         throw std::invalid_argument("PGwire requires query capacity 1..256 and timeout 1..86400000 milliseconds");
+    const auto valid_name = [](const std::string &name) {
+        if (name.empty() || name.size() > 63) return false;
+        const auto first = static_cast<unsigned char>(name.front());
+        if (!((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || (first >= '0' && first <= '9') || first == '_')) return false;
+        return std::all_of(name.begin(), name.end(), [](unsigned char c) {
+            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.';
+        });
+    };
+    if (databases.empty()) databases.push_back({options.database_name, &database});
+    if (databases.size() > 32) throw std::invalid_argument("PGwire supports at most 32 published databases");
+    std::set<std::string> database_names;
+    std::set<const void *> instances;
+    bool has_primary = false;
+    for (const auto &route : databases) {
+        const auto name = Upper(route.name);
+        if (!route.database || !route.database->instance || !valid_name(route.name) || name == "SYSTEM" || name == "TEMP" ||
+            !database_names.insert(name).second || !instances.insert(route.database->instance.get()).second)
+            throw std::invalid_argument("Invalid or duplicate published database");
+        has_primary = has_primary || route.database == &database;
+    }
+    if (!has_primary) throw std::invalid_argument("Published database routes must include the primary native instance");
     if (!protected_mode) {
         if (host != "127.0.0.1" && host != "localhost") throw std::invalid_argument("Legacy PGwire requires IPv4 loopback");
         if (password.empty() || password.size() > 1024 || password.find('\0') != std::string::npos)
             throw std::invalid_argument("PGwire requires a nonempty password of at most 1024 bytes");
     } else {
-        duckdb::Connection check(database);
+        for (const auto &route : databases) {
+        duckdb::Connection check(*route.database);
         const auto require_boolean = [&](const char *name, bool expected) {
             Value value;
             if (!check.context->TryGetCurrentSetting(duckdb::Identifier(name), value) || value.IsNull() || value.GetValue<bool>() != expected)
@@ -2277,27 +2320,23 @@ void PgWireServer::Impl::Start() {
             for (const auto suffix : {"", ".wal", ".wal.checkpoint", ".wal.recovery"})
                 storage_paths.insert(native_config.SanitizeAllowedPath(config.database_path + suffix));
             storage_directories.insert(native_config.SanitizeAllowedPath(config.database_path + ".tmp") + "/");
-            storage_directories.insert(native_config.SanitizeAllowedPath((std::filesystem::path(config.database_path).parent_path() / "native-spill").string()) + "/");
-        } else storage_directories.insert(native_config.SanitizeAllowedPath(".tmp") + "/");
+        }
+        if (!config.temporary_directory.empty())
+            storage_directories.insert(native_config.SanitizeAllowedPath(config.temporary_directory) + "/");
         if (!config.allowed_configs.empty()) throw std::invalid_argument("Protected PGwire requires no configurable-setting exceptions");
         for (const auto &path : config.allowed_paths) if (!storage_paths.count(path))
             throw std::invalid_argument("Protected PGwire permits only the published database and its native WAL files");
         for (const auto &path : config.allowed_directories) if (!storage_directories.count(path))
             throw std::invalid_argument("Protected PGwire permits only the published database's native spill directory");
+        }
         if (options.tls_cert.empty() || options.tls_key.empty() || options.users.empty() || options.users.size() > 64)
             throw std::invalid_argument("Protected PGwire requires TLS certificate, key and configured users");
-        const auto valid_name = [](const std::string &name) {
-            if (name.empty() || name.size() > 63) return false;
-            const auto first = static_cast<unsigned char>(name.front());
-            if (!((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || (first >= '0' && first <= '9') || first == '_')) return false;
-            return std::all_of(name.begin(), name.end(), [](unsigned char c) {
-                return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.';
-            });
-        };
-        if (!valid_name(options.database_name)) throw std::invalid_argument("Invalid published database name");
+        if (!FindDatabase(options.database_name)) throw std::invalid_argument("Invalid default published database name");
         std::set<std::string> names;
         for (const auto &user : options.users) {
-            if (!valid_name(user.name) || !names.insert(user.name).second) throw std::invalid_argument("Invalid or duplicate PGwire user");
+            const auto &grant_database = user.database.empty() ? options.database_name : user.database;
+            if (!valid_name(user.name) || !FindDatabase(grant_database) || !names.insert(grant_database + '\0' + user.name).second)
+                throw std::invalid_argument("Invalid or duplicate PGwire database user");
             ValidateScramVerifier(user.scram_verifier);
         }
         unsigned char random[32];
@@ -2420,8 +2459,8 @@ void PgWireServer::Impl::Stop() noexcept {
     bound_port.store(0);
 }
 PgWireServer::PgWireServer(duckdb::DuckDB &database, std::string bind_host, std::uint16_t port, std::string password,
-                           std::size_t max_active_queries, std::uint32_t query_timeout_ms)
-    : impl_(new Impl(database, std::move(bind_host), port, std::move(password), max_active_queries, query_timeout_ms)) {}
+                           std::size_t max_active_queries, std::uint32_t query_timeout_ms, std::vector<PgDatabase> databases)
+    : impl_(new Impl(database, std::move(bind_host), port, std::move(password), max_active_queries, query_timeout_ms, std::move(databases))) {}
 PgWireServer::PgWireServer(duckdb::DuckDB &database, PgWireOptions options)
     : impl_(new Impl(database, std::move(options))) {}
 PgWireServer::~PgWireServer() { Stop(); }

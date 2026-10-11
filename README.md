@@ -35,9 +35,9 @@ SQL
 
 On the first run, the last query returns Coffee with stock 4. This is one ordinary connection reading and writing DuckDB. The local server listens on your machine and shares one password; [remote accounts use verified TLS](#public-access). On Mac or ARM, start with [Docker](#try-with-docker) or [build from source](#build-from-source). Ctrl+C stops the server; its database stays in `duckonwire/data`.
 
-[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-119-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
+[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-144-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
 
-DoW turns your DuckDB database into a shared data service. Connect apps in your favorite language, read and write through the same connection, and let readers keep working while new data arrives. Your data stays in DuckDB.
+DoW turns your DuckDB databases into a shared data service. Connect apps in your favorite language, read and write through the same connection, and let readers keep working while new data arrives. Your data stays in DuckDB.
 
 [Download](https://github.com/misaelzapata/duckonwire/releases) · [Try Docker](#try-with-docker) · [Connect from Neon](#query-from-neon) · [Examples](#examples-and-tests) · [Español](#español) · [中文](#中文) · [MIT](LICENSE)
 
@@ -176,6 +176,7 @@ Readers can query and use transactions. Writers can also change rows and tables.
 | Connection mode | Login | `PGDATABASE` |
 | --- | --- | --- |
 | Local, one database | Shared server token; username is a label | Any name connects to the one open database |
+| Local, multiple databases | Shared server token | Choose a published database name |
 | Protected | Real account and password, verified TLS | Must match the account's configured database |
 
 PostgreSQL connections report `PostgreSQL 16.0 wire-compatible DuckOnWire` from `version()`, followed by the DuckDB engine version. This helps tools identify the connection; SQL still runs in DuckDB. Native Quack connections keep DuckDB's usual `version()`.
@@ -196,6 +197,41 @@ Protected SQL cannot read external files or networks, install extensions or chan
 Quack remains a separate trusted loopback connection with the local token. PostgreSQL accounts, permissions and query limits do not apply to it.
 
 </details>
+
+## Multiple databases
+
+Serve separate databases through one PostgreSQL address. Each connection chooses its database; its reads, writes and transactions stay there.
+
+From a current source build, start two databases in your workspace:
+
+```sh
+./build/bin/duckonwire-server --root . \
+  --database shop=data/shop.duckdb \
+  --database reports=data/reports.duckdb --pg-port 9497
+```
+
+In another terminal, use your usual driver with the same local password:
+
+```sh
+export PGHOST=127.0.0.1 PGPORT=9497 PGPASSWORD="$DUCKONWIRE_TOKEN" PGSSLMODE=disable
+PGDATABASE=shop node examples/postgres/node/crud.mjs
+PGDATABASE=reports node examples/postgres/node/crud.mjs
+```
+
+Each command reads and writes its own database. A connection to `shop` cannot query `reports.main.products`. To work in both, open one connection to each. Transactions commit within one database; they do not commit two files atomically.
+
+For protected access, keep the [same TLS setup](#public-access) and repeat database sections in your private access file. Each `user` row belongs to the preceding `database` section. The same username can have a different password or permission in each database. Generate password verifiers with `duckonwire-password`; use real tabs in the file. [Two-database rules example](examples/access-multiple.tsv.example).
+
+Native Quack clients can attach both endpoints and join their tables:
+
+```sql
+ATTACH 'quack:127.0.0.1:9495' AS shop (TOKEN 'your-server-token');
+ATTACH 'quack:127.0.0.1:9496' AS reports (TOKEN 'your-server-token');
+```
+
+Quack uses one consecutive loopback port per database, beginning at `--port`; choose a PostgreSQL port outside that range. The private runtime descriptor lists all endpoints. Native access uses the shared local token and does not enforce PostgreSQL account permissions.
+
+Up to 32 databases and 64 account grants are supported. Protected engines share one buffer budget; threads and spill limits apply per engine. Start with the databases you need, and restart the server to change the list. `--init-demo` initializes only the first database. Earlier release packages may not contain this feature. [Development checks](tests/results/multiple-databases.json).
 
 ## Native connections, clear transactions
 
@@ -401,12 +437,12 @@ Protected accounts cannot read external objects or create cloud secrets; import 
 | Option | Purpose | Default or example |
 | --- | --- | --- |
 | `--root DIRECTORY` | Keep database, runtime state and configuration in one workspace. Directory must exist. | Current directory; `workspace` |
-| `--database PATH` | Open or create the database inside the root. | `data/demo.duckdb` |
+| `--database PATH` or `--database NAME=PATH` | Open or create a database; repeat named entries for isolated databases. | `data/demo.duckdb`; `shop=data/shop.duckdb` |
 | `--state PATH` | Store the private descriptor, including the local token. Must differ from the database path. | `.runtime/native.json` |
 | `--init-demo` | Import the public sample into an empty database. Omit on restart. | Off |
 | `--demo-prices NUMBER` | Generate this many synthetic price observations; requires `--init-demo`. | CSV sample; 46462–10000000 |
-| `--threads NUMBER` | DuckDB worker threads. | Automatic, up to `2`; override with 1–64 |
-| `--port NUMBER` | Quack loopback port. | `9495`; 1–65535 |
+| `--threads NUMBER` | DuckDB worker threads per database. | Automatic, up to `2`; override with 1–64 |
+| `--port NUMBER` | First Quack loopback port; subsequent databases use consecutive ports. | `9495`; range must stay within 1–65535 |
 | `--pg-port NUMBER` | PostgreSQL port; `0` selects a free port recorded in the descriptor. | `9496`; 0–65535 |
 | `--pg-host ADDRESS` | PostgreSQL listen address. Non-loopback requires protected access. | `127.0.0.1` |
 | `--access-file PATH` | Tab-separated database and account rules; requires TLS. | Off; `access.tsv` |
@@ -454,6 +490,8 @@ Desde [Neon](#query-from-neon), `postgres_fdw` presenta las tablas remotas para 
 
 En local se comparte una contraseña. Por red puedes configurar usuarios reales con permisos de lectura o escritura. Quack requiere el motor nativo compatible: `ATTACH` permite leer y unir tablas, y `CONNECT remote` es la ruta para consultas parametrizadas, CRUD y transacciones.
 
+Puedes servir [varias bases](#multiple-databases) desde un mismo puerto PostgreSQL: cada conexión elige su base y cada cuenta tiene permisos allí. Las bases permanecen aisladas; para cruzar datos desde un cliente nativo, adjunta sus endpoints con `ATTACH`.
+
 `COMMIT` confirma cambios, `ROLLBACK` los descarta y cerrar revierte lo pendiente. Cada trabajador usa su conexión. Hay [diez ejemplos](#examples-and-tests), una [página Flask](#flask-playground) y una [guía para agentes](AGENTS.md); los detalles de configuración y compilación están en apartados desplegables.
 
 Para comparar tiempos, usa la misma consulta, cantidad de filas y equipo. El tiempo de la página mide trabajo en el servidor; tu conexión a Internet añade demora. El ejemplo de Node mide el viaje completo de la consulta.
@@ -463,5 +501,7 @@ Para comparar tiempos, usa la misma consulta, cantidad de filas y equipo. El tie
 DuckOnWire（DoW）让应用连接 DuckDB，在新数据写入时继续读取。普通 PostgreSQL 驱动无需更换客户端 DuckDB；Docker 自动配置本地账号与 TLS，Neon 可通过只读 `postgres_fdw` 和验证 TLS 查询远程表。
 
 原生 Quack 需要匹配的引擎：`ATTACH` 用于读取和连接远程表，参数查询、写入及事务使用 `CONNECT remote`。项目提供十种语言示例，MIT 许可。
+
+一个 PostgreSQL 地址可提供多个隔离数据库；每个连接选择数据库，账号权限按数据库配置。原生客户端可用 `ATTACH` 连接多个端点。
 
 教程展示启动、登录、同一连接读写、事务快照、分页与测量。读者在事务结束后才看到新提交的数据；网页的服务器耗时不等于完整网络等待时间。

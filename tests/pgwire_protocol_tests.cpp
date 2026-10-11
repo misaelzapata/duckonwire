@@ -274,7 +274,17 @@ public:
 		}
 		Require(id != 0, "Missing backend cancellation key");
 	}
-	void ProtectedLogin(const std::string &user, const std::string &password, const std::filesystem::path &cert) {
+	void ProtectedLogin(const std::string &user, const std::string &password, const std::filesystem::path &cert,
+	                    const std::string &database = "duckonwire") {
+		ProtectedAuthentication(user, password, cert, database, false);
+	}
+	void RejectedProtectedLogin(const std::string &user, const std::string &password,
+	                            const std::filesystem::path &cert, const std::string &database) {
+		ProtectedAuthentication(user, password, cert, database, true);
+	}
+private:
+	void ProtectedAuthentication(const std::string &user, const std::string &password,
+	                             const std::filesystem::path &cert, const std::string &database, bool rejected) {
 		Bytes request; U32(request, 8); U32(request, 80877103); Send(request);
 		unsigned char answer = 0; Require(Receive(&answer, 1) && answer == 'S', "Protected TLS not accepted");
 		tls_context_ = SSL_CTX_new(TLS_client_method());
@@ -285,7 +295,7 @@ public:
 		        SSL_set1_host(tls_, "localhost") && SSL_connect(tls_) == 1 && SSL_get_verify_result(tls_) == X509_V_OK,
 		        "Fixture TLS hostname verification failed");
 		Bytes body; U32(body, 196608); String(body, "user"); String(body, user);
-		String(body, "database"); String(body, "duckonwire"); body.push_back(0);
+		String(body, "database"); String(body, database); body.push_back(0);
 		Bytes frame; U32(frame, static_cast<std::uint32_t>(body.size() + 4)); frame.insert(frame.end(), body.begin(), body.end()); Send(frame);
 		auto auth = Next(); Require(auth && auth->type == 'R' && Read32(auth->body, 0) == 10, "Missing SCRAM mechanism challenge");
 		std::string random(18, '\0'); Require(RAND_bytes(reinterpret_cast<unsigned char *>(random.data()), static_cast<int>(random.size())) == 1,
@@ -297,12 +307,18 @@ public:
 		                                    "Missing SCRAM continuation");
 		const auto proof = ScramProof(password, bare, std::string(continuation->body.begin() + 4, continuation->body.end()));
 		Message('p', Bytes(proof.first.begin(), proof.first.end()));
-		auto final = Next(); Require(final && final->type == 'R' && Read32(final->body, 0) == 12 &&
+		auto final = Next();
+		if (rejected) {
+			Require(final && ErrorCode(*final) == "28P01", "Rejected database/user did not complete ordinary SCRAM authentication failure");
+			Require(!Next(), "Rejected protected authentication left the socket open"); return;
+		}
+		Require(final && final->type == 'R' && Read32(final->body, 0) == 12 &&
 		    std::string(final->body.begin() + 4, final->body.end()) == proof.second, "SCRAM server signature mismatch");
 		const auto replies = Until("Z"); Require(!Contains(replies, 'E') && State(replies) == 'I', "Protected login failed");
 		for (const auto &reply : replies) if (reply.type == 'K') { id = Read32(reply.body, 0); secret = Read32(reply.body, 4); }
 		Require(id != 0, "Missing protected cancellation key");
 	}
+public:
 	void QuerySend(const std::string &sql) { Bytes body; String(body, sql); Message('Q', body); }
 	std::vector<Reply> Query(const std::string &sql) { QuerySend(sql); return Until("Z"); }
 	void Parse(const std::string &name, const std::string &sql, const std::vector<std::uint32_t> &oids = {}) {
@@ -368,6 +384,60 @@ private:
 	const std::string password = "fixture-only-password-not-a-real-credential";
 };
 
+class MultiDatabaseFixture {
+public:
+	MultiDatabaseFixture(const std::filesystem::path &parent, const std::filesystem::path &executable)
+	    : root(parent), cert(root.path() / "ca.pem"), primary(root.path() / "primary.duckdb"),
+	      reporting(root.path() / "data" / "reporting.duckdb"), executable_(executable) {
+		const auto key = root.path() / "key.pem", access = root.path() / "access.tsv";
+		FixtureCertificate(cert, key);
+		{
+			std::ofstream file(access);
+			const auto primary_verifier = duckonwire::MakeScramVerifier(Password("duckonwire"), 4096);
+			const auto reporting_verifier = duckonwire::MakeScramVerifier(Password("reporting"), 4096);
+			file << "database\tduckonwire\nuser\twriter\twrite\t" << primary_verifier
+			     << "\nuser\treader\tread\t" << primary_verifier
+			     << "\nuser\tmixed\tread\t" << primary_verifier
+			     << "\nuser\tprimary_only\tread\t" << primary_verifier
+			     << "\ndatabase\treporting\nuser\twriter\twrite\t" << reporting_verifier
+			     << "\nuser\treader\tread\t" << reporting_verifier
+			     << "\nuser\tmixed\twrite\t" << reporting_verifier
+			     << "\nuser\treporting_only\tread\t" << reporting_verifier << '\n';
+			Require(bool(file) && chmod(access.c_str(), 0600) == 0, "Cannot create isolated multi-database rules");
+		}
+		Start();
+	}
+	void Start() {
+		Require(!server || server->pid() <= 0, "Cannot restart a running multi-database fixture");
+		server = std::make_unique<test_support::NativeServer>(root.path(), primary, executable_, 0, false,
+		    std::vector<std::string> {"--database", "reporting=data/reporting.duckdb", "--access-file",
+		        (root.path() / "access.tsv").string(), "--tls-cert", cert.string(), "--tls-key",
+		        (root.path() / "key.pem").string()});
+	}
+	std::unique_ptr<Wire> Client(const std::string &database, const std::string &user = "writer") {
+		auto wire = std::make_unique<Wire>(server->pg_port());
+		wire->ProtectedLogin(user, Password(database), cert, database); return wire;
+	}
+	void Reject(const std::string &database, const std::string &user, const std::string &credential_database) {
+		Wire wire(server->pg_port()); wire.RejectedProtectedLogin(user, Password(credential_database), cert, database);
+	}
+	std::string SecondaryEndpoint() const {
+		const auto &endpoint = server->endpoint(); const auto colon = endpoint.rfind(':');
+		Require(colon != std::string::npos, "Malformed multi-database native endpoint");
+		return endpoint.substr(0, colon + 1) + std::to_string(std::stoi(endpoint.substr(colon + 1)) + 1);
+	}
+	test_support::TempRoot root;
+	std::filesystem::path cert, primary, reporting;
+	std::unique_ptr<test_support::NativeServer> server;
+private:
+	const std::string &Password(const std::string &database) const {
+		return database == "reporting" ? reporting_password_ : primary_password_;
+	}
+	std::filesystem::path executable_;
+	const std::string primary_password_ = "isolated-primary-fixture-only-password";
+	const std::string reporting_password_ = "isolated-reporting-fixture-only-password";
+};
+
 std::string ValuesInsert(const std::string &table, std::size_t rows, std::size_t columns) {
 	std::string sql = "INSERT INTO " + table + " VALUES ";
 	for (std::size_t row = 0, parameter = 1; row < rows; ++row) {
@@ -413,12 +483,12 @@ int main(int argc, char **argv) {
 		else { std::cerr << "Unknown option\n"; return 2; }
 	}
 	std::vector<std::pair<std::string, std::string>> checks;
-	std::string private_token;
+	std::vector<std::string> private_tokens;
 	try {
 		Require(!server_program.empty(), "--server is required");
 		test_support::TempRoot fixture(fixture_parent);
 		test_support::NativeServer server(fixture.path(), fixture.path() / "protocol.duckdb", server_program);
-		private_token = server.token();
+		private_tokens.push_back(server.token());
 		auto client = [&] { auto wire = std::make_unique<Wire>(server.pg_port()); wire->Login(server.token()); return wire; };
 		auto test = [&](const std::string &name, const std::function<void()> &body) {
 			try { body(); checks.emplace_back(name, ""); }
@@ -465,10 +535,10 @@ int main(int argc, char **argv) {
 			const auto stdout_before = std::filesystem::exists("stdout"), upper_before = std::filesystem::exists("STDOUT");
 			for (const auto &sql : {std::string("COPY (SELECT 87654321) TO STDOUT (FORMAT CSV)"),
 			                       std::string("CoPy (SELECT 87654321) tO /* wire stream */ sTdOuT"),
-                               std::string("COPY pgwire_network_copy FROM STDIN (FORMAT CSV)"),
-                               std::string("EXPLAIN ANALYZE COPY pgwire_network_copy FROM STDIN (FORMAT CSV)"),
-                               std::string("PREPARE blocked_export AS COPY (SELECT 87654321) TO STDOUT"),
-                               std::string("PREPARE blocked_import AS COPY pgwire_network_copy FROM STDIN (FORMAT CSV)")}) {
+			                       std::string("COPY pgwire_network_copy FROM STDIN (FORMAT CSV)"),
+			                       std::string("EXPLAIN ANALYZE COPY pgwire_network_copy FROM STDIN (FORMAT CSV)"),
+			                       std::string("PREPARE blocked_export AS COPY (SELECT 87654321) TO STDOUT"),
+			                       std::string("PREPARE blocked_import AS COPY pgwire_network_copy FROM STDIN (FORMAT CSV)")}) {
 				const auto simple = wire->Query(sql);
 				Require(HasError(simple, "0A000") && State(simple) == 'I' && !Contains(simple, 'C') &&
 				        !Contains(simple, 'H') && !Contains(simple, 'G') && !Contains(simple, 'd'),
@@ -489,9 +559,12 @@ int main(int argc, char **argv) {
 			        "Network COPY rejection disabled legitimate legacy local-file COPY");
 			Require(Scalar(*wire, "SELECT sum(id) FROM read_csv(" + test_support::Literal(csv.string()) + ",header=true)") == 7,
 			        "Local-file COPY changed exported values");
-            Require(!Contains(wire->Query("CREATE TABLE stdin AS SELECT 8::INTEGER AS id"), 'E'), "COPY source-name fixture failed");
-            const auto named = wire->Query("COPY (SELECT * FROM stdin) TO " + test_support::Literal((fixture.path() / "named-source.csv").string()) + " (HEADER)");
-            Require(!Contains(named, 'E') && Command(named) == "COPY 1", "A table named stdin was mistaken for a COPY stream");
+			Require(!Contains(wire->Query("CREATE TABLE stdin AS SELECT 8::INTEGER AS id"), 'E'), "COPY source-name fixture failed");
+			const auto named_csv = fixture.path() / "named-source.csv";
+			const auto named = wire->Query("COPY (SELECT * FROM stdin) TO " + test_support::Literal(named_csv.string()) + " (HEADER)");
+			Require(!Contains(named, 'E') && Command(named) == "COPY 1" &&
+			        Scalar(*wire, "SELECT sum(id) FROM read_csv(" + test_support::Literal(named_csv.string()) + ",header=true)") == 8,
+			        "A table named stdin was mistaken for a network COPY stream");
 		});
 		test("malformed_frame_fails_closed_without_affecting_other_session", [&] {
 			auto wire = client(); Bytes malformed {'Q'}; U32(malformed, 3); wire->Send(malformed);
@@ -810,6 +883,7 @@ int main(int argc, char **argv) {
 		});
 		server.stop(); test("graceful_shutdown_with_protocol_sessions", [&] { Require(server.clean_shutdown(), "Native server required forced shutdown"); });
 		ProtectedFixture protected_fixture(fixture_parent, server_program);
+		private_tokens.push_back(protected_fixture.server->token());
 		test("protected_network_copy_reports_unsupported_before_permission_policy", [&] {
 			for (const auto &role : {std::string("writer"), std::string("reader")}) {
 				auto wire = protected_fixture.Client(role);
@@ -817,7 +891,10 @@ int main(int argc, char **argv) {
 				Require(version.size() == 1 && version[0][0] && version[0][0]->find("PostgreSQL 16.0") == 0,
 				        "Protected version() still advertises native engine as PostgreSQL wire version");
 				for (const auto &sql : {std::string("COPY (SELECT 7) TO STDOUT"),
-				                       std::string("COPY missing_copy_table FROM STDIN")}) {
+				                       std::string("COPY missing_copy_table FROM STDIN"),
+				                       std::string("EXPLAIN ANALYZE COPY missing_copy_table FROM STDIN"),
+				                       std::string("PREPARE blocked_export AS COPY (SELECT 7) TO STDOUT"),
+				                       std::string("PREPARE blocked_import AS COPY missing_copy_table FROM STDIN")}) {
 					const auto simple = wire->Query(sql);
 					Require(HasError(simple, "0A000") && State(simple) == 'I' && !Contains(simple, 'C'),
 					        "Protected network COPY was not rejected as an unsupported wire feature");
@@ -998,11 +1075,264 @@ int main(int argc, char **argv) {
 			});
 			Require(protected_fixture.server->clean_shutdown(), "Active parsing or waiters required forced owner shutdown");
 		});
+
+		test("multiple_databases_reject_storage_aliases_duplicate_names_and_port_overflow", [&] {
+			auto rejected = [&](const std::string &scenario, const std::vector<std::string> &arguments,
+			                    const std::string &reason, int port = 0) {
+				test_support::TempRoot invalid(fixture_parent); bool denied = false;
+				const auto primary = invalid.path() / "primary.duckdb";
+				try {
+					test_support::NativeServer bad(invalid.path(), primary, server_program, port, false, arguments);
+				} catch (const std::exception &error) {
+					Require(std::string(error.what()).find(reason) != std::string::npos,
+					        "Startup rejected " + scenario + " for an unexpected reason: " + error.what());
+					denied = true;
+				}
+				Require(denied && !std::filesystem::exists(primary),
+				        "Unsafe configuration " + scenario + " started an owner or created the primary database");
+			};
+			for (const auto &suffix : {std::string(".wal"), std::string(".wal.checkpoint"),
+			                          std::string(".wal.recovery"), std::string(".tmp")}) {
+				rejected("secondary database aliases primary " + suffix,
+				    {"--database", "reporting=primary.duckdb" + suffix}, "paths must not overlap");
+			}
+			rejected("duplicate canonical database paths", {"--database", "reporting=./data/../primary.duckdb"}, "paths must not overlap");
+			int descriptor_port = test_support::AvailablePort();
+			while (descriptor_port == 65535) descriptor_port = test_support::AvailablePort();
+			rejected("secondary database aliases server descriptor",
+			    {"--database", "reporting=server-" + std::to_string(descriptor_port) + ".json"}, "paths must not overlap", descriptor_port);
+			rejected("case-folded named database duplicates",
+			    {"--database", "Reporting=second.duckdb", "--database", "reporting=third.duckdb"}, "unique, ignoring case");
+			rejected("secondary Quack port overflows 65535", {"--database", "reporting=second.duckdb"}, "port range exceeds 65535", 65535);
+		});
+		MultiDatabaseFixture multiple(fixture_parent, server_program);
+		private_tokens.push_back(multiple.server->token());
+		test("multiple_databases_have_independent_native_catalogs_and_bound_results", [&] {
+			auto primary = multiple.Client("duckonwire"), reporting = multiple.Client("reporting");
+			Require(!Contains(primary->Query("CREATE TABLE md_shared(id INTEGER PRIMARY KEY,label VARCHAR)"), 'E') &&
+			        !Contains(reporting->Query("CREATE TABLE md_shared(id INTEGER PRIMARY KEY,label INTEGER)"), 'E'),
+			        "Same table name could not be created independently in both databases");
+			const std::string insert = "INSERT INTO md_shared VALUES ($1,$2)";
+			for (auto *wire : {primary.get(), reporting.get()}) {
+				const bool first = wire == primary.get();
+				wire->Parse("same_statement", insert, {23, first ? 25U : 23U});
+				wire->Bind("same_portal", "same_statement", {std::string("1"), first ? "Primary '日本'" : "73"});
+				wire->Execute("same_portal"); wire->Message('S');
+				Require(!Contains(wire->Until("Z"), 'E'), "Identical INSERT syntax retained another database's types");
+			}
+			for (auto *wire : {primary.get(), reporting.get(), primary.get()}) {
+				const bool first = wire == primary.get();
+				wire->Parse("", "SELECT label FROM md_shared WHERE id=$1", {23});
+				wire->Bind("", "", {std::string("1")}); wire->Describe('P', ""); wire->Execute(""); wire->Message('S');
+				const auto replies = wire->Until("Z"); const auto rows = Rows(replies); const auto columns = Description(replies);
+				Require(!Contains(replies, 'E') && rows.size() == 1 && rows[0][0] == (first ? "Primary '日本'" : "73") &&
+				        columns.size() == 1 && columns[0].second == (first ? 25U : 23U),
+				        "Prepared SELECT shared bound data or result metadata between databases");
+			}
+			Require(!Contains(primary->Query("CREATE TABLE md_primary_only(id INTEGER); CREATE SCHEMA primary_only_schema; CREATE VIEW md_primary_view AS SELECT 11 AS value"), 'E') &&
+			        !Contains(reporting->Query("CREATE TABLE md_reporting_only(id INTEGER); CREATE SCHEMA reporting_only_schema; CREATE VIEW md_reporting_view AS SELECT 22 AS value"), 'E'),
+			        "Isolated metadata fixtures failed");
+		});
+		test("multiple_databases_authenticate_same_username_with_distinct_credentials", [&] {
+			multiple.Reject("reporting", "writer", "duckonwire");
+			multiple.Reject("duckonwire", "writer", "reporting");
+			multiple.Reject("reporting", "primary_only", "duckonwire");
+			multiple.Reject("duckonwire", "reporting_only", "reporting");
+			multiple.Reject("not_a_published_database", "writer", "duckonwire");
+			multiple.Reject("reporting", "unknown_user", "reporting");
+			auto primary = multiple.Client("duckonwire", "primary_only"), reporting = multiple.Client("reporting", "reporting_only");
+			Require(Scalar(*primary, "SELECT id FROM md_shared") == 1 && Scalar(*reporting, "SELECT label FROM md_shared") == 73,
+			        "Rejected authentication altered valid routes or database membership");
+		});
+		test("multiple_databases_apply_read_write_permissions_per_database", [&] {
+			auto primary = multiple.Client("duckonwire", "mixed"), reporting = multiple.Client("reporting", "mixed");
+			Require(HasError(primary->Query("INSERT INTO md_shared VALUES(99,'denied')"), "42501"),
+			        "Same user gained the other database's writer role");
+			Require(!Contains(reporting->Query("INSERT INTO md_shared VALUES(99,99)"), 'E') &&
+			        Scalar(*reporting, "SELECT label FROM md_shared WHERE id=99") == 99,
+			        "Same user's reporting writer role was replaced by primary reader permissions");
+			Require(!Contains(reporting->Query("DELETE FROM md_shared WHERE id=99"), 'E'), "Reporting writer cleanup was denied");
+			for (const auto &database : {std::string("duckonwire"), std::string("reporting")}) {
+				auto reader = multiple.Client(database, "reader");
+				reader->Parse("denied", "INSERT INTO md_shared VALUES ($1,$2)", {23, database == "duckonwire" ? 25U : 23U});
+				reader->Bind("denied", "denied", {std::string("100"), database == "duckonwire" ? "denied" : "100"});
+				reader->Execute("denied"); reader->Message('S');
+				Require(HasError(reader->Until("Z"), "42501") && Scalar(*reader, "SELECT count(*) FROM md_shared") == 1,
+				        "Shared prepared syntax bypassed per-database read-only permissions");
+			}
+		});
+		test("multiple_databases_read_while_both_native_instances_write", [&] {
+			std::vector<std::unique_ptr<Wire>> sessions;
+			sessions.push_back(multiple.Client("duckonwire")); sessions.push_back(multiple.Client("reporting"));
+			sessions.push_back(multiple.Client("duckonwire", "reader")); sessions.push_back(multiple.Client("reporting", "reader"));
+			std::atomic<unsigned> pending {0}, observed {0}, committed {0};
+			auto wait = [](const std::atomic<unsigned> &count, const std::string &message) {
+				const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(4);
+				while (count.load() < 2 && std::chrono::steady_clock::now() < deadline) std::this_thread::yield();
+				Require(count.load() == 2, message);
+			};
+			Concurrent(4, [&](std::size_t worker) {
+				auto &wire = *sessions[worker];
+				if (worker < 2) {
+					Require(State(wire.Query("BEGIN")) == 'T', "Multi-database writer BEGIN failed");
+					wire.Parse("pending", "INSERT INTO md_shared VALUES ($1,$2)", {23, worker == 0 ? 25U : 23U});
+					wire.Bind("pending", "pending", {std::string("7"), worker == 0 ? "Primary committed" : "77"});
+					wire.Execute("pending"); wire.Message('S');
+					const auto replies = wire.Until("Z");
+					Require(!Contains(replies, 'E') && State(replies) == 'T', "Writes to matching primary keys crossed database boundaries");
+					++pending; wait(observed, "Readers could not query while both database writers were pending");
+					Require(State(wire.Query("COMMIT")) == 'I', "Multi-database writer COMMIT failed"); ++committed;
+				} else {
+					wait(pending, "Both native writers did not reach pending transactions");
+					Require(State(wire.Query("BEGIN")) == 'T' && Scalar(wire, "SELECT sum(id) FROM md_shared") == 1,
+					        "Pending writes blocked a reader or leaked before COMMIT");
+					++observed; wait(committed, "Independent database writers failed to commit");
+					Require(Scalar(wire, "SELECT sum(id) FROM md_shared") == 1, "Commit changed an existing native reader snapshot");
+					Require(State(wire.Query("COMMIT")) == 'I' && Scalar(wire, "SELECT sum(id) FROM md_shared") == 8,
+					        "Fresh reader transaction did not see its own database's committed write");
+				}
+			});
+		});
+		test("multiple_databases_block_cross_catalog_data_and_ddl", [&] {
+			auto primary = multiple.Client("duckonwire"), reporting = multiple.Client("reporting");
+			auto catalog = [](Wire &wire) {
+				const auto replies = wire.Query("SELECT current_database()"); const auto rows = Rows(replies);
+				Require(!Contains(replies, 'E') && rows.size() == 1 && rows[0].size() == 1 && rows[0][0], "Native catalog identity query failed");
+				return rows[0][0].value();
+			};
+			const auto primary_catalog = catalog(*primary), reporting_catalog = catalog(*reporting);
+			Require(primary_catalog != reporting_catalog, "Fixtures unexpectedly use the same native catalog name");
+			for (auto *wire : {primary.get(), reporting.get()}) {
+				const auto peer = (wire == primary.get() ? reporting_catalog : primary_catalog) + ".main.md_shared";
+				for (const auto &sql : {"SELECT * FROM " + peer,
+				                       "CREATE TABLE md_stolen AS SELECT * FROM " + peer,
+				                       "CREATE VIEW md_stolen_view AS SELECT * FROM " + peer,
+				                       "SELECT (SELECT count(*) FROM " + peer + ")",
+				                       "EXPLAIN SELECT * FROM " + peer,
+				                       "EXPLAIN ANALYZE SELECT * FROM " + peer,
+				                       "INSERT INTO md_shared SELECT * FROM " + peer,
+				                       "DELETE FROM " + peer,
+				                       "ALTER TABLE " + peer + " ADD COLUMN stolen INTEGER",
+				                       "DROP TABLE " + peer}) {
+					const auto rejected = wire->Query(sql);
+					Require(Contains(rejected, 'E') && State(rejected) == 'I' && !Contains(rejected, 'D'),
+					        "Protected connection accessed or modified a different database's catalog");
+				}
+				Require(Scalar(*wire, "SELECT count(*) FROM md_shared") == 2 &&
+				        Scalar(*wire, "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('md_stolen','md_stolen_view')") == 0,
+				        "Rejected cross-database query created local objects or altered selected data");
+			}
+		});
+		test("multiple_databases_metadata_lists_only_selected_database", [&] {
+			for (const auto &database : {std::string("duckonwire"), std::string("reporting")}) {
+				auto reader = multiple.Client(database, "reader"); const bool primary = database == "duckonwire";
+				const std::string peer = primary ? "reporting" : "primary";
+				Require(Scalar(*reader, "SELECT count(*) FROM information_schema.tables WHERE table_name='md_" + peer + "_only'") == 0 &&
+				        Scalar(*reader, "SELECT count(*) FROM duckdb_tables() WHERE table_name='md_" + peer + "_only'") == 0 &&
+				        Scalar(*reader, "SELECT count(*) FROM duckdb_views() WHERE view_name='md_" + peer + "_view'") == 0 &&
+				        Scalar(*reader, "SELECT count(*) FROM duckdb_schemas() WHERE schema_name='" + peer + "_only_schema'") == 0,
+				        "Metadata exposed another database's tables, views or schemas");
+				Require(Scalar(*reader, "SELECT count(*) FROM duckdb_databases() WHERE NOT internal") == 1 &&
+				        Scalar(*reader, "SELECT count(*) FROM duckdb_databases() WHERE path=" +
+				            test_support::Literal((primary ? multiple.reporting : multiple.primary).string())) == 0,
+				        "Metadata exposed another published database file");
+				Require(Scalar(*reader, "SELECT count(*) FROM duckdb_tables() WHERE NOT internal AND NOT temporary AND database_name<>current_database()") == 0 &&
+				        Scalar(*reader, "SELECT count(*) FROM duckdb_views() WHERE NOT internal AND NOT temporary AND database_name<>current_database()") == 0,
+				        "Native metadata contained persistent catalogs outside the selected database");
+			}
+		});
+		test("multiple_databases_connection_and_pool_resets_preserve_route", [&] {
+			const std::string pooled_reset = "SET SESSION AUTHORIZATION DEFAULT; RESET ALL; CLOSE ALL; UNLISTEN *; SELECT pg_advisory_unlock_all(); DISCARD SEQUENCES; DISCARD TEMP";
+			for (const auto &database : {std::string("duckonwire"), std::string("reporting")}) {
+				auto wire = multiple.Client(database); const bool primary = database == "duckonwire";
+				auto check_route = [&] {
+					const auto replies = wire->Query("SELECT label FROM md_shared WHERE id=1"); const auto rows = Rows(replies);
+					Require(!Contains(replies, 'E') && rows.size() == 1 && rows[0][0] == (primary ? "Primary '日本'" : "73"),
+					        "Session reset reverted a client to another native database");
+				};
+				for (const auto &reset : {std::string("DEALLOCATE ALL"), std::string("DISCARD ALL")}) {
+					Require(!Contains(wire->Query(reset), 'E'), "Multi-database session reset failed"); check_route();
+				}
+				wire->Parse("kept", "SELECT label FROM md_shared WHERE id=$1", {23}); wire->Message('S');
+				Require(!Contains(wire->Until("Z"), 'E') && !Contains(wire->Query(pooled_reset), 'E'), "Pool reset fixture failed");
+				wire->Bind("kept", "kept", {std::string("1")}); wire->Execute("kept"); wire->Message('S');
+				const auto replies = wire->Until("Z"); const auto rows = Rows(replies);
+				Require(!Contains(replies, 'E') && rows.size() == 1 && rows[0][0] == (primary ? "Primary '日本'" : "73"),
+				        "Reprepared statement after pool reset moved to the primary database"); check_route();
+			}
+		});
+		test("multiple_databases_disconnect_rolls_back_each_native_transaction", [&] {
+			for (const auto &database : {std::string("duckonwire"), std::string("reporting")}) {
+				{
+					auto writer = multiple.Client(database); Require(State(writer->Query("BEGIN")) == 'T', "Abandoned multi-database BEGIN failed");
+					const auto sql = database == "duckonwire" ? "INSERT INTO md_shared VALUES(8,'rolled back')" : "INSERT INTO md_shared VALUES(8,88)";
+					Require(!Contains(writer->Query(sql), 'E'), "Abandoned multi-database INSERT failed");
+				}
+				auto observer = multiple.Client(database);
+				Require(Scalar(*observer, "SELECT count(*) FROM md_shared WHERE id=8") == 0 &&
+				        !Contains(observer->Query(database == "duckonwire" ? "INSERT INTO md_shared VALUES(8,'reused')" : "INSERT INTO md_shared VALUES(8,88)"), 'E') &&
+				        !Contains(observer->Query("DELETE FROM md_shared WHERE id=8"), 'E'),
+				        "Closed connection committed pending data or retained a write lock in its database");
+			}
+		});
+		test("multiple_databases_trusted_native_attach_can_join_two_endpoints", [&] {
+			duckdb::DuckDB local(nullptr); duckdb::Connection native(local);
+			for (const auto &endpoint : {std::make_pair("primary_remote", multiple.server->endpoint()),
+			                             std::make_pair("reporting_remote", multiple.SecondaryEndpoint())}) {
+				test_support::Check(native.Query("ATTACH " + test_support::Literal(endpoint.second) + " AS " + endpoint.first +
+				    " (TOKEN " + test_support::Literal(multiple.server->token()) + ")"));
+			}
+			auto joined = native.Query("SELECT p.id,p.label,r.label FROM primary_remote.main.md_shared p JOIN reporting_remote.main.md_shared r USING(id) ORDER BY id");
+			test_support::Check(joined); const auto rows = test_support::FetchRows(*joined);
+			Require(rows.size() == 2 && rows[0][0].GetValue<int>() == 1 && rows[0][1].GetValue<std::string>() == "Primary '日本'" &&
+			        rows[0][2].GetValue<int>() == 73 && rows[1][0].GetValue<int>() == 7 && rows[1][2].GetValue<int>() == 77,
+			        "Trusted ATTACH failed to join distinct native catalogs on the same owner");
+		});
+		test("multiple_databases_graceful_restart_preserves_both_files_and_routes", [&] {
+			multiple.server->stop(); Require(multiple.server->clean_shutdown(), "Multi-database owner required forced shutdown");
+			Require(std::filesystem::is_regular_file(multiple.primary) && std::filesystem::is_regular_file(multiple.reporting),
+			        "Multi-database owner did not create two persistent DuckDB files");
+			multiple.Start();
+			private_tokens.push_back(multiple.server->token());
+			auto primary = multiple.Client("duckonwire"), reporting = multiple.Client("reporting");
+			const auto primary_rows = Rows(primary->Query("SELECT id,label FROM md_shared ORDER BY id"));
+			const auto reporting_rows = Rows(reporting->Query("SELECT id,label FROM md_shared ORDER BY id"));
+			Require(primary_rows.size() == 2 && primary_rows[0][0] == "1" && primary_rows[0][1] == "Primary '日本'" &&
+			        primary_rows[1][0] == "7" && primary_rows[1][1] == "Primary committed" &&
+			        reporting_rows.size() == 2 && reporting_rows[0][0] == "1" && reporting_rows[0][1] == "73" &&
+			        reporting_rows[1][0] == "7" && reporting_rows[1][1] == "77",
+			        "Restart lost confirmed writes, revived abandoned writes or crossed database routes");
+			primary.reset(); reporting.reset(); multiple.server->stop();
+			Require(multiple.server->clean_shutdown(), "Restarted multi-database owner failed graceful shutdown");
+		});
+		test("multiple_databases_recover_confirmed_commits_after_owned_sigkill", [&] {
+			multiple.Start(); private_tokens.push_back(multiple.server->token());
+			auto primary = multiple.Client("duckonwire"), reporting = multiple.Client("reporting");
+			Require(!Contains(primary->Query("INSERT INTO md_shared VALUES(9,'confirmed before crash')"), 'E') &&
+			        !Contains(reporting->Query("INSERT INTO md_shared VALUES(9,99)"), 'E'), "Crash fixture did not confirm both commits");
+			Require(State(primary->Query("BEGIN")) == 'T' && State(reporting->Query("BEGIN")) == 'T' &&
+			        !Contains(primary->Query("INSERT INTO md_shared VALUES(10,'pending at crash')"), 'E') &&
+			        !Contains(reporting->Query("INSERT INTO md_shared VALUES(10,100)"), 'E'), "Crash fixture pending transactions failed");
+			Require(kill(multiple.server->pid(), SIGKILL) == 0, "Could not kill the owned isolated multi-database fixture");
+			multiple.server->stop(); primary.reset(); reporting.reset();
+			const int status = multiple.server->exit_status();
+			Require(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL,
+			        "Crash recovery did not actually follow SIGKILL");
+			multiple.Start(); private_tokens.push_back(multiple.server->token());
+			for (const auto &database : {std::string("duckonwire"), std::string("reporting")}) {
+				auto recovered = multiple.Client(database);
+				Require(Scalar(*recovered, "SELECT count(*) FROM md_shared") == 3 &&
+				        Scalar(*recovered, "SELECT count(*) FROM md_shared WHERE id=9") == 1 &&
+				        Scalar(*recovered, "SELECT count(*) FROM md_shared WHERE id=10") == 0,
+				        "Crash recovery lost a confirmed commit or persisted a pending write in a database");
+			}
+			multiple.server->stop(); Require(multiple.server->clean_shutdown(), "Recovered multi-database owner failed graceful shutdown");
+		});
 	} catch (const std::exception &error) { checks.emplace_back("fixture_setup", error.what()); }
 	bool passed = !checks.empty();
 	for (auto &check : checks) {
 		passed = passed && check.second.empty();
-		if (!private_token.empty()) {
+		for (const auto &private_token : private_tokens) if (!private_token.empty()) {
 			std::size_t at = 0;
 			while ((at = check.second.find(private_token, at)) != std::string::npos) {
 				check.second.replace(at, private_token.size(), "[redacted]"); at += 10;
