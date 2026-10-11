@@ -217,7 +217,14 @@ def run():
     reference = answer(WINDOW_TOP3)
     check("TopK preset and public SQL match all six window-ranked catalog rows",
           reference["row_count"] == 6 and answer(top) == reference and answer(example_top) == reference)
+    def observation_ids(prefix):
+        # Each price observation has a primary key in the actual demo schema.
+        return prefix.replace("prices(product_id,price)", "price_samples(product_id,price)", 1) + (
+            "prices AS (SELECT CAST(row_number() OVER () AS INTEGER) AS id,"
+            "product_id,price FROM price_samples), "
+        )
     for name, prefix in TOPK_FIXTURES:
+        prefix = observation_ids(prefix)
         check("actual TopK/window equivalence for " + name,
               answer(prefix + top.removeprefix("WITH ")) == answer(prefix + WINDOW_TOP3.removeprefix("WITH ")))
     boundaries = (
@@ -227,6 +234,7 @@ def run():
         "prices(product_id,price) AS (VALUES "
         "(2147483647,CAST(250.00 AS DECIMAL(18,2))),(-2147483648,249.99),(0,250.00),(1,250.00)), "
     )
+    boundaries = observation_ids(boundaries)
     check("TopK cents outweigh the full signed product-id range",
           answer(boundaries + top.removeprefix("WITH ")) ==
           answer(boundaries + WINDOW_TOP3.removeprefix("WITH ")))

@@ -1,0 +1,162 @@
+{
+  "passed": true,
+  "status": "Query-only local and Amazon runtime qualification. Repository CI, source integration and playground deployment are separate pending gates.",
+  "source_base_commit": "ef66bc4f54363ce9b5c996e1cce5326c37d6a402",
+  "engine_commit": "0cfb63a5f712fadf06a0de33217b7b03666ae66b",
+  "server_binary_sha256": "6e14d8ecf0df8361ab75e94eac7f21d05f2ebf9ecee2b5854d7c7dc095e0d1cb",
+  "engine_binary_sha256": "58b8b89b78d3f360e320f44b142ce280463a837a5a81d5bd95f43715e8ccd024",
+  "source_files_sha256": {
+    "examples/postgres/queries/top-prices.sql": "f6262e6faf673de3fa454b1dbb08011db644f5a8f705a69b1c9d1a88064c1e47",
+    "examples/postgres/queries/brand-movement.sql": "7276a7f0d00a1af3e9dbbb41d235135d510a694b44d5a62c9ed74d138485091e",
+    "tests/flask_playground.py": "a698daaec048633de4e758609b00012438298e086ff1d7a1bd6655c4216279b0",
+    "examples/postgres/flask/app.py": "605c4cd44166534f9f526acca03c2ca6456d38131d6a9960a127514b92e7f408"
+  },
+  "changes": [
+    "Retain only observation IDs in the top-three heap, then retrieve the chosen native price and product rows through their primary keys.",
+    "Calculate the exact numeric date/observation ordering key once for both first and last price aggregates.",
+    "Give synthetic TopK test fixtures unique price observation IDs, matching the demo schema."
+  ],
+  "data": {
+    "products": 46462,
+    "price_observations": 1000000,
+    "coverage": [
+      "Argentina",
+      "Spain"
+    ],
+    "prices": "Synthetic reproducible history; no private retailer or application data."
+  },
+  "local_correctness": {
+    "typed_ordered_and_pagination_comparisons": 3960,
+    "actual_protected_Flask_checks": 91,
+    "actual_protected_Flask_passed": true,
+    "scope": "Apple M1 Pro, unchanged native server, reused incremental engine with embedded source ID848126236a; separate from fresh Linux CI.",
+    "comparison_scope": "3960 exact comparisons across ten alternative SQL plans,396 per alternative, including each of the two adopted candidates; separate from the91 actual Flask checks.",
+    "typed_ordered_and_pagination_comparisons_per_chosen_candidate": 396,
+    "Flask_scope": "The actual optimized TopK and brand movement presets, including unique observation-ID edge fixtures, passed all91 protected Flask checks. The earlier pre-preset integration receipt is retained separately and is not this acceptance."
+  },
+  "read_only_Amazon_pairing": {
+    "driver": "Unmodified Node pg8.16.3",
+    "network": "Host loopback, verified TLS/SCRAM; one reused genuine reader connection.",
+    "owner_cpu_cores": 1,
+    "owner_threads": 1,
+    "owner_memory_bytes": 402653184,
+    "client_cpu_cores": 1,
+    "client_memory_bytes": 201326592,
+    "swap_bytes": 0,
+    "page": {
+      "limit": 101,
+      "offset": 0
+    },
+    "warmups_per_variant": 2,
+    "measured_pairs_per_query": 12,
+    "cases": [
+      {
+        "name": "top-observation-id",
+        "baseline_file": "examples/postgres/queries/top-prices.sql",
+        "candidate_sha256": "f6262e6faf673de3fa454b1dbb08011db644f5a8f705a69b1c9d1a88064c1e47",
+        "baseline_sha256": "dc34645eacd20bc77ba1fb8b3ce5552a5081eda9e07d5b30939dd4dcc91f4cbe",
+        "baseline": {
+          "samples": 12,
+          "mean_ms": 116.77731583333336,
+          "median_ms": 116.68329600000015,
+          "nearest_rank_p50_ms": 116.31809700000031,
+          "nearest_rank_p95_ms": 118.039896,
+          "minimum_ms": 115.84645300000011,
+          "maximum_ms": 118.039896
+        },
+        "candidate": {
+          "samples": 12,
+          "mean_ms": 82.20910000000009,
+          "median_ms": 82.04191400000013,
+          "nearest_rank_p50_ms": 81.9727810000004,
+          "nearest_rank_p95_ms": 83.11654800000042,
+          "minimum_ms": 81.42876999999999,
+          "maximum_ms": 83.11654800000042
+        },
+        "mean_improvement_percent": 29.60182428124109,
+        "candidate_faster_pairs": 12
+      },
+      {
+        "name": "brand-shared-key",
+        "baseline_file": "examples/postgres/queries/brand-movement.sql",
+        "candidate_sha256": "7276a7f0d00a1af3e9dbbb41d235135d510a694b44d5a62c9ed74d138485091e",
+        "baseline_sha256": "ccde8d4f69b193ef1baca87ea0e20b0ba0a079d1921afcdf4e342f627b48b7af",
+        "baseline": {
+          "samples": 12,
+          "mean_ms": 156.48425150000034,
+          "median_ms": 155.26106250000066,
+          "nearest_rank_p50_ms": 154.93464800000038,
+          "nearest_rank_p95_ms": 167.59380500000043,
+          "minimum_ms": 151.66130800000064,
+          "maximum_ms": 167.59380500000043
+        },
+        "candidate": {
+          "samples": 12,
+          "mean_ms": 119.92178124999994,
+          "median_ms": 119.7973135000002,
+          "nearest_rank_p50_ms": 119.32280499999979,
+          "nearest_rank_p95_ms": 123.96739999999954,
+          "minimum_ms": 115.3760540000003,
+          "maximum_ms": 123.96739999999954
+        },
+        "mean_improvement_percent": 23.36495199965878,
+        "candidate_faster_pairs": 12
+      }
+    ],
+    "timing": "Complete driver round trips including bound parameters and decoded rows; authentication, pauses, fingerprint checks and later instrumented plans excluded.",
+    "typed_results_and_pages_identical": true,
+    "paired_independent_review_passed": true
+  },
+  "mixed_Amazon": {
+    "client_rows_inserted": 2000000,
+    "confirmed_commits": 2000,
+    "bound_parameters": 6000000,
+    "writers": 4,
+    "readers": 4,
+    "all_ten_complex_queries_verified_and_overlapping": true,
+    "read_queries": 1372,
+    "read_queries_overlapping_writes": 1368,
+    "write_seconds": 147.05075265800002,
+    "insert_rows_per_second": 13600.746435153957,
+    "mean_read_latency_ms": 428.89317100947557,
+    "read_p95_ms_client_reported": 1453.1108349999995,
+    "baseline_mean_read_latency_ms": 495.1754899363484,
+    "baseline_insert_rows_per_second": 13537.286031894442,
+    "comparison": "Separate sequential baseline and candidate loads, with two SQL changes and different read sample populations. This comparison is not a paired causal throughput measurement.",
+    "write_target": "Separate ingestion tables in the same copied database. Demo price history remains one million rows; these are not two million additional price observations.",
+    "native_child_sampled_peak_RSS_bytes": 280494080,
+    "owner_cgroup_peak_bytes": 264171520,
+    "owner_cgroup_limit_bytes": 402653184,
+    "client_cgroup_peak_bytes": 50442240,
+    "client_cgroup_limit_bytes": 201326592,
+    "owner_cpu_seconds": 148.291139,
+    "owner_cpu_throttled_seconds": 129.948735,
+    "no_OOM": true,
+    "exact_integrity_after_graceful_restart": true,
+    "independent_runtime_review_passed": true
+  },
+  "reproduce": {
+    "read_only": "PG_LATENCY_SAMPLES=12 PG_LATENCY_WARMUPS=2 node examples/postgres/node/latency.mjs",
+    "mixed": "PG_DEMO_READS=1 PG_INGEST_ROWS=2000000 node examples/postgres/node/ingest.mjs",
+    "setup": "Use a copied demo database initialized with --init-demo --demo-prices 1000000 and separate protected writer/reader PG credentials. See README for normal driver login.",
+    "scope": "Public client commands exercise the current queries; the private comparison additionally alternated the preserved baseline SQL and verified restart integrity."
+  },
+  "limits": [
+    "All ten queries below10ms remains unmet.",
+    "Loopback driver timings are not engine-only, HTTP or Internet response times.",
+    "The mixed test uses eight query slots and30s fixture timeout; the public playground retains two slots and5s timeout.",
+    "Process RSS and cgroup accounting differ; a memory budget is not a hard RSS limit.",
+    "100ms resource sampling can miss transient RSS peaks.",
+    "Mixed read percentiles are reported by the unchanged client; only weighted means were independently recomputed.",
+    "No new engine patch, schema, result cache or index is required for these SQL changes."
+  ],
+  "evidence_sha256": {
+    "readonly_runtime_review": "86992992c05990e7414739e974c4b1cbede0eb734ff866a3b0da98bb9aaf7a7b",
+    "mixed_raw": "bcedac28f30ad69cfe58e13cbaace6c34f346c6252956037d97db566bb98168c",
+    "mixed_analysis": "be3433f4d754ccc1c2537c6fcb4df471d8607e3fe11abc32260d81b0ef71b888",
+    "mixed_runtime_review": "bcde2b1e96494392a68b2d65fc56a78e89b4625211accbfcdf9144047b96fa9a",
+    "local_Flask_receipt": "20fe140acc594c8d50b2d7dba96efe726885781167318d9f6ac17e6bbf103b41",
+    "mixed_independent_analysis_review": "6ee15d5de299c954b8ccb768d34b942c11e2cdfe956a69c0767fea3fe0293c0f"
+  },
+  "created_utc": "2026-10-11T00:12:36.250833+00:00"
+}
