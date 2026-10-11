@@ -2,22 +2,18 @@
 -- The native numeric key preserves DATE/observation-id order, including NULLs.
 -- Demo prices are synthetic.
 WITH keyed AS (
- SELECT product_id,price,
-   CAST(CASE WHEN day IS NULL THEN 2147483648
-             WHEN day=DATE 'infinity' THEN 2147483647
+ SELECT product_id,price,day,id,
+   CAST(CASE WHEN day=DATE 'infinity' THEN 2147483647
              WHEN day=DATE '-infinity' THEN -2147483647
              ELSE date_diff('day',DATE '1970-01-01',day) END AS HUGEINT)
-     *18446744073709551616::HUGEINT+id::HUGEINT AS first_key,
-   CAST(CASE WHEN day IS NULL THEN -2147483648
-             WHEN day=DATE 'infinity' THEN 2147483647
-             WHEN day=DATE '-infinity' THEN -2147483647
-             ELSE date_diff('day',DATE '1970-01-01',day) END AS HUGEINT)
-     *18446744073709551616::HUGEINT+id::HUGEINT AS last_key
+     *18446744073709551616::HUGEINT+id::HUGEINT AS observation_key
  FROM prices
 ), samples AS (
  SELECT product_id,
-   arg_min_null(price,first_key) AS first_sample,
-   arg_max_null(price,last_key) AS last_sample
+   arg_min_null(price,CASE WHEN day IS NULL THEN 2147483648::HUGEINT
+     *18446744073709551616::HUGEINT+id::HUGEINT ELSE observation_key END) AS first_sample,
+   arg_max_null(price,CASE WHEN day IS NULL THEN -2147483648::HUGEINT
+     *18446744073709551616::HUGEINT+id::HUGEINT ELSE observation_key END) AS last_sample
  FROM keyed GROUP BY product_id
 )
 SELECT p.country_code,p.brand,count(*) AS products_with_history,

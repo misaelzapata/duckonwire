@@ -1,7 +1,7 @@
 {
   "project": "DuckOnWire",
   "version": "0.3.0",
-  "status": "Version0.3.0 release acceptance is preserved below. Current performance changes have separate source and runtime evidence; fresh build and deployment acceptance remain pending.",
+  "status": "Version0.3.0 acceptance is retained. Two additional SQL optimizations passed local and Amazon runtime checks; fresh repository CI and deployment are recorded separately.",
   "native_engine_version": "v2.1.0-dev0",
   "quack_protocol": 7,
   "patches_sha256": {
@@ -49,6 +49,10 @@
     {
       "path": "installer.json",
       "sha256": "9b0fd48d0257f126de5bce4047d57856e7335cba0eca2179163ee6ab30688505"
+    },
+    {
+      "path": "query-optimization.json",
+      "sha256": "399f8479b26b93e47f7d510f091d58430f032a2265b4ff48a836e5b3a1bdfd27"
     }
   ],
   "benchmark_runs": [
@@ -703,7 +707,7 @@
     "preset_count": 7,
     "top_prices_sql": "examples/postgres/queries/top-prices.sql"
   },
-  "updated_utc": "2026-10-10T16:46:50.422901+00:00",
+  "updated_utc": "2026-10-11T00:12:36.250833+00:00",
   "performance_20261010": {
     "status": "Final source locally passed; fresh current Linux CI and deployment pending",
     "duckdb_fork_commit": "0cfb63a5f712fadf06a0de33217b7b03666ae66b",
@@ -742,5 +746,21 @@
       "rows": 2000000,
       "full_Linux_protocol40_qualified": false
     }
+  },
+  "current_query_qualification": {
+    "status": "Runtime-qualified SQL candidate; fresh current-source CI and playground deployment pending.",
+    "result_file": "query-optimization.json",
+    "result_sha256": "399f8479b26b93e47f7d510f091d58430f032a2265b4ff48a836e5b3a1bdfd27",
+    "retained_engine_commit": "0cfb63a5f712fadf06a0de33217b7b03666ae66b",
+    "queries": [
+      "top-prices.sql",
+      "brand-movement.sql"
+    ],
+    "read_only_pairing_passed": true,
+    "actual_Amazon_2M_four_writer_four_reader_passed": true,
+    "graceful_restart_integrity_passed": true,
+    "local_protected_Flask_checks": 91,
+    "public_playground_updated": false,
+    "all_queries_under_10ms": false
   }
 }
