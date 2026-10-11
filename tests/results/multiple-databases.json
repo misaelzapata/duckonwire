@@ -26,7 +26,19 @@
       "native_sessions": 21,
       "bootstrap": 17
     },
-    "passed": true
+    "passed": true,
+    "concurrent_smoke": {
+      "passed": true,
+      "rows_per_mode": 10000,
+      "writers": 4,
+      "readers": 4,
+      "modes": [
+        "embedded",
+        "Quack loopback"
+      ],
+      "durable_reopen_verified": true,
+      "scope": "Generated native INSERT SELECT rows; not client VALUES throughput."
+    }
   },
   "acceptance": {
     "protocol": {
@@ -512,7 +524,22 @@
   },
   "independent_review": {
     "source_review": "Both found blockers fixed: reserve WAL/recovery/temp paths and validate actual native instance identity.",
-    "runtime_review": "Stock-driver review pending."
+    "runtime_review": {
+      "passed": true,
+      "checks": 23,
+      "driver": "Node.js 24.9.0 / pg 8.16.3",
+      "verified_tls": true,
+      "engine_qualification": "Cached development engine, current dependency pins require CI.",
+      "coverage": [
+        "database routing and identical prepared SQL",
+        "scoped credentials with different read/write roles",
+        "cross-database and metadata isolation",
+        "commit and rollback",
+        "authentication and rejection recovery",
+        "DISCARD ALL retains database and permissions",
+        "per-database integrity"
+      ]
+    }
   },
   "source_sha256": {
     "src/server.cpp": "4749ddcec70096604138252bd9a571da5dc93daf0ebc88754b159e6702e8fe16",

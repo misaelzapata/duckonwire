@@ -56,7 +56,7 @@
     },
     {
       "path": "multiple-databases.json",
-      "sha256": "f4a453c2e6bbf4533041e464fb508fb284283c52d131e2d5676c173ece818b61"
+      "sha256": "180ab5f3d16e64d5d10b20750c2369e2f3fc416034d04f938e123ff7fec228b3"
     },
     {
       "path": "pg-client-compatibility.json",
