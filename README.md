@@ -173,6 +173,15 @@ node examples/postgres/node/crud.mjs
 
 Readers can query and use transactions. Writers can also change rows and tables. Unknown accounts and database names are rejected. Keep passwords out of URLs, command arguments and logs; do not disable TLS verification. [Permission tests](tests/results/public-access.json).
 
+| Connection mode | Login | `PGDATABASE` |
+| --- | --- | --- |
+| Local, one database | Shared server token; username is a label | Any name connects to the one open database |
+| Protected | Real account and password, verified TLS | Must match the account's configured database |
+
+PostgreSQL connections report `PostgreSQL 16.0 wire-compatible DuckOnWire` from `version()`, followed by the DuckDB engine version. This helps tools identify the connection; SQL still runs in DuckDB. Native Quack connections keep DuckDB's usual `version()`.
+
+Network `COPY TO STDOUT` and `COPY FROM STDIN` return an explicit unsupported-operation error. Send inserts in bound batches and read rows with `SELECT`. Trusted local connections can still export CSV to a server-side file; protected accounts cannot access files.
+
 </details>
 
 <details>

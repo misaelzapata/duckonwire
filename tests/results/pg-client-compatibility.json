@@ -1,0 +1,225 @@
+{
+  "project": "DuckOnWire",
+  "date": "2026-10-11",
+  "status": "Local cached-engine checks and independent stock-driver review passed; fresh pinned-source CI pending.",
+  "scope": "PostgreSQL wire identity and explicit rejection of unsupported network COPY; native identity unchanged; documented single-database local routing.",
+  "local": {
+    "platform": "macOS ARM64",
+    "engine_source": "848126236a4a8879f232bed7ab5f702683a55300",
+    "engine_version": "v2.1.0-dev0",
+    "qualification": "Cached development engine; does not qualify fresh current dependency pins.",
+    "server_sha256": "916517f218ef4a3f6b8b976a0d0cca9d87d6e30b6000d25c19fbde7ee45a63d4",
+    "engine_sha256": "5beb16eb653a59c11a37471da2c4182ffcf882adebb1774e55d6fef2b88b6e39",
+    "protocol_checks": 44,
+    "passed": true,
+    "checks": [
+      {
+        "name": "password_failure_is_fatal_and_bounded",
+        "passed": true
+      },
+      {
+        "name": "ssl_declined_then_plain_startup",
+        "passed": true
+      },
+      {
+        "name": "wire_version_identifies_protocol_without_changing_native_engine",
+        "passed": true
+      },
+      {
+        "name": "legacy_single_database_accepts_label_and_keeps_primary_route",
+        "passed": true
+      },
+      {
+        "name": "network_copy_is_explicitly_unsupported_in_simple_and_extended_protocol",
+        "passed": true
+      },
+      {
+        "name": "malformed_frame_fails_closed_without_affecting_other_session",
+        "passed": true
+      },
+      {
+        "name": "parser_error_and_sync_recovery",
+        "passed": true
+      },
+      {
+        "name": "unsupported_parameter_oid_rejected_even_for_null",
+        "passed": true
+      },
+      {
+        "name": "text_parameter_unicode_null_decimal_and_blob",
+        "passed": true
+      },
+      {
+        "name": "prepared_binary_pagination_15003_rows",
+        "passed": true
+      },
+      {
+        "name": "close_statement_closes_associated_portals",
+        "passed": true
+      },
+      {
+        "name": "explicit_constraint_failure_requires_rollback",
+        "passed": true
+      },
+      {
+        "name": "extended_implicit_transaction_commits_only_at_sync",
+        "passed": true
+      },
+      {
+        "name": "extended_implicit_error_rolls_back_prior_commands",
+        "passed": true
+      },
+      {
+        "name": "disconnect_rolls_back_pending_explicit_write",
+        "passed": true
+      },
+      {
+        "name": "mvcc_reader_keeps_snapshot_while_writer_commits",
+        "passed": true
+      },
+      {
+        "name": "same_row_conflict_preserves_reader_and_rollback_recovers",
+        "passed": true
+      },
+      {
+        "name": "simple_batch_begin_promotes_prior_implicit_work",
+        "passed": true
+      },
+      {
+        "name": "dml_command_tags_and_returning_row_counts",
+        "passed": true
+      },
+      {
+        "name": "schema_changes_are_fresh_across_pgwire_and_quack",
+        "passed": true
+      },
+      {
+        "name": "bound_file_table_functions_describe_actual_schema",
+        "passed": true
+      },
+      {
+        "name": "describe_only_insert_does_not_execute_or_end_transaction",
+        "passed": true
+      },
+      {
+        "name": "statement_describe_declared_types_and_unresolved_fail_closed",
+        "passed": true
+      },
+      {
+        "name": "sql_cursor_requires_explicit_transaction",
+        "passed": true
+      },
+      {
+        "name": "sql_cursor_forward_pagination_preserves_every_row",
+        "passed": true
+      },
+      {
+        "name": "sql_cursor_identifier_case_and_duplicate_errors",
+        "passed": true
+      },
+      {
+        "name": "sql_cursor_independent_positions_and_zero_fetch",
+        "passed": true
+      },
+      {
+        "name": "extended_cursor_declaration_binds_values_without_returning_rows",
+        "passed": true
+      },
+      {
+        "name": "extended_fetch_and_close_keep_protocol_synchronized",
+        "passed": true
+      },
+      {
+        "name": "sql_cursors_are_removed_at_transaction_end",
+        "passed": true
+      },
+      {
+        "name": "close_all_preserves_transaction_and_prepared_statements",
+        "passed": true
+      },
+      {
+        "name": "savepoints_do_not_fake_rollback_for_legacy_writers",
+        "passed": true
+      },
+      {
+        "name": "cancel_request_interrupts_query_and_session_recovers",
+        "passed": true
+      },
+      {
+        "name": "graceful_shutdown_with_protocol_sessions",
+        "passed": true
+      },
+      {
+        "name": "protected_network_copy_reports_unsupported_before_permission_policy",
+        "passed": true
+      },
+      {
+        "name": "protected_concurrent_positional_values_and_reader_denial",
+        "passed": true
+      },
+      {
+        "name": "protected_template_uses_current_catalog_and_bound_types",
+        "passed": true
+      },
+      {
+        "name": "protected_template_replacement_preserves_native_semantics",
+        "passed": true
+      },
+      {
+        "name": "protected_declare_uses_fresh_native_prepare_and_permissions",
+        "passed": true
+      },
+      {
+        "name": "protected_parse_contention_deadline_cancel_and_reuse",
+        "passed": true
+      },
+      {
+        "name": "protected_select_template_uses_current_catalog_and_parameter_types",
+        "passed": true
+      },
+      {
+        "name": "protected_select_template_preserves_session_snapshot_and_authority",
+        "passed": true
+      },
+      {
+        "name": "protected_select_template_eviction_and_uncached_shapes_preserve_results",
+        "passed": true
+      },
+      {
+        "name": "protected_shutdown_releases_parse_waiters",
+        "passed": true
+      }
+    ],
+    "documentation": {
+      "passed": true,
+      "documents": 3,
+      "links": 100,
+      "anchors": 24,
+      "fences": 31
+    }
+  },
+  "independent_review": {
+    "passed": true,
+    "driver": "pg 8.16.3",
+    "runtime": "Node.js 24.9.0",
+    "checks": 16,
+    "coverage": [
+      "simple and extended COPY rejection",
+      "SQL PREPARE and EXPLAIN ANALYZE COPY rejection",
+      "mixed case and comments",
+      "no unintended imports or owner stdout payload",
+      "quoted file import/export and table named stdin",
+      "version identity and DISCARD ALL restoration"
+    ]
+  },
+  "source_sha256": {
+    "src/pgwire.cpp": "806d0f29dafe49d30029477813c0c1e43b33972f1b036e3fcf9fbe482887a8f9",
+    "tests/pgwire_protocol_tests.cpp": "fc63c114a2037c00f68d9cad7aecdfb27bcad8569f5e9176a521c4ddce0a3052"
+  },
+  "limitations": [
+    "PostgreSQL wire compatibility does not implement PostgreSQL SQL, all catalogs or ORM support.",
+    "Network COPY remains unsupported; bound INSERT batches and SELECT are supported.",
+    "Trusted local filesystem COPY is a server-side export/import, not a streamed client transfer.",
+    "Single-database legacy local mode accepts any database label; protected mode checks membership."
+  ]
+}

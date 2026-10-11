@@ -53,6 +53,10 @@
     {
       "path": "query-optimization.json",
       "sha256": "399f8479b26b93e47f7d510f091d58430f032a2265b4ff48a836e5b3a1bdfd27"
+    },
+    {
+      "path": "pg-client-compatibility.json",
+      "sha256": "1a28bc705d92e64eb35d6d2c1464515b2f8fde20f288bb8a679d5913bc50baa0"
     }
   ],
   "benchmark_runs": [
