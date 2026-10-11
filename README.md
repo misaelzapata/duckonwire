@@ -35,7 +35,7 @@ SQL
 
 On the first run, the last query returns Coffee with stock 4. This is one ordinary connection reading and writing DuckDB. The local server listens on your machine and shares one password; [remote accounts use verified TLS](#public-access). On Mac or ARM, start with [Docker](#try-with-docker) or [build from source](#build-from-source). Ctrl+C stops the server; its database stays in `duckonwire/data`.
 
-[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-115-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
+[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-119-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
 
 DoW turns your DuckDB database into a shared data service. Connect apps in your favorite language, read and write through the same connection, and let readers keep working while new data arrives. Your data stays in DuckDB.
 
