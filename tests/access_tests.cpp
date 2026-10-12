@@ -103,6 +103,9 @@ int main(int argc, char **argv) {
             Require(config.users[0].name == "reader.name" && config.users[0].read_only && config.users[0].verifier == VERIFIER,
                     "Reader rule or verifier changed");
             Require(config.users[1].name == "Writer_2-test" && !config.users[1].read_only, "Writer rule changed");
+            Require(config.databases == std::vector<std::string>{"duckonwire"} &&
+                    config.users[0].database == "duckonwire" && config.users[1].database == "duckonwire",
+                    "Legacy rules were not scoped to their database");
         });
         test("owner_read_only_crlf_and_final_line_without_newline", [&] {
             auto path = fixture.Write("database\tduckonwire\r\nuser\treader\tread\t" + VERIFIER, 0400);
@@ -133,6 +136,77 @@ int main(int argc, char **argv) {
             Rejected(fixture.Write(Config() + "user\treader\twrite\t" + VERIFIER).string());
             Require(duckonwire::ReadAccessConfig(fixture.Write(Config() + "user\tReader\twrite\t" + VERIFIER).string()).users.size() == 2,
                     "Distinct case-sensitive users collapsed");
+        });
+        test("multiple_databases_scope_roles_and_separate_credentials", [&] {
+            auto other_verifier = VERIFIER;
+            other_verifier.replace(std::string("SCRAM-SHA-256$").size(), 4, "8192");
+            auto path = fixture.Write("database\tPrimaryDB\r\nuser\tshared\tread\t" + VERIFIER +
+                                      "\r\nuser\twriter\twrite\t" + VERIFIER +
+                                      "\r\ndatabase\tanalytics.2\r\nuser\tshared\twrite\t" + other_verifier);
+            const auto config = duckonwire::ReadAccessConfig(path.string());
+            Require(config.database == "PrimaryDB" &&
+                    config.databases == std::vector<std::string>{"PrimaryDB", "analytics.2"} && config.users.size() == 3,
+                    "Multiple database order or default changed");
+            Require(config.users[0].database == "PrimaryDB" && config.users[0].name == "shared" &&
+                    config.users[0].read_only && config.users[0].verifier == VERIFIER,
+                    "First database reader grant changed");
+            Require(config.users[1].database == "PrimaryDB" && config.users[1].name == "writer" && !config.users[1].read_only,
+                    "First database writer grant changed");
+            Require(config.users[2].database == "analytics.2" && config.users[2].name == "shared" &&
+                    !config.users[2].read_only && config.users[2].verifier == other_verifier,
+                    "Second database grant inherited another database's credential or role");
+        });
+        test("each_database_section_requires_at_least_one_user", [&] {
+            for (const auto &content : std::vector<std::string>{
+                "database\tfirst\ndatabase\tsecond\nuser\treader\tread\t" + VERIFIER,
+                Config() + "database\tsecond\ndatabase\tthird\nuser\treader\tread\t" + VERIFIER,
+                Config() + "database\tsecond",
+                "user\treader\tread\t" + VERIFIER + "\ndatabase\tfirst\nuser\treader\tread\t" + VERIFIER})
+                Rejected(fixture.Write(content).string());
+        });
+        test("database_alias_duplicates_and_reserved_aliases_are_rejected", [&] {
+            for (const auto &name : {"duckonwire", "DuckOnWire", "DUCKONWIRE"})
+                Rejected(fixture.Write(Config() + "database\t" + name + "\nuser\tother\tread\t" + VERIFIER).string());
+            for (const auto &name : {"system", "SYSTEM", "System", "temp", "TEMP", "Temp"}) {
+                Rejected(fixture.Write("database\t" + std::string(name) + "\nuser\treader\tread\t" + VERIFIER).string());
+                Rejected(fixture.Write(Config() + "database\t" + name + "\nuser\treader\tread\t" + VERIFIER).string());
+            }
+        });
+        test("duplicate_users_are_rejected_within_every_database", [&] {
+            const auto second = Config() + "database\tsecond\nuser\treader\twrite\t" + VERIFIER + "\n";
+            Rejected(fixture.Write(second + "user\treader\tread\t" + VERIFIER).string());
+            const auto config = duckonwire::ReadAccessConfig(fixture.Write(second + "user\tReader\tread\t" + VERIFIER).string());
+            Require(config.users.size() == 3 && config.users[1].name == "reader" && config.users[2].name == "Reader" &&
+                    config.users[1].database == "second" && config.users[2].database == "second",
+                    "Second database lost case-sensitive username handling");
+        });
+        test("database_count_32_allowed_33_rejected", [&] {
+            std::string content;
+            for (int i = 0; i < 32; ++i)
+                content += "database\tdb" + std::to_string(i) + "\nuser\tshared\tread\t" + VERIFIER + "\n";
+            const auto config = duckonwire::ReadAccessConfig(fixture.Write(content).string());
+            Require(config.databases.size() == 32 && config.users.size() == 32 && config.database == "db0" &&
+                    config.users.back().database == "db31", "32-database boundary or grant scopes failed");
+            Rejected(fixture.Write(content + "database\tdb32\nuser\tshared\tread\t" + VERIFIER).string());
+        });
+        test("grant_count_64_is_global_across_database_sections", [&] {
+            std::string content;
+            for (int i = 0; i < 32; ++i)
+                content += "database\tdb" + std::to_string(i) + "\nuser\treader\tread\t" + VERIFIER +
+                           "\nuser\twriter\twrite\t" + VERIFIER + "\n";
+            const auto config = duckonwire::ReadAccessConfig(fixture.Write(content).string());
+            Require(config.users.size() == 64 && config.databases.size() == 32,
+                    "64 scoped grants across databases were rejected");
+            Rejected(fixture.Write(content + "user\tother\tread\t" + VERIFIER).string());
+        });
+        test("later_sections_preserve_strict_names_roles_and_verifiers", [&] {
+            for (const auto &name : std::vector<std::string>{"", "-bad", "bad/name", "bad name", "caf\xc3\xa9", std::string(64, 'a')}) {
+                Rejected(fixture.Write(Config() + "database\t" + name + "\nuser\treader\tread\t" + VERIFIER).string());
+                Rejected(fixture.Write(Config() + "database\tsecond\nuser\t" + name + "\tread\t" + VERIFIER).string());
+            }
+            Rejected(fixture.Write(Config() + "database\tsecond\nuser\treader\tadmin\t" + VERIFIER).string());
+            Rejected(fixture.Write(Config() + "database\tsecond\nuser\treader\tread\tPRIVATE_INVALID_VERIFIER").string());
+            Rejected(fixture.Write(Config() + "database\tsecond\textra\nuser\treader\tread\t" + VERIFIER).string());
         });
         test("user_count_64_allowed_65_rejected", [&] {
             std::string content = "database\tduckonwire\n";

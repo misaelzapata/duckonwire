@@ -5,9 +5,10 @@
   "changes": [
     "One exact acceptance-count definition shared by CTest summaries, packaging and release provenance.",
     "Installed packages qualify database routing when the suite is configured.",
-    "Release verifies the same source and count-definition hashes."
+    "Release verifies the same source and count-definition hashes.",
+    "Native test fixtures probe the full consecutive port range before launching multiple databases."
   ],
-  "expected_unique_checks": 119,
+  "expected_unique_checks": 144,
   "validation": {
     "package_gate_regressions": {
       "passed": true,
@@ -23,10 +24,22 @@
     },
     "documentation_checks": {
       "passed": true
+    },
+    "cached_engine_protocol": {
+      "passed": true,
+      "checks": 56,
+      "native_source": "848126236a",
+      "includes_occupied_second_port": true
+    },
+    "port_allocator": {
+      "passed": true,
+      "forced_occupied_neighbor_cases": 128,
+      "descriptor_leaks": 0
     }
   },
   "limitations": [
     "Current-head native packaging and Docker workflow results are pending.",
-    "Cached development-engine runtime checks do not qualify current dependency pins."
+    "Cached development-engine runtime checks do not qualify current dependency pins.",
+    "Port probing fixes occupied neighbors; it is not atomic socket activation."
   ]
 }

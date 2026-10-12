@@ -55,12 +55,16 @@
       "sha256": "399f8479b26b93e47f7d510f091d58430f032a2265b4ff48a836e5b3a1bdfd27"
     },
     {
+      "path": "multiple-databases.json",
+      "sha256": "180ab5f3d16e64d5d10b20750c2369e2f3fc416034d04f938e123ff7fec228b3"
+    },
+    {
       "path": "pg-client-compatibility.json",
       "sha256": "1a28bc705d92e64eb35d6d2c1464515b2f8fde20f288bb8a679d5913bc50baa0"
     },
     {
       "path": "ci-repair.json",
-      "sha256": "d40249da782f285ae4144e2d226469983f000e1f259c5b388179764010e17b64"
+      "sha256": "24ca9d10c7305df41a23fbc40fcd43918eea5bf53a7d7a19a1c57a2e00a1e557"
     }
   ],
   "benchmark_runs": [

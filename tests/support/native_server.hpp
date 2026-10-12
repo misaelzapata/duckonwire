@@ -6,6 +6,7 @@
 #include <cerrno>
 #include <chrono>
 #include <csignal>
+#include <cstdint>
 #include <cstring>
 #include <fcntl.h>
 #include <filesystem>
@@ -92,39 +93,78 @@ private:
 	fs::path path_;
 };
 
+// Hold every probe socket until the entire consecutive range is known to be
+// available. Partial failures and exceptions release all owned descriptors.
+class PortRangeReservation {
+public:
+	PortRangeReservation() = default;
+	PortRangeReservation(const PortRangeReservation &) = delete;
+	PortRangeReservation &operator=(const PortRangeReservation &) = delete;
+	~PortRangeReservation() { for (int fd : sockets_) close(fd); }
+	bool Bind(std::size_t count, int first_port = 0) {
+		Require(sockets_.empty(), "Native fixture port reservation cannot be reused");
+		Require(count > 0 && count <= 32 && first_port >= 0 && first_port <= 65535,
+		        "Invalid native fixture port range");
+		sockets_.reserve(count);
+		for (std::size_t offset = 0; offset < count; ++offset) {
+			int fd = socket(AF_INET, SOCK_STREAM, 0);
+			if (fd < 0) throw std::runtime_error("Cannot allocate native fixture port");
+			sockets_.push_back(fd);
+			if (fcntl(fd, F_SETFD, FD_CLOEXEC) != 0)
+				throw std::runtime_error("Cannot protect native fixture probe socket");
+			struct sockaddr_in address {};
+			address.sin_family = AF_INET;
+			address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+			address.sin_port = htons(static_cast<std::uint16_t>(offset ? port_ + offset : first_port));
+			if (bind(fd, reinterpret_cast<sockaddr *>(&address), sizeof(address)) != 0) {
+				if (errno == EADDRINUSE) return false;
+				throw std::runtime_error("Cannot bind native fixture port");
+			}
+			if (!offset) {
+				socklen_t size = sizeof(address);
+				if (getsockname(fd, reinterpret_cast<sockaddr *>(&address), &size) != 0)
+					throw std::runtime_error("Cannot inspect native fixture port");
+				port_ = ntohs(address.sin_port);
+				if (count - 1 > static_cast<std::size_t>(65535 - port_)) return false;
+			}
+		}
+		return true;
+	}
+	int port() const { return port_; }
+private:
+	std::vector<int> sockets_;
+	int port_ = 0;
+};
+
+// The optional first candidate makes occupied-neighbor and overflow regression
+// tests deterministic. Normal fixtures let the OS choose the first candidate.
+inline int AvailablePortRange(std::size_t count, int first_candidate = 0) {
+	Require(count > 0 && count <= 32 && first_candidate >= 0 && first_candidate <= 65535,
+	        "Invalid native fixture port range");
+	for (unsigned attempt = 0; attempt < 128; ++attempt) {
+		PortRangeReservation reservation;
+		if (reservation.Bind(count, attempt ? 0 : first_candidate)) return reservation.port();
+	}
+	throw std::runtime_error("Cannot allocate an available native fixture port range after 128 probes");
+}
+
 inline int AvailablePort() {
-	int fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (fd < 0) throw std::runtime_error("Cannot allocate native fixture port");
-	struct sockaddr_in address {};
-	address.sin_family = AF_INET;
-	address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	address.sin_port = 0;
-	if (bind(fd, reinterpret_cast<sockaddr *>(&address), sizeof(address)) != 0) {
-		close(fd);
-		throw std::runtime_error("Cannot bind native fixture port");
-	}
-	socklen_t size = sizeof(address);
-	if (getsockname(fd, reinterpret_cast<sockaddr *>(&address), &size) != 0) {
-		close(fd);
-		throw std::runtime_error("Cannot inspect native fixture port");
-	}
-	const int port = ntohs(address.sin_port);
-	close(fd);
-	return port;
+	return AvailablePortRange(1);
 }
 
 // This fixture launches the real C++ server. SQL stays in DuckDB's native Connection.
 class NativeServer {
 public:
 	NativeServer(const fs::path &root, const fs::path &database, const fs::path &executable, int port = 0,
-	             bool init_demo = false, const std::vector<std::string> &extra_arguments = {})
+	             bool init_demo = false, const std::vector<std::string> &extra_arguments = {},
+	             std::size_t native_port_count = 1)
 	    : root_(fs::canonical(root)), database_(fs::weakly_canonical(database)),
 	      executable_(fs::canonical(executable)) {
 		Require(access(executable_.c_str(), X_OK) == 0, "Native server executable is unavailable");
 		Require(database_.lexically_relative(root_).native().find("..") != 0,
 		        "Native fixture database must be inside its root");
 		fs::create_directories(database_.parent_path());
-		const int selected_port = port ? port : AvailablePort();
+		const int selected_port = port ? port : AvailablePortRange(native_port_count);
 		endpoint_ = "quack:127.0.0.1:" + std::to_string(selected_port);
 		state_ = root_ / ("server-" + std::to_string(selected_port) + ".json");
 		Require(!fs::exists(state_), "Native fixture descriptor already exists; preserved");

@@ -1,0 +1,5 @@
+database	shop
+user	app	write	REPLACE_WITH_SHOP_SCRAM_VERIFIER
+user	reader	read	REPLACE_WITH_SHOP_READER_SCRAM_VERIFIER
+database	reports
+user	app	read	REPLACE_WITH_REPORTS_SCRAM_VERIFIER

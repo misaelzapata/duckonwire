@@ -1,0 +1,554 @@
+{
+  "project": "DuckOnWire",
+  "date": "2026-10-11",
+  "status": "Development validation passed on a cached engine; exact pinned-source CI and resource-container qualification pending.",
+  "model": "One owner process, independent native DuckDB instance per file, one PostgreSQL address, per-database account grants, trusted native endpoint per engine.",
+  "limits": {
+    "databases": 32,
+    "account_grants": 64,
+    "cross_database_atomic_commit": false,
+    "native_account_rules": false,
+    "protected_buffer_budget": "Detected 75 percent of available engine buffer budget, capped at 1 GiB total and divided among engines; not a total-RSS limit.",
+    "threads": "Up to two by default per engine, subject to detected quota."
+  },
+  "local": {
+    "platform": "macOS ARM64",
+    "engine_source": "848126236a4a8879f232bed7ab5f702683a55300",
+    "engine_version": "v2.1.0-dev0",
+    "server_sha256": "d685628765bad8ba30bc541cff40bd79cbdf8cb0754806586a6427fc776062ea",
+    "fresh_pins_qualified": false,
+    "checks": {
+      "protocol": 56,
+      "access": 20,
+      "scram": 12,
+      "database_routing": 6,
+      "native_attach": 12,
+      "native_sessions": 21,
+      "bootstrap": 17
+    },
+    "passed": true,
+    "concurrent_smoke": {
+      "passed": true,
+      "rows_per_mode": 10000,
+      "writers": 4,
+      "readers": 4,
+      "modes": [
+        "embedded",
+        "Quack loopback"
+      ],
+      "durable_reopen_verified": true,
+      "scope": "Generated native INSERT SELECT rows; not client VALUES throughput."
+    }
+  },
+  "acceptance": {
+    "protocol": {
+      "passed": true,
+      "native_used": true,
+      "checks": [
+        {
+          "name": "password_failure_is_fatal_and_bounded",
+          "passed": true
+        },
+        {
+          "name": "ssl_declined_then_plain_startup",
+          "passed": true
+        },
+        {
+          "name": "wire_version_identifies_protocol_without_changing_native_engine",
+          "passed": true
+        },
+        {
+          "name": "legacy_single_database_accepts_label_and_keeps_primary_route",
+          "passed": true
+        },
+        {
+          "name": "network_copy_is_explicitly_unsupported_in_simple_and_extended_protocol",
+          "passed": true
+        },
+        {
+          "name": "malformed_frame_fails_closed_without_affecting_other_session",
+          "passed": true
+        },
+        {
+          "name": "parser_error_and_sync_recovery",
+          "passed": true
+        },
+        {
+          "name": "unsupported_parameter_oid_rejected_even_for_null",
+          "passed": true
+        },
+        {
+          "name": "text_parameter_unicode_null_decimal_and_blob",
+          "passed": true
+        },
+        {
+          "name": "prepared_binary_pagination_15003_rows",
+          "passed": true
+        },
+        {
+          "name": "close_statement_closes_associated_portals",
+          "passed": true
+        },
+        {
+          "name": "explicit_constraint_failure_requires_rollback",
+          "passed": true
+        },
+        {
+          "name": "extended_implicit_transaction_commits_only_at_sync",
+          "passed": true
+        },
+        {
+          "name": "extended_implicit_error_rolls_back_prior_commands",
+          "passed": true
+        },
+        {
+          "name": "disconnect_rolls_back_pending_explicit_write",
+          "passed": true
+        },
+        {
+          "name": "mvcc_reader_keeps_snapshot_while_writer_commits",
+          "passed": true
+        },
+        {
+          "name": "same_row_conflict_preserves_reader_and_rollback_recovers",
+          "passed": true
+        },
+        {
+          "name": "simple_batch_begin_promotes_prior_implicit_work",
+          "passed": true
+        },
+        {
+          "name": "dml_command_tags_and_returning_row_counts",
+          "passed": true
+        },
+        {
+          "name": "schema_changes_are_fresh_across_pgwire_and_quack",
+          "passed": true
+        },
+        {
+          "name": "bound_file_table_functions_describe_actual_schema",
+          "passed": true
+        },
+        {
+          "name": "describe_only_insert_does_not_execute_or_end_transaction",
+          "passed": true
+        },
+        {
+          "name": "statement_describe_declared_types_and_unresolved_fail_closed",
+          "passed": true
+        },
+        {
+          "name": "sql_cursor_requires_explicit_transaction",
+          "passed": true
+        },
+        {
+          "name": "sql_cursor_forward_pagination_preserves_every_row",
+          "passed": true
+        },
+        {
+          "name": "sql_cursor_identifier_case_and_duplicate_errors",
+          "passed": true
+        },
+        {
+          "name": "sql_cursor_independent_positions_and_zero_fetch",
+          "passed": true
+        },
+        {
+          "name": "extended_cursor_declaration_binds_values_without_returning_rows",
+          "passed": true
+        },
+        {
+          "name": "extended_fetch_and_close_keep_protocol_synchronized",
+          "passed": true
+        },
+        {
+          "name": "sql_cursors_are_removed_at_transaction_end",
+          "passed": true
+        },
+        {
+          "name": "close_all_preserves_transaction_and_prepared_statements",
+          "passed": true
+        },
+        {
+          "name": "savepoints_do_not_fake_rollback_for_legacy_writers",
+          "passed": true
+        },
+        {
+          "name": "cancel_request_interrupts_query_and_session_recovers",
+          "passed": true
+        },
+        {
+          "name": "graceful_shutdown_with_protocol_sessions",
+          "passed": true
+        },
+        {
+          "name": "protected_network_copy_reports_unsupported_before_permission_policy",
+          "passed": true
+        },
+        {
+          "name": "protected_concurrent_positional_values_and_reader_denial",
+          "passed": true
+        },
+        {
+          "name": "protected_template_uses_current_catalog_and_bound_types",
+          "passed": true
+        },
+        {
+          "name": "protected_template_replacement_preserves_native_semantics",
+          "passed": true
+        },
+        {
+          "name": "protected_declare_uses_fresh_native_prepare_and_permissions",
+          "passed": true
+        },
+        {
+          "name": "protected_parse_contention_deadline_cancel_and_reuse",
+          "passed": true
+        },
+        {
+          "name": "protected_select_template_uses_current_catalog_and_parameter_types",
+          "passed": true
+        },
+        {
+          "name": "protected_select_template_preserves_session_snapshot_and_authority",
+          "passed": true
+        },
+        {
+          "name": "protected_select_template_eviction_and_uncached_shapes_preserve_results",
+          "passed": true
+        },
+        {
+          "name": "protected_shutdown_releases_parse_waiters",
+          "passed": true
+        },
+        {
+          "name": "multiple_databases_reject_storage_aliases_duplicate_names_and_port_overflow",
+          "passed": true
+        },
+        {
+          "name": "multiple_databases_have_independent_native_catalogs_and_bound_results",
+          "passed": true
+        },
+        {
+          "name": "multiple_databases_authenticate_same_username_with_distinct_credentials",
+          "passed": true
+        },
+        {
+          "name": "multiple_databases_apply_read_write_permissions_per_database",
+          "passed": true
+        },
+        {
+          "name": "multiple_databases_read_while_both_native_instances_write",
+          "passed": true
+        },
+        {
+          "name": "multiple_databases_block_cross_catalog_data_and_ddl",
+          "passed": true
+        },
+        {
+          "name": "multiple_databases_metadata_lists_only_selected_database",
+          "passed": true
+        },
+        {
+          "name": "multiple_databases_connection_and_pool_resets_preserve_route",
+          "passed": true
+        },
+        {
+          "name": "multiple_databases_disconnect_rolls_back_each_native_transaction",
+          "passed": true
+        },
+        {
+          "name": "multiple_databases_trusted_native_attach_can_join_two_endpoints",
+          "passed": true
+        },
+        {
+          "name": "multiple_databases_graceful_restart_preserves_both_files_and_routes",
+          "passed": true
+        },
+        {
+          "name": "multiple_databases_recover_confirmed_commits_after_owned_sigkill",
+          "passed": true
+        }
+      ]
+    },
+    "access": {
+      "checks": [
+        {
+          "name": "private_lf_config_preserves_database_verifier_and_roles",
+          "passed": true
+        },
+        {
+          "name": "owner_read_only_crlf_and_final_line_without_newline",
+          "passed": true
+        },
+        {
+          "name": "missing_unknown_extra_and_empty_records_fail_closed",
+          "passed": true
+        },
+        {
+          "name": "strict_roles_and_verifier_prefix_fail_closed",
+          "passed": true
+        },
+        {
+          "name": "database_and_user_names_are_ascii_and_bounded",
+          "passed": true
+        },
+        {
+          "name": "duplicate_users_rejected_and_case_sensitive_names_preserved",
+          "passed": true
+        },
+        {
+          "name": "multiple_databases_scope_roles_and_separate_credentials",
+          "passed": true
+        },
+        {
+          "name": "each_database_section_requires_at_least_one_user",
+          "passed": true
+        },
+        {
+          "name": "database_alias_duplicates_and_reserved_aliases_are_rejected",
+          "passed": true
+        },
+        {
+          "name": "duplicate_users_are_rejected_within_every_database",
+          "passed": true
+        },
+        {
+          "name": "database_count_32_allowed_33_rejected",
+          "passed": true
+        },
+        {
+          "name": "grant_count_64_is_global_across_database_sections",
+          "passed": true
+        },
+        {
+          "name": "later_sections_preserve_strict_names_roles_and_verifiers",
+          "passed": true
+        },
+        {
+          "name": "user_count_64_allowed_65_rejected",
+          "passed": true
+        },
+        {
+          "name": "group_world_special_and_executable_permissions_rejected",
+          "passed": true
+        },
+        {
+          "name": "symlink_missing_file_and_directory_rejected",
+          "passed": true
+        },
+        {
+          "name": "fifo_is_rejected_with_external_deadline",
+          "passed": true
+        },
+        {
+          "name": "file_size_limit_64_kib_inclusive",
+          "passed": true
+        },
+        {
+          "name": "truncated_columns_nul_and_control_bytes_rejected",
+          "passed": true
+        },
+        {
+          "name": "errors_do_not_echo_config_or_path_and_descriptors_are_closed",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    "scram": {
+      "checks": [
+        {
+          "name": "independent_reference_matches_rfc7677_known_proof_and_signature",
+          "passed": true
+        },
+        {
+          "name": "native_exchange_matches_independent_client_and_server_signature",
+          "passed": true
+        },
+        {
+          "name": "generated_verifier_uses_independent_password_derivation_and_random_salt",
+          "passed": true
+        },
+        {
+          "name": "random_server_nonce_prevents_cross_exchange_replay",
+          "passed": true
+        },
+        {
+          "name": "exchange_cannot_repeat_challenge_finish_or_recover_after_bad_proof",
+          "passed": true
+        },
+        {
+          "name": "incorrect_password_and_corrupted_proof_rejected",
+          "passed": true
+        },
+        {
+          "name": "wrong_nonce_and_channel_binding_rejected_even_with_valid_math",
+          "passed": true
+        },
+        {
+          "name": "duplicate_missing_extended_and_control_attributes_rejected",
+          "passed": true
+        },
+        {
+          "name": "plus_authzid_and_invalid_username_escape_rejected",
+          "passed": true
+        },
+        {
+          "name": "nonce_and_message_bounds_enforced",
+          "passed": true
+        },
+        {
+          "name": "verifier_iteration_salt_key_and_canonical_base64_bounds",
+          "passed": true
+        },
+        {
+          "name": "password_generator_ascii_length_and_iteration_bounds",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    "database-routing": {
+      "passed": true,
+      "checks": [
+        {
+          "name": "shared_native_instance_rejected",
+          "passed": true
+        },
+        {
+          "name": "case_folded_duplicate_rejected",
+          "passed": true
+        },
+        {
+          "name": "null_route_rejected",
+          "passed": true
+        },
+        {
+          "name": "reserved_catalog_rejected",
+          "passed": true
+        },
+        {
+          "name": "missing_primary_rejected",
+          "passed": true
+        },
+        {
+          "name": "independent_native_instances_start",
+          "passed": true
+        }
+      ]
+    },
+    "attach": {
+      "passed": true,
+      "native_used": true,
+      "example_checks_per_run": 8,
+      "example_runs": 2,
+      "checks": [
+        {
+          "name": "missing_token_fails_before_remote_mutation",
+          "passed": true
+        },
+        {
+          "name": "actual_attach_example_run_1",
+          "passed": true
+        },
+        {
+          "name": "owned_remote_fixture_removed_after_run_1",
+          "passed": true
+        },
+        {
+          "name": "actual_attach_example_run_2",
+          "passed": true
+        },
+        {
+          "name": "owned_remote_fixture_removed_after_run_2",
+          "passed": true
+        },
+        {
+          "name": "preexisting_remote_data_preserved",
+          "passed": true
+        },
+        {
+          "name": "attach_unbound_parameter_fails_closed",
+          "passed": true
+        },
+        {
+          "name": "connect_bound_string_with_apostrophe",
+          "passed": true
+        },
+        {
+          "name": "connect_alias_sessions_are_independent",
+          "passed": true
+        },
+        {
+          "name": "connect_alias_reader_retains_snapshot",
+          "passed": true
+        },
+        {
+          "name": "connect_alias_close_rolls_back_pending_write",
+          "passed": true
+        },
+        {
+          "name": "owned_server_graceful_shutdown",
+          "passed": true
+        }
+      ]
+    },
+    "native": {
+      "passed": true,
+      "native_checks": 21,
+      "checks": [
+        "builtin_extensions_and_private_descriptor",
+        "typed_parameter_crud_no_sql_interpolation",
+        "named_parameters",
+        "repeated_prepared_batch_and_commit",
+        "complex_typed_parameters_and_null",
+        "native_result_types_and_duplicate_names",
+        "ddl_visibility_between_sessions",
+        "sql_and_bind_errors_leave_session_usable",
+        "native_begin_commit_rollback_methods",
+        "pending_changes_are_isolated",
+        "closing_session_rolls_back",
+        "reader_snapshot_until_new_transaction",
+        "same_row_conflict_and_rollback_recovery",
+        "streaming_result_pages",
+        "commit_without_active_transaction_errors",
+        "remote_query_interrupt_and_recovery",
+        "reader_progress_while_writer_pending",
+        "graceful_restart_persistence",
+        "sigkill_recovers_commits_and_discards_pending",
+        "real_cpp_transaction_flow",
+        "native_demo_initialization_and_existing_data_protection"
+      ]
+    }
+  },
+  "independent_review": {
+    "source_review": "Both found blockers fixed: reserve WAL/recovery/temp paths and validate actual native instance identity.",
+    "runtime_review": {
+      "passed": true,
+      "checks": 23,
+      "driver": "Node.js 24.9.0 / pg 8.16.3",
+      "verified_tls": true,
+      "engine_qualification": "Cached development engine, current dependency pins require CI.",
+      "coverage": [
+        "database routing and identical prepared SQL",
+        "scoped credentials with different read/write roles",
+        "cross-database and metadata isolation",
+        "commit and rollback",
+        "authentication and rejection recovery",
+        "DISCARD ALL retains database and permissions",
+        "per-database integrity"
+      ]
+    }
+  },
+  "source_sha256": {
+    "src/server.cpp": "4749ddcec70096604138252bd9a571da5dc93daf0ebc88754b159e6702e8fe16",
+    "src/pgwire.cpp": "9e72cddfd97cb725242c6e9157de9d1f1ca7dd6483083dd5d2ca779b9c8478dd",
+    "src/access.cpp": "2d2b56b701f7648c5c71083b6ff8405792e8ad19046fa85fba7f8c35b4e4ceda",
+    "include/duckonwire/pgwire.hpp": "e7b9e617898c7b8c6489b415b0941220c2f2af3710d9bf222546d335039af0c6",
+    "include/duckonwire/access.hpp": "3e0e247b02da3b7d366117541bb5fb4b8a9c66fb0244c133af57e1d2e8208d8d",
+    "tests/pgwire_protocol_tests.cpp": "e398b657d128f338c5ecadd10a7a5562d92ccc1f9552a013a7272b81a6ba619f",
+    "tests/database_routing_tests.cpp": "197caf2580c7908ffde835f10f076b364bdc7380807ec402bcd3a818d51ab38c",
+    "tests/access_tests.cpp": "c797c9fde66e32600e5b135192bc0d9bb3ee14da23ad8ff9e55a02ec5dd7a7f4"
+  }
+}

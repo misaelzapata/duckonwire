@@ -16,6 +16,7 @@ namespace duckonwire {
 namespace {
 constexpr std::size_t MAX_FILE_BYTES = 64 * 1024;
 constexpr std::size_t MAX_USERS = 64;
+constexpr std::size_t MAX_DATABASES = 32;
 constexpr std::string_view SCRAM_PREFIX = "SCRAM-SHA-256$";
 
 [[noreturn]] void Invalid() {
@@ -40,6 +41,13 @@ bool Name(std::string_view value) {
     if (!alnum(static_cast<unsigned char>(value.front()))) return false;
     for (unsigned char c : value) if (!alnum(c) && c != '-' && c != '.') return false;
     return true;
+}
+
+std::string DatabaseKey(std::string_view value) {
+    std::string result(value);
+    // Database aliases are case-insensitive in DuckDB, independently of locale.
+    for (char &c : result) if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+    return result;
 }
 
 std::vector<std::string_view> Fields(std::string_view line) {
@@ -84,8 +92,8 @@ AccessConfig ReadAccessConfig(const std::string &path) {
     }
 
     AccessConfig config;
-    std::unordered_set<std::string> names;
-    std::size_t begin = 0, line_number = 0;
+    std::unordered_set<std::string> database_names, user_names;
+    std::size_t begin = 0;
     while (begin < content.size()) {
         const auto newline = content.find('\n', begin);
         const auto end = newline == std::string::npos ? content.size() : newline;
@@ -93,22 +101,26 @@ AccessConfig ReadAccessConfig(const std::string &path) {
         if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
         if (line.empty()) Invalid();
         const auto fields = Fields(line);
-        if (!line_number) {
-            if (fields.size() != 2 || fields[0] != "database" || !Name(fields[1])) Invalid();
-            config.database = std::string(fields[1]);
+        if (fields[0] == "database") {
+            if (fields.size() != 2 || !Name(fields[1]) || config.databases.size() >= MAX_DATABASES ||
+                (!config.databases.empty() && user_names.empty())) Invalid();
+            auto key = DatabaseKey(fields[1]);
+            if (key == "system" || key == "temp" || !database_names.insert(std::move(key)).second) Invalid();
+            config.databases.emplace_back(fields[1]);
+            if (config.database.empty()) config.database = config.databases.back();
+            user_names.clear();
         } else {
-            if (fields.size() != 4 || fields[0] != "user" || !Name(fields[1]) ||
+            if (config.databases.empty() || fields.size() != 4 || fields[0] != "user" || !Name(fields[1]) ||
                 (fields[2] != "read" && fields[2] != "write") || !Verifier(fields[3]) ||
                 config.users.size() >= MAX_USERS)
                 Invalid();
             std::string name(fields[1]);
-            if (!names.insert(name).second) Invalid();
-            config.users.push_back({std::move(name), std::string(fields[3]), fields[2] == "read"});
+            if (!user_names.insert(name).second) Invalid();
+            config.users.push_back({std::move(name), std::string(fields[3]), fields[2] == "read", config.databases.back()});
         }
-        ++line_number;
         begin = newline == std::string::npos ? content.size() : newline + 1;
     }
-    if (config.database.empty() || config.users.empty()) Invalid();
+    if (config.databases.empty() || user_names.empty()) Invalid();
     return config;
 }
 } // namespace duckonwire
