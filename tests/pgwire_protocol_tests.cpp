@@ -412,7 +412,7 @@ public:
 		server = std::make_unique<test_support::NativeServer>(root.path(), primary, executable_, 0, false,
 		    std::vector<std::string> {"--database", "reporting=data/reporting.duckdb", "--access-file",
 		        (root.path() / "access.tsv").string(), "--tls-cert", cert.string(), "--tls-key",
-		        (root.path() / "key.pem").string()});
+		        (root.path() / "key.pem").string()}, 2);
 	}
 	std::unique_ptr<Wire> Client(const std::string &database, const std::string &user = "writer") {
 		auto wire = std::make_unique<Wire>(server->pg_port());
@@ -1077,6 +1077,27 @@ int main(int argc, char **argv) {
 		});
 
 		test("multiple_databases_reject_storage_aliases_duplicate_names_and_port_overflow", [&] {
+			const int first = test_support::AvailablePortRange(2);
+			test_support::PortRangeReservation occupied_neighbor;
+			Require(occupied_neighbor.Bind(1, first + 1), "Cannot occupy the owned second fixture port");
+			const int selected = test_support::AvailablePortRange(2, first);
+			Require(selected != first && !(selected <= first + 1 && first + 1 < selected + 2),
+			        "Port allocator selected a range containing an occupied second port");
+			{
+				test_support::PortRangeReservation first_reclaimed;
+				Require(first_reclaimed.Bind(1, first), "Failed neighbor probe leaked its first socket");
+			}
+			{
+				test_support::PortRangeReservation range_reclaimed;
+				Require(range_reclaimed.Bind(2, selected), "Successful range probe retained its sockets");
+			}
+			bool final_port_was_free = false;
+			{ test_support::PortRangeReservation last; final_port_was_free = last.Bind(1, 65535); }
+			Require(test_support::AvailablePortRange(2, 65535) < 65535, "Native port range overflowed 65535");
+			if (final_port_was_free) {
+				test_support::PortRangeReservation final_reclaimed;
+				Require(final_reclaimed.Bind(1, 65535), "Overflowed range probe leaked its first socket");
+			}
 			auto rejected = [&](const std::string &scenario, const std::vector<std::string> &arguments,
 			                    const std::string &reason, int port = 0) {
 				test_support::TempRoot invalid(fixture_parent); bool denied = false;
