@@ -55,7 +55,7 @@ cmake --install build --prefix dist
 cmake -DSOURCE_DIR=. -DSERVER_BINARY=build/bin/duckonwire-server -P cmake/DocumentationTests.cmake
 ```
 
-CTest covers native sessions/transactions, PostgreSQL protocol, access rules, SCRAM, concurrent smoke and bootstrap regressions. The [CI workflow](.github/workflows/verify.yml) adds the two-million-row native benchmark and installed-package relocation checks. Run relevant checks after changes; do not repeat expensive workloads without a material reason or measure performance while another build/load is running.
+`tests/expected-checks.json` defines exact acceptance counts for CTest summaries, installed packages and releases. Update it when adding checks; keep count, named-result, source-head and definition-hash verification strict. CTest covers native sessions/transactions, PostgreSQL protocol, access rules, SCRAM, concurrent smoke and bootstrap regressions. The [CI workflow](.github/workflows/verify.yml) adds the two-million-row native benchmark and installed-package relocation checks. Run relevant checks after changes; do not repeat expensive workloads without a material reason or measure performance while another build/load is running.
 
 The `native-attach` CTest runs the actual `attach-client` against its own temporary server. It checks remote reads, a join with local data, `CONNECT remote`, parameterized changes, transactions and cleanup. To run just this example's checks, build `attach-client` and `attach-tests`, then use `ctest --test-dir build -R native-attach --output-on-failure`. This executable is in current source builds; earlier packages may not contain it.
 

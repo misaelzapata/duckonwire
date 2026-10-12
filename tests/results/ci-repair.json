@@ -1,0 +1,32 @@
+{
+  "project": "DuckOnWire",
+  "date": "2026-10-11",
+  "status": "Local regression and independent review passed; current-head CI pending.",
+  "changes": [
+    "One exact acceptance-count definition shared by CTest summaries, packaging and release provenance.",
+    "Installed packages qualify database routing when the suite is configured.",
+    "Release verifies the same source and count-definition hashes."
+  ],
+  "expected_unique_checks": 119,
+  "validation": {
+    "package_gate_regressions": {
+      "passed": true,
+      "total_cases_both_branches": 24
+    },
+    "independent_cmake_review": {
+      "passed": true,
+      "total_cases_both_branches": 30
+    },
+    "release_gate_regressions": {
+      "passed": true,
+      "total_cases_both_branches": 32
+    },
+    "documentation_checks": {
+      "passed": true
+    }
+  },
+  "limitations": [
+    "Current-head native packaging and Docker workflow results are pending.",
+    "Cached development-engine runtime checks do not qualify current dependency pins."
+  ]
+}

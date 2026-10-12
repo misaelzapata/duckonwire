@@ -26,6 +26,8 @@
 #include "duckdb/parser/query_node/insert_query_node.hpp"
 #include "duckdb/parser/statement/execute_statement.hpp"
 #include "duckdb/parser/statement/create_statement.hpp"
+#include "duckdb/parser/statement/copy_statement.hpp"
+#include "duckdb/parser/statement/prepare_statement.hpp"
 #include "duckdb/parser/statement/explain_statement.hpp"
 #include "duckdb/parser/statement/drop_statement.hpp"
 #include "duckdb/parser/statement/select_statement.hpp"
@@ -1077,7 +1079,7 @@ struct PgWireServer::Impl::Session {
     void UpgradeTLS();
     void Authenticate(const std::map<std::string, std::string> &options);
     Buffer AuthenticationResponse();
-    void Authorize(duckdb::SQLStatement &statement);
+    void Authorize(duckdb::SQLStatement &statement, const std::string &source_sql = {});
     void AuthorizeBound(duckdb::StatementProperties properties);
     void InitializeTypeCatalog();
     void ResetConnection(bool preserve_statements);
@@ -1148,13 +1150,39 @@ void PgWireServer::Impl::Session::AuthorizeBound(duckdb::StatementProperties pro
     if (server.protected_mode && read_only && !properties.IsReadOnly())
         throw WireError("42501", "This database user has read-only access");
 }
-void PgWireServer::Impl::Session::Authorize(duckdb::SQLStatement &statement) {
-    if (!server.protected_mode) return;
+void PgWireServer::Impl::Session::Authorize(duckdb::SQLStatement &statement, const std::string &source_sql) {
     using S = duckdb::StatementType;
+    const auto &query_sql = statement.query.empty() ? source_sql : statement.query;
+    if (statement.type == S::EXPLAIN_STATEMENT) {
+        // Check the contained operation even for trusted local sessions.
+        Authorize(*statement.Cast<duckdb::ExplainStatement>().stmt, query_sql);
+    } else if (statement.type == S::PREPARE_STATEMENT) {
+        Authorize(*statement.Cast<duckdb::PrepareStatement>().statement, query_sql);
+    }
+    if (statement.type == S::COPY_STATEMENT) {
+        const auto &info = *statement.Cast<duckdb::CopyStatement>().info;
+        bool stream = info.file_path == "/dev/stdout" || info.file_path == "/dev/stdin" || info.file_path == "/dev/stderr";
+        // DuckDB maps STDOUT to the owner's stdout; STDIN can become a file
+        // named stdin. Neither implements PostgreSQL CopyIn/CopyOut messages.
+        // Tokenize rather than searching strings, so a quoted filename stays
+        // an ordinary local file export/import.
+        std::string previous;
+        const auto tokens = duckdb::Parser::Tokenize(query_sql);
+        for (std::size_t i = 0; i < tokens.size(); ++i) {
+            if (tokens[i].type == duckdb::SimplifiedTokenType::SIMPLIFIED_TOKEN_COMMENT) continue;
+            const auto end = i + 1 < tokens.size() ? tokens[i + 1].start : query_sql.size();
+            auto token = Upper(query_sql.substr(tokens[i].start, end - tokens[i].start));
+            const auto last = token.find_last_not_of(" \t\r\n");
+            if (last != std::string::npos) token.resize(last + 1);
+            if (info.is_from && previous == "FROM" && token == "STDIN") stream = true;
+            previous = std::move(token);
+        }
+        if (stream) throw WireError("0A000", "PostgreSQL COPY streaming is not supported; use bound INSERT batches or SELECT rows");
+    }
+    if (!server.protected_mode) return;
     const auto denied = [] { throw WireError("42501", "This SQL operation is not allowed on the published database"); };
     if (statement.type == S::EXPLAIN_STATEMENT) {
-        auto &explain = statement.Cast<duckdb::ExplainStatement>();
-        Authorize(*explain.stmt); // EXPLAIN ANALYZE must never hide a prohibited operation.
+        // The contained operation was authorized above.
     } else if (statement.type == S::SELECT_STATEMENT || statement.type == S::TRANSACTION_STATEMENT) {
         // The bound plan below additionally rejects SELECT expressions that modify the database.
     } else {
@@ -1339,6 +1367,12 @@ void PgWireServer::Impl::Session::InitializeTypeCatalog() {
         auto result = connection.Query(sql);
         if (result->HasError()) NativeError(result->GetErrorObject());
     }
+    // PostgreSQL tools inspect version() in addition to server_version. Keep
+    // the wire identity session-local: native clients still see DuckDB's version.
+    const auto identity = "PostgreSQL 16.0 wire-compatible DuckOnWire (DuckDB " +
+                          std::string(duckdb::DuckDB::LibraryVersion()) + ")";
+    auto version = connection.Query("CREATE TEMP MACRO version() AS " + duckdb::Value(identity).ToSQLString());
+    if (version->HasError()) NativeError(version->GetErrorObject());
 }
 void PgWireServer::Impl::Session::Run() {
     try {

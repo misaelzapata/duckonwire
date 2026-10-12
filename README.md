@@ -35,7 +35,7 @@ SQL
 
 On the first run, the last query returns Coffee with stock 4. This is one ordinary connection reading and writing DuckDB. The local server listens on your machine and shares one password; [remote accounts use verified TLS](#public-access). On Mac or ARM, start with [Docker](#try-with-docker) or [build from source](#build-from-source). Ctrl+C stops the server; its database stays in `duckonwire/data`.
 
-[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-115-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
+[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-119-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
 
 DoW turns your DuckDB database into a shared data service. Connect apps in your favorite language, read and write through the same connection, and let readers keep working while new data arrives. Your data stays in DuckDB.
 
@@ -172,6 +172,15 @@ node examples/postgres/node/crud.mjs
 ```
 
 Readers can query and use transactions. Writers can also change rows and tables. Unknown accounts and database names are rejected. Keep passwords out of URLs, command arguments and logs; do not disable TLS verification. [Permission tests](tests/results/public-access.json).
+
+| Connection mode | Login | `PGDATABASE` |
+| --- | --- | --- |
+| Local, one database | Shared server token; username is a label | Any name connects to the one open database |
+| Protected | Real account and password, verified TLS | Must match the account's configured database |
+
+PostgreSQL connections report `PostgreSQL 16.0 wire-compatible DuckOnWire` from `version()`, followed by the DuckDB engine version. This helps tools identify the connection; SQL still runs in DuckDB. Native Quack connections keep DuckDB's usual `version()`.
+
+Network `COPY TO STDOUT` and `COPY FROM STDIN` return an explicit unsupported-operation error. Send inserts in bound batches and read rows with `SELECT`. Trusted local connections can still export CSV to a server-side file; protected accounts cannot access files.
 
 </details>
 

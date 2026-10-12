@@ -259,15 +259,15 @@ public:
 		}
 		throw std::runtime_error("Backend response exceeds test message bound");
 	}
-	void Startup() {
+	void Startup(const std::string &database = "duckonwire") {
 		Bytes body; U32(body, 196608); String(body, "user"); String(body, "duckonwire");
-		String(body, "database"); String(body, "duckonwire"); String(body, "client_encoding"); String(body, "UTF8"); body.push_back(0);
+		String(body, "database"); String(body, database); String(body, "client_encoding"); String(body, "UTF8"); body.push_back(0);
 		Bytes frame; U32(frame, static_cast<std::uint32_t>(body.size() + 4)); frame.insert(frame.end(), body.begin(), body.end()); Send(frame);
 		auto auth = Next(); Require(auth && auth->type == 'R' && Read32(auth->body, 0) == 3, "Missing password challenge");
 	}
 	void Password(const std::string &password) { Bytes body; String(body, password); Message('p', body); }
-	void Login(const std::string &password) {
-		Startup(); Password(password); const auto replies = Until("Z");
+	void Login(const std::string &password, const std::string &database = "duckonwire") {
+		Startup(database); Password(password); const auto replies = Until("Z");
 		Require(!Contains(replies, 'E') && State(replies) == 'I', "Protocol login failed");
 		for (const auto &reply : replies) if (reply.type == 'K') {
 			Require(reply.body.size() == 8, "Invalid backend cancellation key"); id = Read32(reply.body, 0); secret = Read32(reply.body, 4);
@@ -433,6 +433,65 @@ int main(int argc, char **argv) {
 			Wire wire(server.pg_port()); Bytes request; U32(request, 8); U32(request, 80877103); wire.Send(request);
 			unsigned char denied = 0; Require(wire.Receive(&denied, 1) && denied == 'N', "SSL negotiation mismatch");
 			wire.Login(server.token()); Require(Scalar(wire, "SELECT 42") == 42, "Query after SSL negotiation failed");
+		});
+		test("wire_version_identifies_protocol_without_changing_native_engine", [&] {
+			auto wire = client();
+			auto check_version = [&] {
+				const auto replies = wire->Query("SELECT version()"); const auto rows = Rows(replies);
+				Require(!Contains(replies, 'E') && rows.size() == 1 && rows[0].size() == 1 && rows[0][0] &&
+				        rows[0][0]->find("PostgreSQL 16.0") == 0 && rows[0][0]->find("DuckOnWire") != std::string::npos,
+				        "version() did not identify PostgreSQL 16.0 wire compatibility and DuckOnWire");
+			};
+			check_version();
+			Require(!Contains(wire->Query("DISCARD ALL"), 'E'), "Version fixture DISCARD ALL failed"); check_version();
+			duckdb::DuckDB local(nullptr); duckdb::Connection native(local);
+			test_support::Connect(native, server.endpoint(), server.token());
+			auto result = native.Query("SELECT version()"); test_support::Check(result);
+			Require(result->GetValue(0, 0).GetValue<std::string>() == duckdb::DuckDB::LibraryVersion(),
+			        "Wire compatibility identity leaked into native Quack version()");
+		});
+		test("legacy_single_database_accepts_label_and_keeps_primary_route", [&] {
+			auto primary = client();
+			Require(!Contains(primary->Query("CREATE TABLE pgwire_legacy_label(id INTEGER)"), 'E') &&
+			        !Contains(primary->Query("INSERT INTO pgwire_legacy_label VALUES(43)"), 'E'), "Legacy label fixture setup failed");
+			Wire labelled(server.pg_port()); labelled.Login(server.token(), "a_client_label_not_a_new_database");
+			Require(Scalar(labelled, "SELECT id FROM pgwire_legacy_label") == 43 &&
+			        Scalar(*primary, "SELECT id FROM pgwire_legacy_label") == 43,
+			        "A single-database legacy login label selected a different database");
+		});
+		test("network_copy_is_explicitly_unsupported_in_simple_and_extended_protocol", [&] {
+			auto wire = client();
+			Require(!Contains(wire->Query("CREATE TABLE pgwire_network_copy(id INTEGER)"), 'E'), "COPY fixture creation failed");
+			const auto stdout_before = std::filesystem::exists("stdout"), upper_before = std::filesystem::exists("STDOUT");
+			for (const auto &sql : {std::string("COPY (SELECT 87654321) TO STDOUT (FORMAT CSV)"),
+			                       std::string("CoPy (SELECT 87654321) tO /* wire stream */ sTdOuT"),
+                               std::string("COPY pgwire_network_copy FROM STDIN (FORMAT CSV)"),
+                               std::string("EXPLAIN ANALYZE COPY pgwire_network_copy FROM STDIN (FORMAT CSV)"),
+                               std::string("PREPARE blocked_export AS COPY (SELECT 87654321) TO STDOUT"),
+                               std::string("PREPARE blocked_import AS COPY pgwire_network_copy FROM STDIN (FORMAT CSV)")}) {
+				const auto simple = wire->Query(sql);
+				Require(HasError(simple, "0A000") && State(simple) == 'I' && !Contains(simple, 'C') &&
+				        !Contains(simple, 'H') && !Contains(simple, 'G') && !Contains(simple, 'd'),
+				        "Simple network COPY silently succeeded or started an unsupported stream");
+				wire->Parse("", sql); wire->Bind("", ""); wire->Execute(""); wire->Message('S');
+				const auto prepared = wire->Until("Z");
+				Require(HasError(prepared, "0A000") && State(prepared) == 'I' && !Contains(prepared, 'C') &&
+				        !Contains(prepared, 'H') && !Contains(prepared, 'G') && !Contains(prepared, 'd'),
+				        "Prepared network COPY silently succeeded or started an unsupported stream");
+			}
+			Require(std::filesystem::exists("stdout") == stdout_before && std::filesystem::exists("STDOUT") == upper_before,
+			        "Network COPY created a local stdout file");
+			Require(Scalar(*wire, "SELECT count(*) FROM pgwire_network_copy") == 0,
+			        "Rejected COPY FROM modified the table or poisoned the session");
+			const auto csv = fixture.path() / "local-copy.csv";
+			const auto copied = wire->Query("COPY (SELECT 7 AS id) TO " + test_support::Literal(csv.string()) + " (HEADER)");
+			Require(!Contains(copied, 'E') && Command(copied) == "COPY 1" && std::filesystem::is_regular_file(csv),
+			        "Network COPY rejection disabled legitimate legacy local-file COPY");
+			Require(Scalar(*wire, "SELECT sum(id) FROM read_csv(" + test_support::Literal(csv.string()) + ",header=true)") == 7,
+			        "Local-file COPY changed exported values");
+            Require(!Contains(wire->Query("CREATE TABLE stdin AS SELECT 8::INTEGER AS id"), 'E'), "COPY source-name fixture failed");
+            const auto named = wire->Query("COPY (SELECT * FROM stdin) TO " + test_support::Literal((fixture.path() / "named-source.csv").string()) + " (HEADER)");
+            Require(!Contains(named, 'E') && Command(named) == "COPY 1", "A table named stdin was mistaken for a COPY stream");
 		});
 		test("malformed_frame_fails_closed_without_affecting_other_session", [&] {
 			auto wire = client(); Bytes malformed {'Q'}; U32(malformed, 3); wire->Send(malformed);
@@ -751,6 +810,25 @@ int main(int argc, char **argv) {
 		});
 		server.stop(); test("graceful_shutdown_with_protocol_sessions", [&] { Require(server.clean_shutdown(), "Native server required forced shutdown"); });
 		ProtectedFixture protected_fixture(fixture_parent, server_program);
+		test("protected_network_copy_reports_unsupported_before_permission_policy", [&] {
+			for (const auto &role : {std::string("writer"), std::string("reader")}) {
+				auto wire = protected_fixture.Client(role);
+				const auto version = Rows(wire->Query("SELECT version()"));
+				Require(version.size() == 1 && version[0][0] && version[0][0]->find("PostgreSQL 16.0") == 0,
+				        "Protected version() still advertises native engine as PostgreSQL wire version");
+				for (const auto &sql : {std::string("COPY (SELECT 7) TO STDOUT"),
+				                       std::string("COPY missing_copy_table FROM STDIN")}) {
+					const auto simple = wire->Query(sql);
+					Require(HasError(simple, "0A000") && State(simple) == 'I' && !Contains(simple, 'C'),
+					        "Protected network COPY was not rejected as an unsupported wire feature");
+					wire->Parse("", sql); wire->Bind("", ""); wire->Execute(""); wire->Message('S');
+					const auto extended = wire->Until("Z");
+					Require(HasError(extended, "0A000") && State(extended) == 'I' && !Contains(extended, 'C'),
+					        "Protected prepared COPY bypassed the unsupported-wire rejection");
+				}
+				Require(Scalar(*wire, "SELECT 44") == 44, "Protected COPY rejection poisoned the session");
+			}
+		});
 		test("protected_concurrent_positional_values_and_reader_denial", [&] {
 			auto observer = protected_fixture.Client();
 			Require(!Contains(observer->Query("CREATE TABLE template_batch(id BIGINT PRIMARY KEY,amount DECIMAL(18,2),label VARCHAR)"), 'E'), "Protected table setup failed");

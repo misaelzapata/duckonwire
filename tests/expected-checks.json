@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "suites": {
+    "native-tests": 21,
+    "native-attach": 12,
+    "pgwire-protocol": 44,
+    "access-rules": 13,
+    "scram-authentication": 12,
+    "bootstrap-regressions": 17
+  },
+  "ctest_uncounted_suites": [
+    "concurrent-smoke"
+  ]
+}
