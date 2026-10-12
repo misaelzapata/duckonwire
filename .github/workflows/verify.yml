@@ -6,6 +6,7 @@ on:
       - 'src/**'
       - 'include/**'
       - 'tests/*.cpp'
+      - 'tests/expected-checks.json'
       - 'tests/support/**'
       - 'examples/*.cpp'
       - 'examples/*.c'
@@ -24,6 +25,7 @@ on:
       - 'src/**'
       - 'include/**'
       - 'tests/*.cpp'
+      - 'tests/expected-checks.json'
       - 'tests/support/**'
       - 'examples/*.cpp'
       - 'examples/*.c'
@@ -79,7 +81,7 @@ jobs:
         run: cmake --build build --parallel 2
       - name: Native acceptance and concurrent smoke
         run: ctest --test-dir build --verbose --output-log build/test-results/ctest.log
-      - name: Validate all 119 checks and record the summary
+      - name: Validate all required checks and record the summary
         id: provenance
         run: |
           cmake -DTEST_LOG="$PWD/build/Testing/Temporary/LastTest.log" \
