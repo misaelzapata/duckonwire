@@ -149,7 +149,7 @@ Users log in with their usual PostgreSQL **username and password**. TLS encrypts
 
 Put the server certificate, private key and rules file inside the server root. The certificate must match the hostname clients use. Keep the key and rules file mode `0600` or `0400`; clients need a trusted issuing CA.
 
-Generate passwords and SCRAM verifiers. The rules file contains verifiers, not the original passwords:
+Generate passwords and SCRAM verifiers. A verifier lets the server check a password without storing the original. If you choose your own password, use 32–1024 printable ASCII characters; `duckonwire-password` also accepts hidden interactive input.
 
 ```sh
 export PGPASSWORD="$(openssl rand -hex 32)"
@@ -162,6 +162,17 @@ reader_verifier="$(printf '%s\n' "$PGREADER_PASSWORD" | ./bin/duckonwire-passwor
 ```
 
 Stop the local server before starting this one. Import external data before enabling protected mode. The tab-separated file starts with `database`, database name; each following record is `user`, username, `read` or `write`, verifier. Restart to apply changes.
+
+Manage accounts in `access.tsv`; SQL `CREATE USER` and `GRANT` are not available. Each database section needs at least one user. Use real tabs, with no blank lines or comments.
+
+| Change | What to edit in `access.tsv` |
+| --- | --- |
+| Add an account | Add a `user` row under its database, with its permission and generated verifier. |
+| Change a password | Generate a verifier for the new password and replace that account's verifier. |
+| Change permissions | Set the account's permission to `read` or `write`. `write` includes reading. |
+| Remove access | Remove that account's row from the database section. |
+
+Restart the server after these changes; existing connections close and clients log in again using the new rules. Keep the rules file private (`chmod 600 access.tsv`). These steps configure the server directly; the Docker demo manages its own `writer` and `reader` accounts and regenerates its rules file on startup.
 
 On a client, use that account's password and verify the server certificate:
 
@@ -194,7 +205,24 @@ Protected mode sizes its buffers for the available memory, leaving room for conn
 
 Protected SQL cannot read external files or networks, install extensions or change server configuration. Import data locally first. Permissions cover the database, not individual tables or rows; full PostgreSQL roles and SCRAM channel binding are not implemented.
 
-Quack remains a separate trusted loopback connection with the local token. PostgreSQL accounts, permissions and query limits do not apply to it.
+Quack stays on loopback. In protected mode it uses the same database accounts and `read`/`write` permissions; the server's shared token cannot bypass them. Its credential is sent through Quack's existing `TOKEN` field as `username:password`. This is password verification against the same stored verifier, rather than PostgreSQL's SCRAM exchange. Use an encrypted SSH tunnel or verified HTTPS termination for remote Quack access; the PostgreSQL certificate options protect only the PostgreSQL listener.
+
+Before publishing a protected database, DoW checks stored views, macros and table expressions too. Definitions that hide file access, configuration changes or Quack control calls prevent startup. Ordinary views, macros and defaults remain usable.
+
+</details>
+
+<details>
+<summary>Failed logins, temporary IP blocks and traffic limits</summary>
+
+Protection is enabled with `--access-file` for both PostgreSQL and Quack. Five failed logins within 60 seconds block that IP for five minutes. More than 120 connections or 6,000 protocol requests in a 60-second counting window also triggers the block. Successful logins do not erase failed attempts; rejected attempts do not extend an existing block.
+
+Native account permissions and IP protection are available in current source builds. Earlier downloaded packages may not include them.
+
+The limits are shared across databases and protocols. A blocked IP cannot keep querying through an existing session or switch to another database to avoid the block. Other IPs continue working. After the block expires, its counters reset. Blocks are kept in memory and reset when the server restarts; an operation already executing is not automatically cancelled by a later IP block.
+
+Use `--auth-max-failures`, `--auth-window-seconds`, `--ban-seconds`, `--max-connections-per-minute` and `--max-requests-per-minute` to adjust these defaults. Requests are protocol messages, so one query can use several. PostgreSQL counts accepted TCP connections; Quack counts native login requests.
+
+DoW uses the actual socket IP and ignores forwarded-IP headers. Clients behind the same NAT, proxy or SSH tunnel share that IP's limits. Tracking is bounded to 4,096 IPs; when full, new IPs are rejected until old entries expire. Recent attempts and active blocks are never discarded to admit new IPs.
 
 </details>
 
@@ -220,7 +248,19 @@ PGDATABASE=reports node examples/postgres/node/crud.mjs
 
 Each command reads and writes its own database. A connection to `shop` cannot query `reports.main.products`. To work in both, open one connection to each. Transactions commit within one database; they do not commit two files atomically.
 
-For protected access, keep the [same TLS setup](#public-access) and repeat database sections in your private access file. Each `user` row belongs to the preceding `database` section. The same username can have a different password or permission in each database. Generate password verifiers with `duckonwire-password`; use real tabs in the file. [Two-database rules example](examples/access-multiple.tsv.example).
+For protected access, keep the [same TLS setup](#public-access) and repeat database sections in your private access file. Each `user` row belongs to the preceding `database` section. The same username can have a different password or permission in each database, for both PostgreSQL and Quack. Generate password verifiers with `duckonwire-password`; use real tabs in the file. [Two-database rules example](examples/access-multiple.tsv.example).
+
+The example grants `app` read/write access to `shop` and read-only access to `reports`; `reader` can only read `shop`. Copy it to `access.tsv`, replace every placeholder with the generated verifier for that account and database, and set `chmod 600 access.tsv`. Stop the local server first. With the certificate and private key inside the server root, start both databases with those rules:
+
+```sh
+./build/bin/duckonwire-server --root . \
+  --database shop=data/shop.duckdb \
+  --database reports=data/reports.duckdb --pg-port 9497 \
+  --access-file access.tsv --tls-cert server.crt --tls-key server.key \
+  --pg-host 0.0.0.0
+```
+
+Both database names must have matching sections in the rules file. Clients use `PGPORT=9497`, their account's `PGUSER` and `PGPASSWORD`, and `PGDATABASE=shop` or `reports`, with the verified TLS settings above. The shared local token is not a protected account password.
 
 Native Quack clients can attach both endpoints and join their tables:
 
@@ -229,13 +269,15 @@ ATTACH 'quack:127.0.0.1:9495' AS shop (TOKEN 'your-server-token');
 ATTACH 'quack:127.0.0.1:9496' AS reports (TOKEN 'your-server-token');
 ```
 
-Quack uses one consecutive loopback port per database, beginning at `--port`; choose a PostgreSQL port outside that range. The private runtime descriptor lists all endpoints. Native access uses the shared local token and does not enforce PostgreSQL account permissions.
+Quack uses one consecutive loopback port per database, beginning at `--port`; choose a PostgreSQL port outside that range. The private runtime descriptor lists all endpoints. The ATTACH example above uses the shared token in local mode. In protected mode, supply the account credential for each database instead; its permissions apply to both `ATTACH` and `CONNECT`.
 
 Up to 32 databases and 64 account grants are supported. Protected engines share one buffer budget; threads and spill limits apply per engine. Start with the databases you need, and restart the server to change the list. `--init-demo` initializes only the first database. Earlier release packages may not contain this feature. [Development checks](tests/results/multiple-databases.json).
 
 ## Native connections, clear transactions
 
 Use Quack with DuckOnWire's compatible native engine. HTTPFS and Quack are built in; no extension paths or `LOAD` commands are needed. An unrelated stock DuckDB engine is not automatically compatible. Exact bindings and protocol versions are recorded in [AGENTS.md](AGENTS.md) and the [result index](tests/results/index.json).
+
+For protected native examples, in the client terminal set `DUCKONWIRE_TOKEN="${PGUSER}:${PGPASSWORD}"` using that database's account. The examples keep the ordinary DuckDB connection API; readers can query and writers can also modify data. With `CREATE SECRET (TYPE quack, TOKEN ...)`, the same credential can be kept in a native session secret for `ATTACH` and `CONNECT`.
 
 ### ATTACH a remote catalog
 
@@ -340,6 +382,8 @@ node examples/postgres/node/ingest.mjs
 The second command sends two million rows. Use a test database and run one copy at a time. For protected access, set `PGREADER_USER` and `PGREADER_PASSWORD`; otherwise readers use the writer's login. The JSON reports throughput, read latency, commits and each reader's progress.
 
 With the public demo loaded, add `PG_DEMO_READS=1` to also run its ten queries while inserts arrive. These reads check the unchanged demo tables; inserts go into separate test tables in the same database. The output reports each query's latency and verifies its results.
+
+For the protected two-million-row benchmark, start its test server with `--max-requests-per-minute 60000`. This gives the bound batches and concurrent readers an explicit traffic budget; the ordinary protected default remains 6000.
 
 With a million-price demo loaded, one local Apple M1 Pro run sent **two million client rows at 280,300 rows/s** while running all ten demo queries. Reads averaged **17.97 ms**. Timing included row creation, transport and 2,000 confirmed commits; login, setup and final checks were excluded. Counts, checksums and query results passed in-session. These are local measurements; several complex queries still exceed 10 ms. [Measured conditions](tests/results/performance.json).
 
@@ -450,6 +494,11 @@ Protected accounts cannot read external objects or create cloud secrets; import 
 | `--tls-key PATH` | Private key inside the root, mode `0600` or `0400`. | Required with access rules; `server.key` |
 | `--max-queries NUMBER` | Simultaneous PostgreSQL queries; excess work returns `53300`. | `8`; 1–256 |
 | `--query-timeout-ms NUMBER` | Request cooperative cancellation after this many milliseconds. | `30000`; 1–3600000 |
+| `--auth-max-failures NUMBER` | Failed logins per IP before a temporary block. | `5` |
+| `--auth-window-seconds NUMBER` | Counting period for failed logins. | `60` |
+| `--ban-seconds NUMBER` | Duration of a temporary IP block. | `300` |
+| `--max-connections-per-minute NUMBER` | Per-IP TCP connections (PostgreSQL) or native logins (Quack) before a block. | `120` |
+| `--max-requests-per-minute NUMBER` | Per-IP protocol messages before a block. | `6000` |
 | `--help` | Print options and exit. | `./bin/duckonwire-server --help` |
 
 Relative paths resolve inside `--root`. Ctrl+C or SIGTERM closes sessions and removes the runtime descriptor. Do not delete the descriptor or database while the server is running.
@@ -489,6 +538,8 @@ El [tutorial](#tutorial) sigue un recorrido sencillo: iniciar el servidor, entra
 Desde [Neon](#query-from-neon), `postgres_fdw` presenta las tablas remotas para consultarlas y unirlas con datos locales. El ejemplo usa una cuenta de solo lectura y TLS verificado; los datos permanecen en DuckDB.
 
 En local se comparte una contraseña. Por red puedes configurar usuarios reales con permisos de lectura o escritura. Quack requiere el motor nativo compatible: `ATTACH` permite leer y unir tablas, y `CONNECT remote` es la ruta para consultas parametrizadas, CRUD y transacciones.
+
+Con `--access-file`, las cuentas y permisos también se aplican a Quack. Cinco fallos de login en un minuto bloquean la IP durante cinco minutos; también se limita el exceso de conexiones y solicitudes. El bloqueo se comparte entre bases y protocolos. Para Quack remoto usa un túnel cifrado o HTTPS verificado.
 
 Puedes servir [varias bases](#multiple-databases) desde un mismo puerto PostgreSQL: cada conexión elige su base y cada cuenta tiene permisos allí. Las bases permanecen aisladas; para cruzar datos desde un cliente nativo, adjunta sus endpoints con `ATTACH`.
 

@@ -119,7 +119,7 @@ jobs:
           required(expected.schema_version === 1 && expected.suites && typeof expected.suites === 'object' && !Array.isArray(expected.suites), 'Invalid native check definition');
           const expectedSuites = Object.entries(expected.suites);
           required(expectedSuites.every(([name, count]) => /^[a-z][a-z0-9-]*$/.test(name) && Number.isSafeInteger(count) && count > 0), 'Invalid native suite count');
-          const mandatorySuites = ['native-tests', 'native-attach', 'pgwire-protocol', 'access-rules', 'scram-authentication', 'bootstrap-regressions'];
+          const mandatorySuites = ['native-tests', 'native-attach', 'pgwire-protocol', 'access-rules', 'scram-authentication', 'bootstrap-regressions', 'database-routing', 'peer-protection', 'native-access', 'pg-peer-protection'];
           required(mandatorySuites.every(name => Object.hasOwn(expected.suites, name)), 'Missing a required native suite');
           const uncounted = expected.ctest_uncounted_suites;
           required(Array.isArray(uncounted) && uncounted.includes('concurrent-smoke') && new Set(uncounted).size === uncounted.length && uncounted.every(name => typeof name === 'string' && /^[a-z][a-z0-9-]*$/.test(name) && !Object.hasOwn(expected.suites, name)), 'Invalid uncounted CTest suites');
@@ -131,6 +131,10 @@ jobs:
           required(summary.ctest_suites_passed === expectedSuites.length + uncounted.length, 'A required CTest suite did not pass');
           required(summary.expected_checks_sha256 === expectedHash, 'Native check definition differs from the tested definition');
           required(manifest.source_head === head && manifest.expected_checks_sha256 === expectedHash, 'Package source or check definition differs from the workflow commit');
+          for (const suite of ['peer-protection', 'native-access', 'pg-peer-protection']) {
+            const result = manifest[`${suite}_acceptance`];
+            required(result?.passed === true && result.checks?.length === expected.suites[suite] && result.checks.every(check => check.passed === true), `Installed ${suite} checks are incomplete`);
+          }
           required(fs.readFileSync('proof/postgres/source-head.txt', 'utf8').trim() === head, 'Driver checks are from another commit');
           required(fdw.passed && fdw.owned_fixture_cleanup_complete && fdw.checks.length === 20 && fdw.checks.every(check => check.passed), 'FDW checks are incomplete');
           required(fdw.server_sha256 === manifest.files['bin/duckonwire-server'], 'FDW tested a different server');

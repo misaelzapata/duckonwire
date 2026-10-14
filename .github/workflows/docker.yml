@@ -58,6 +58,11 @@ jobs:
             --server /opt/duckonwire/bin/duckonwire-server | tee test-results/pgwire.json
           docker compose exec -T duckonwire /opt/duckonwire/bin/access-tests | tee test-results/access.json
           docker compose exec -T duckonwire /opt/duckonwire/bin/database-routing-tests | tee test-results/routing.json
+          docker compose exec -T duckonwire /opt/duckonwire/bin/peer-guard-tests | tee test-results/peer-protection.json
+          docker compose exec -T duckonwire /opt/duckonwire/bin/quack-access-tests \
+            --server /opt/duckonwire/bin/duckonwire-server --fixture-parent /tmp | tee test-results/native-access.json
+          docker compose exec -T duckonwire /opt/duckonwire/bin/pg-peer-guard-tests \
+            --server /opt/duckonwire/bin/duckonwire-server --fixture-parent /tmp | tee test-results/pg-peer-protection.json
           docker compose exec -T duckonwire /opt/duckonwire/bin/scram-tests | tee test-results/scram.json
           docker compose exec -T duckonwire /opt/duckonwire/bin/duckonwire-benchmark \
             --server /opt/duckonwire/bin/duckonwire-server --mode both --rows 10000 --batch 250 \

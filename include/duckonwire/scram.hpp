@@ -9,6 +9,9 @@ namespace duckonwire {
 // ambiguous SASLprep profile while retaining randomly generated passwords.
 std::string MakeScramVerifier(const std::string &password, std::uint32_t iterations = 65536);
 void ValidateScramVerifier(const std::string &verifier);
+// Native Quack credentials arrive over loopback or a verified encrypted channel.
+// This validates them against the same verifier; it is not a SCRAM wire exchange.
+bool VerifyScramPassword(const std::string &verifier, const std::string &password);
 // Unknown identities receive distinct, deterministic mock challenges per server.
 std::string MockScramVerifier(const std::string &server_verifier, const std::string &identity);
 

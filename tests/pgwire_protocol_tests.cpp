@@ -412,7 +412,7 @@ public:
 		server = std::make_unique<test_support::NativeServer>(root.path(), primary, executable_, 0, false,
 		    std::vector<std::string> {"--database", "reporting=data/reporting.duckdb", "--access-file",
 		        (root.path() / "access.tsv").string(), "--tls-cert", cert.string(), "--tls-key",
-		        (root.path() / "key.pem").string()}, 2);
+		        (root.path() / "key.pem").string(), "--auth-max-failures", "100"}, 2);
 	}
 	std::unique_ptr<Wire> Client(const std::string &database, const std::string &user = "writer") {
 		auto wire = std::make_unique<Wire>(server->pg_port());
@@ -426,6 +426,7 @@ public:
 		Require(colon != std::string::npos, "Malformed multi-database native endpoint");
 		return endpoint.substr(0, colon + 1) + std::to_string(std::stoi(endpoint.substr(colon + 1)) + 1);
 	}
+	std::string NativeCredential(const std::string &database) const { return "writer:" + Password(database); }
 	test_support::TempRoot root;
 	std::filesystem::path cert, primary, reporting;
 	std::unique_ptr<test_support::NativeServer> server;
@@ -1296,18 +1297,20 @@ int main(int argc, char **argv) {
 				        "Closed connection committed pending data or retained a write lock in its database");
 			}
 		});
-		test("multiple_databases_trusted_native_attach_can_join_two_endpoints", [&] {
+		test("multiple_databases_authenticated_native_attach_can_join_two_endpoints", [&] {
 			duckdb::DuckDB local(nullptr); duckdb::Connection native(local);
 			for (const auto &endpoint : {std::make_pair("primary_remote", multiple.server->endpoint()),
 			                             std::make_pair("reporting_remote", multiple.SecondaryEndpoint())}) {
+				const auto credential = multiple.NativeCredential(std::string(endpoint.first) == "primary_remote" ? "duckonwire" : "reporting");
+				private_tokens.push_back(credential);
 				test_support::Check(native.Query("ATTACH " + test_support::Literal(endpoint.second) + " AS " + endpoint.first +
-				    " (TOKEN " + test_support::Literal(multiple.server->token()) + ")"));
+				    " (TOKEN " + test_support::Literal(credential) + ")"));
 			}
 			auto joined = native.Query("SELECT p.id,p.label,r.label FROM primary_remote.main.md_shared p JOIN reporting_remote.main.md_shared r USING(id) ORDER BY id");
 			test_support::Check(joined); const auto rows = test_support::FetchRows(*joined);
 			Require(rows.size() == 2 && rows[0][0].GetValue<int>() == 1 && rows[0][1].GetValue<std::string>() == "Primary '日本'" &&
 			        rows[0][2].GetValue<int>() == 73 && rows[1][0].GetValue<int>() == 7 && rows[1][2].GetValue<int>() == 77,
-			        "Trusted ATTACH failed to join distinct native catalogs on the same owner");
+			        "Authenticated ATTACH failed to join distinct native catalogs on the same owner");
 		});
 		test("multiple_databases_graceful_restart_preserves_both_files_and_routes", [&] {
 			multiple.server->stop(); Require(multiple.server->clean_shutdown(), "Multi-database owner required forced shutdown");

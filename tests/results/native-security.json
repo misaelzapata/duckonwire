@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "status": "local_native_acceptance_passed_fresh_ci_pending",
+  "passed": true,
+  "required_checks": 226,
+  "suites": {
+    "native-tests": {
+      "passed": true,
+      "checks": 21,
+      "receipt_sha256": "5bbd52d42c6e4aa5ef6c9624d846682c4c6b0d956e6e47c700cd052395791553"
+    },
+    "native-attach": {
+      "passed": true,
+      "checks": 12,
+      "receipt_sha256": "44f0a0633cd2f382dd839a8c4e01a8c401bb93609e843944a1a7cc6e61994410"
+    },
+    "pgwire-protocol": {
+      "passed": true,
+      "checks": 56,
+      "receipt_sha256": "69cd0568cab8663d123687ccb7af1975b202befedc3b5faf843d52a6e6d42dd6"
+    },
+    "access-rules": {
+      "passed": true,
+      "checks": 20,
+      "receipt_sha256": "f5cea022b8e8590b9b920d4ec292fef44786e133923c251146e60711392d31c0"
+    },
+    "scram-authentication": {
+      "passed": true,
+      "checks": 15,
+      "receipt_sha256": "e7f39b0558cd12a26aafb03d7cea7780fabf9ec6b4a0d0f623f1c63bf9894d28"
+    },
+    "database-routing": {
+      "passed": true,
+      "checks": 6,
+      "receipt_sha256": "48654871194b36cd76de70cd365fd394f3149d9808bf7c30336f4d9508d002ce"
+    },
+    "peer-protection": {
+      "passed": true,
+      "checks": 15,
+      "receipt_sha256": "f0e0ac254f1a2dff2121db24ccec89907d0934f5ca0986d88b9e2c97179db46c"
+    },
+    "native-access": {
+      "passed": true,
+      "checks": 57,
+      "receipt_sha256": "949742dcb4af47ad5034939a87fde9fd065867588509c70923ac293fd86a1535"
+    },
+    "pg-peer-protection": {
+      "passed": true,
+      "checks": 7,
+      "receipt_sha256": "e56e43e53a7f70e2e99b8188b329d7a4f799acc8ed90397fe4eb76e0872d83c2"
+    },
+    "bootstrap-regressions": {
+      "passed": true,
+      "checks": 17,
+      "receipt_sha256": "7e13dc109d60ac8c76406082667380925b01d396152de5a77fe691a1d2e52cf5"
+    }
+  },
+  "scope": "Native C++ server and rebuilt Quack extension; all32 Quack translation units rebuilt with immutable cached DuckDB848126236a/HTTPFS objects. This is not fresh exact-pin engine or installed release qualification.",
+  "native_security": {
+    "account_source": "access.tsv",
+    "native_credential_format": "username:password through existing TOKEN field",
+    "native_password_exchange": "password verification against stored SCRAM verifier; not SCRAM wire negotiation",
+    "native_listener": "loopback; remote needs encrypted tunnel or verified HTTPS termination",
+    "permissions": [
+      "read",
+      "write"
+    ],
+    "owner_token_bypass": false,
+    "real_bound_read_only_checks": true,
+    "stored_definition_audit": [
+      "views",
+      "scalar_macros",
+      "table_macros",
+      "table_expressions",
+      "indexes"
+    ]
+  },
+  "peer_protection": {
+    "auth_failures": 5,
+    "auth_window_seconds": 60,
+    "ban_seconds": 300,
+    "connections_or_logins_per60seconds": 120,
+    "protocol_requests_per60seconds": 6000,
+    "max_tracked_peers": 4096,
+    "shared_across_databases_and_protocols": true,
+    "identity": "canonical numeric socket peer, no forwarded headers",
+    "ban_state": "memory only; resets on process restart",
+    "executing_operations": "not automatically cancelled by a later IP ban"
+  },
+  "stock_node_protected_workload": {
+    "passed": true,
+    "rows": 2000000,
+    "writers": 4,
+    "readers": 4,
+    "rowsPerSecond": 292682.7412541331,
+    "demoQueriesVerified": 10,
+    "demoQueriesOverlappingWrites": 10,
+    "complexResultsVerified": true,
+    "readLatency": {
+      "samples": 1591,
+      "meanMs": 17.115048472030182,
+      "p50Ms": 15.108833000000232,
+      "p95Ms": 40.123333999999886
+    }
+  },
+  "workload_conditions": {
+    "sslmode": "verify-full",
+    "reader_account": "separate read-only role",
+    "protocol_requests_per60seconds": 60000,
+    "parameters_sent": 6000000,
+    "demo_prices": 1000000,
+    "demo_data": "public manufacturer-brand catalog and synthetic prices",
+    "owned_fixture_removed": true
+  },
+  "validation": {
+    "independent_review": "no blocking issues; local acceptance approved; fresh pins/installed runtime/CI pending",
+    "documentation": {
+      "passed": true,
+      "server_help_checked": true,
+      "supported_server_options": 20,
+      "documents": 3,
+      "links": 104,
+      "anchors": 26,
+      "fences": 35
+    },
+    "fresh_pinned_cmake_configure_passed": true,
+    "fresh_build_or_ci_passed": false,
+    "production_changed": false,
+    "release_published": false
+  },
+  "source_sha256": {
+    "src/native_access.cpp": "c60324e4cdd80e143859b9c2b6ac3f1d4fa1c4c25a99c72de1b255361678621d",
+    "src/peer_guard.cpp": "f0c30dcfd0f2cba748616ea57362a72e1e5711dc3533d12ef69033b041bbe337",
+    "src/pgwire.cpp": "cc93b3f47a51040920aa9e915b2cd1a204b30d7c64d5f8a19af5698a3f0a3867",
+    "src/server.cpp": "55f3a4f9b5792fe895a60c7c17ea46db86741b377753484999901b3a77998ef2",
+    "src/scram.cpp": "e9e9dc7274bc3c4e16571d4c3856f1e8ccfdf77f559951f54b7139d9f3e9b4fe",
+    "tests/quack_access_tests.cpp": "b21ca9c51d627015d42226033f3851620623d239fe7650755ebc5ac804480abf",
+    "tests/pg_peer_guard_tests.cpp": "d16151097dc91cf25ff3bd96c34de867c04b31fb0d8195f899a15bd28a6a7540",
+    "tests/peer_guard_tests.cpp": "9ced48785ccdf7147b6f6a253e2350d76693dc5bcd92dd3096ec043c8321d166"
+  },
+  "binary_sha256": {
+    "server": "94ee45fc3ccf9dd6e1d79a6817f399bdf0dbfc849ef8139cf330c9177f810865",
+    "native_engine": "1fa6fc6e8f14062225b10ca085eecfec9ba4a9e31c34e18b9eea01b7e589ecb1"
+  },
+  "hot_swap": {
+    "status": "separate isolated native experiment; not integrated in DoW service",
+    "receipt_sha256": "65471a2563cb4d9fab40ca53313c29ec84039caa4eda1b9e84a7d98387060dfa",
+    "accepted_checks": 18,
+    "readers": 4,
+    "swaps": 20,
+    "transactions": 177,
+    "errors": 0,
+    "mixed_generations": 0,
+    "rollback_hazard_verified": true
+  }
+}

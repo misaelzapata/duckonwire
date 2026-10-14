@@ -10,6 +10,8 @@ namespace duckdb { class DuckDB; }
 
 namespace duckonwire {
 
+class PeerGuard;
+
 struct PgUser {
     std::string name, scram_verifier;
     bool read_only = true;
@@ -33,6 +35,9 @@ struct PgWireOptions {
     std::vector<PgDatabase> databases;
     std::size_t max_active_queries = 8;
     std::uint32_t query_timeout_ms = 30000;
+    // Protected servers create a guard when omitted. Share this instance with
+    // other public protocols so one socket peer cannot evade bans by switching.
+    std::shared_ptr<PeerGuard> peer_guard;
 };
 
 // PostgreSQL protocol 3.0 over a POSIX socket, sharing an existing

@@ -137,7 +137,9 @@ jobs:
           reader_verifier=$(printf '%s\n' "$PGREADER_PASSWORD" | build/bin/duckonwire-password)
           printf 'database\tduckonwire\nuser\tduckonwire\twrite\t%s\nuser\treader\tread\t%s\n' "$verifier" "$reader_verifier" > build/tls-fixture/access.tsv
           chmod 600 build/tls-fixture/access.tsv
-          build/bin/duckonwire-server --root "$PWD/build/tls-fixture" --port 19495 --pg-port "$PGPORT" --access-file access.tsv --tls-cert cert.pem --tls-key key.pem > build/test-results/tls-server.log 2>&1 &
+          # This benchmark sends millions of bound values and concurrent reads.
+          # Give it an explicit traffic budget; abuse fixtures test the defaults separately.
+          build/bin/duckonwire-server --root "$PWD/build/tls-fixture" --port 19495 --pg-port "$PGPORT" --access-file access.tsv --tls-cert cert.pem --tls-key key.pem --max-requests-per-minute 60000 > build/test-results/tls-server.log 2>&1 &
           owner_pid=$!
           trap 'kill -TERM "$owner_pid" 2>/dev/null || true; wait "$owner_pid" || true' EXIT
           for attempt in {1..100}; do

@@ -1,7 +1,7 @@
 {
   "project": "DuckOnWire",
   "version": "0.3.0",
-  "status": "Version0.3.0 acceptance is retained. Two additional SQL optimizations passed local and Amazon runtime checks; fresh repository CI and deployment are recorded separately.",
+  "status": "Version0.3.0 evidence is retained. Native account and peer-protection changes passed226 local native/bootstrap checks and a protected two-million-row Node workload; fresh pinned CI and deployment remain separate gates.",
   "native_engine_version": "v2.1.0-dev0",
   "quack_protocol": 7,
   "patches_sha256": {
@@ -11,7 +11,7 @@
     "duckdb.patch": "62f0ad0faf0543d7e8c30591a6e5b0cb8e72398bc34fa8ef177b16df685de7d4",
     "f8e285333da4b30cacb02f69d6dee409d03b9452.patch": "55ce6d1d42e5ac4e18e3d88a3a28cb3e1e3c11fdaef2c094ce8f823ae6dafbf1",
     "httpfs.patch": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "quack.patch": "e63842a385e4ed48d7c0708d9f7c5a470e4638d8f9d25a1184f5cdc4d4a4d03c"
+    "quack.patch": "dd00c3d679890e71edf188e9867d3440126e2dc43e62a0f67f798295c1b6e0a7"
   },
   "results": [
     {
@@ -65,6 +65,10 @@
     {
       "path": "ci-repair.json",
       "sha256": "24ca9d10c7305df41a23fbc40fcd43918eea5bf53a7d7a19a1c57a2e00a1e557"
+    },
+    {
+      "path": "native-security.json",
+      "sha256": "5a19e8bfb3475359e814d96ba244e477956de78d0c2be53a6f0678157b4a75ad"
     }
   ],
   "benchmark_runs": [
