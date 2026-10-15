@@ -8,19 +8,23 @@ DuckOnWire shares a DuckDB file through a C++ server. The server opens the file 
 | --- | --- |
 | Local PostgreSQL, `127.0.0.1:9496` | Stock PostgreSQL driver. `PGPASSWORD` is the server's shared `DUCKONWIRE_TOKEN`; `PGUSER` is a label, not an account or permission boundary. Local examples default to `PGSSLMODE=disable`. Use an encrypted SSH tunnel for remote access. |
 | Protected PostgreSQL | Stock driver with real `PGUSER`, `PGPASSWORD` and the configured `PGDATABASE`. Requires TLS certificate/hostname verification (`PGSSLMODE=verify-full`, `PGSSLROOTCERT`) and SCRAM-SHA-256. Server options: `--access-file`, `--tls-cert`, `--tls-key`, optionally `--pg-host`. Rules grant database-wide `read` or `write` access. |
-| Native Quack, `127.0.0.1:9495` | A DuckDB connection using `ATTACH` or `CONNECT`, the paired native engine and Quack protocol 7. HTTPFS/Quack are built in. Quack uses the local token and stays on loopback, including in protected mode. |
+| Native Quack, `127.0.0.1:9495` | A DuckDB connection using `ATTACH` or `CONNECT`, the paired native engine and Quack protocol 7. HTTPFS/Quack are built in. Local mode uses the shared token. Protected mode uses `TOKEN` containing `username:password`, checked against that database's account verifier with its `read`/`write` grant. Stays on loopback; remote access needs an encrypted tunnel or verified HTTPS termination. |
 
 PostgreSQL clients use their usual driver and leave an existing DuckDB installation alone. Queries still use DuckDB SQL; full PostgreSQL catalogs, ORMs and network `COPY` are not supported. Check the version in each result before applying it to a different release.
 
 `ATTACH 'quack:127.0.0.1:9495' AS remote (TOKEN '...')` makes remote tables available as `remote.main.table_name`, so a client can join them with local tables. `CONNECT remote` sends subsequent SQL and transactions to the server. Use that route for parameterized SQL and general CRUD: plain `ATTACH` does not transport bound parameters in the tested remote-read path, has incomplete UPDATE/DELETE fallback paths and can cache schema metadata. Do not turn an ATTACH read test into a claim of full CRUD compatibility. The [ATTACH example](examples/attach.cpp) uses synthetic rows and removes its own table when finished.
 
-Quack is trusted local access: PostgreSQL's per-user read/write rules and query limits do not apply to that endpoint.
+In protected mode, Quack enforces account identity, per-database grants, parsed SQL policy and bound-plan read-only checks. The owner's shared token is rejected. Native credential verification is not a SCRAM challenge exchange; PostgreSQL TLS options do not encrypt the Quack listener. Quack's query concurrency/time limits remain separate from the PostgreSQL controls.
 
 ## Multiple databases
 
 Repeat `--database NAME=PATH` (up to 32 files) to publish isolated native engines in one owner process. PostgreSQL clients choose a configured `PGDATABASE` on the same port. Access TSV files use repeated `database` sections, each followed by its `user` grants (up to 64 grants overall). A user can have different credentials or read/write access per database. Routing occurs after authentication; connection reset preserves the selected engine. SQL caches contain syntax only, never shared prepared plans or transaction state.
 
-Each native engine opens one file. Protected SQL cannot attach other files or query another published engine's catalogs. Local single-file mode preserves arbitrary database labels; local multi-file mode requires a published name. Quack uses consecutive loopback ports from `--port`, one endpoint per engine, and a shared local token. Native clients can ATTACH multiple endpoints for joins; those endpoints are trusted and do not enforce PostgreSQL accounts. Select a PostgreSQL port outside the native range.
+Each native engine opens one file. Protected SQL cannot attach other files or query another published engine's catalogs. Local single-file mode preserves arbitrary database labels; local multi-file mode requires a published name. Quack uses consecutive loopback ports from `--port`, one endpoint per engine. Native clients can ATTACH multiple endpoints for joins, supplying each protected database's account credential. Select a PostgreSQL port outside the native range.
+
+One bounded `PeerGuard` covers all protected databases and both protocols. Defaults: five failed credentials in 60 seconds, 300-second block, 120 connections/logins and 6,000 protocol messages per 60-second counting window. Use numeric socket peers, canonicalize mapped IPv4/IPv6, and ignore forwarded headers. Existing sessions check blocks before further messages; bans do not cancel operations already executing. NAT/proxy/tunnel clients share peer accounting. Blocks are in memory, bounded to 4,096 tracked peers, and expire without evicting active bans. Qualify threshold/expiry, cross-protocol and cross-database bypass attempts, malformed input, other-IP continuity and tracking exhaustion with owned fixtures.
+
+Protected startup audits persisted views, scalar/table macros, table expressions and indexes, including defaults and overloads, without binding their bodies. Reject unsafe or unverifiable definitions with generic diagnostics; never echo definition text or credentials. Bound read-only checks must run before execution, including side-effecting SELECT expressions and prepared EXECUTE. Preserve native streams' session ownership.
 
 Protected buffer memory is divided across the configured engines, using one detected process budget capped at 1 GiB. Worker and spill settings are per engine, and total RSS is not hard-limited. Transactions do not provide atomic commits across separate engines. Demo initialization affects only the first database. Qualify per-database credentials and read/write roles, cross-catalog and metadata isolation, cached SQL with distinct schemas, resets, parallel transactions, disconnect rollback, persistence and crash recovery. `database-routing` also rejects two wrappers of the same native instance.
 
@@ -80,7 +84,7 @@ Published native bundles were tested on macOS 26 ARM64 and Ubuntu 24.04 x86-64-v
 [cmake/Pins.cmake](cmake/Pins.cmake) is authoritative:
 
 - DuckDB fork: `0cfb63a5f712fadf06a0de33217b7b03666ae66b`.
-- Quack fork: `a6e7cb9243ee3d7ec0e5371b720be3292a32061f`.
+- Quack fork: `8ebc6c89c06db534aa8d2c7e38d6939d99f859f3`.
 - Official HTTPFS: `96a2f2e88e5dd075facbc5a65dc3afd67aa2bb44`.
 
 The fork commits already contain the audited changes: never replay their patches. Official baseline revisions and patch hashes remain audit references. Keep `upstream/` clean; CMake creates independent working checkouts under `build/sources/`. Do not reset existing checkouts or silently advance pins; use a fresh build directory when source receipts differ.

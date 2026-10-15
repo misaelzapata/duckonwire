@@ -113,6 +113,25 @@ std::string MakeScramVerifier(const std::string &password, std::uint32_t iterati
     return "SCRAM-SHA-256$" + std::to_string(iterations) + ":" + Encode(salt) + "$" + Encode(stored) + ":" + Encode(server);
 }
 void ValidateScramVerifier(const std::string &verifier) { (void) Parse(verifier); }
+bool VerifyScramPassword(const std::string &verifier, const std::string &password) {
+    const auto parsed = Parse(verifier);
+    if (password.size() < 32 || password.size() > 1024 ||
+        std::any_of(password.begin(), password.end(), [](unsigned char c) { return c < 0x20 || c > 0x7e; }))
+        return false;
+    std::string salted(KEY_SIZE, '\0');
+    if (!PKCS5_PBKDF2_HMAC(password.data(), static_cast<int>(password.size()),
+                          reinterpret_cast<const unsigned char *>(parsed.salt.data()),
+                          static_cast<int>(parsed.salt.size()), static_cast<int>(parsed.iterations),
+                          EVP_sha256(), KEY_SIZE, reinterpret_cast<unsigned char *>(salted.data())))
+        throw std::runtime_error("OpenSSL PBKDF2 failed");
+    auto client = Mac(salted, "Client Key");
+    auto stored = Digest(client);
+    OPENSSL_cleanse(salted.data(), salted.size());
+    OPENSSL_cleanse(client.data(), client.size());
+    const bool matches = CRYPTO_memcmp(stored.data(), parsed.stored.data(), KEY_SIZE) == 0;
+    OPENSSL_cleanse(stored.data(), stored.size());
+    return matches;
+}
 std::string MockScramVerifier(const std::string &server_verifier, const std::string &identity) {
     const auto parsed = Parse(server_verifier);
     const auto salt = Mac(parsed.server, "DuckOnWire mock salt:" + identity).substr(0, parsed.salt.size());

@@ -1,4 +1,5 @@
 #include "duckonwire/pgwire.hpp"
+#include "duckonwire/peer_guard.hpp"
 #include "duckonwire/scram.hpp"
 
 #include <openssl/ssl.h>
@@ -873,6 +874,7 @@ struct PgWireServer::Impl {
     std::string host, password;
     bool protected_mode = false;
     PgWireOptions options;
+    std::shared_ptr<PeerGuard> peer_guard;
     SSL_CTX *tls_context = nullptr;
     std::string fake_verifier;
     std::uint16_t requested_port;
@@ -931,7 +933,9 @@ struct PgWireServer::Impl {
           max_active_queries(maximum), query_timeout_ms(timeout) {}
     Impl(duckdb::DuckDB &db, PgWireOptions config)
         : database(db), databases(config.databases), host(config.host), protected_mode(true), options(std::move(config)), requested_port(options.port),
-          max_active_queries(options.max_active_queries), query_timeout_ms(options.query_timeout_ms) {}
+          max_active_queries(options.max_active_queries), query_timeout_ms(options.query_timeout_ms) {
+        peer_guard = options.peer_guard ? options.peer_guard : std::make_shared<PeerGuard>();
+    }
     ~Impl() { Stop(); if (tls_context) SSL_CTX_free(tls_context); }
     void Start();
     void Stop() noexcept;
@@ -976,6 +980,7 @@ struct PgWireServer::Impl::Session {
     WireSocket socket;
     std::mutex socket_lock;
     std::string authenticated_user;
+    const std::string peer;
     bool read_only = true;
     std::uint32_t id, cancel_secret;
     bool failed_transaction = false, skip_until_sync = false, implicit_extended_transaction = false;
@@ -989,8 +994,9 @@ struct PgWireServer::Impl::Session {
     std::unordered_map<std::string, std::shared_ptr<Statement>> statements;
     std::unordered_map<std::string, Portal> portals;
     std::unordered_map<std::string, Portal> sql_cursors;
-    Session(Impl &owner, int socket_p, std::uint32_t id_p)
-        : server(owner), selected_database(&owner.database), connection(owner.database), socket(socket_p), id(id_p), cancel_secret(0) {
+    Session(Impl &owner, int socket_p, std::uint32_t id_p, std::string peer_p)
+        : server(owner), selected_database(&owner.database), connection(owner.database), socket(socket_p), peer(std::move(peer_p)),
+          id(id_p), cancel_secret(0) {
         if (RAND_bytes(reinterpret_cast<unsigned char *>(&cancel_secret), sizeof(cancel_secret)) != 1)
             throw std::runtime_error("Cannot generate cancellation key");
     }
@@ -1002,6 +1008,7 @@ struct PgWireServer::Impl::Session {
         bool finished = false;
         std::thread timer;
         explicit ExecutionGuard(Session &owner) : session(owner) {
+            session.CheckPeer();
             if (session.server.active_queries.fetch_add(1) >= session.server.max_active_queries) {
                 session.server.active_queries.fetch_sub(1);
                 throw WireError("53300", "The native query capacity is full; retry after an active query completes");
@@ -1034,6 +1041,7 @@ struct PgWireServer::Impl::Session {
         std::uint64_t generation;
         std::chrono::steady_clock::time_point deadline;
         explicit ParseAdmission(Session &owner) : session(owner), generation(owner.cancel_generation.load()) {
+            session.CheckPeer();
             std::unique_lock<std::mutex> lock(session.server.parse_lock);
             deadline = std::chrono::steady_clock::now() +
                 std::chrono::milliseconds(std::min<std::uint32_t>(30000, session.server.query_timeout_ms));
@@ -1045,6 +1053,7 @@ struct PgWireServer::Impl::Session {
             session.server.parse_busy = true;
         }
         void Check() const {
+            session.CheckPeer();
             if (session.server.stopping.load()) throw WireError("57P01", "Server is stopping", true);
             if (session.cancel_generation.load() != generation)
                 throw WireError("57014", "Statement cancelled during native parsing");
@@ -1081,6 +1090,10 @@ struct PgWireServer::Impl::Session {
         if (!suppress_ready) Message(socket, 'Z', Buffer {static_cast<unsigned char>(State())});
     }
     void Run();
+    void CheckPeer() const {
+        if (server.peer_guard && server.peer_guard->IsBanned(peer))
+            throw WireError("53300", "Socket peer is temporarily blocked", true);
+    }
     bool Startup();
     void UpgradeTLS();
     void Authenticate(const std::map<std::string, std::string> &options);
@@ -1257,6 +1270,7 @@ Buffer PgWireServer::Impl::Session::AuthenticationResponse() {
     return response;
 }
 void PgWireServer::Impl::Session::Authenticate(const std::map<std::string, std::string> &startup) {
+    CheckPeer();
     const auto user = startup.find("user"), database = startup.find("database");
     const PgUser *selected = nullptr;
     if (user != startup.end() && database != startup.end() && server.FindDatabase(database->second))
@@ -1278,8 +1292,10 @@ void PgWireServer::Impl::Session::Authenticate(const std::map<std::string, std::
         const auto challenge = exchange.Challenge(std::string(bytes.begin(), bytes.end()));
         body.clear(); Put32(body, 11); body.insert(body.end(), challenge.begin(), challenge.end()); Message(socket, 'R', body);
         const auto final = AuthenticationResponse();
+        CheckPeer();
         const auto response = exchange.Finish(std::string(final.begin(), final.end()));
         if (!selected) throw std::invalid_argument("Unknown credentials");
+        CheckPeer();
         SelectDatabase(*server.FindDatabase(database->second));
         authenticated_user = selected->name; read_only = selected->read_only;
         body.clear(); Put32(body, 12); body.insert(body.end(), response.begin(), response.end()); Message(socket, 'R', body);
@@ -1287,6 +1303,7 @@ void PgWireServer::Impl::Session::Authenticate(const std::map<std::string, std::
 }
 bool PgWireServer::Impl::Session::Startup() {
     for (unsigned tries = 0; tries < 3; ++tries) {
+        CheckPeer();
         std::array<unsigned char, 4> length_bytes {};
         if (!Receive(socket, length_bytes.data(), length_bytes.size())) return false;
         Buffer length_buffer(length_bytes.begin(), length_bytes.end()); Reader length_reader(length_buffer);
@@ -1404,11 +1421,14 @@ void PgWireServer::Impl::Session::Run() {
         }
         if (!Startup()) { CloseSocket(); return; }
         while (!server.stopping.load()) {
+            CheckPeer();
             if (server.protected_mode) socket.read_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(300);
             unsigned char type; std::array<unsigned char, 4> header {};
             if (!Receive(socket, &type, 1) || !Receive(socket, header.data(), 4)) break;
             Buffer header_buffer(header.begin(), header.end()); Reader size(header_buffer); auto length = size.U32();
             if (length < 4 || length > MAX_FRAME) throw WireError("08P01", "Invalid PostgreSQL frame size", true);
+            if (server.peer_guard && !server.peer_guard->AdmitRequest(peer))
+                throw WireError("53300", "Socket peer request limit exceeded or temporarily blocked", true);
             Buffer body(length - 4); if (!body.empty() && !Receive(socket, body.data(), body.size())) break;
             if (type == 'X') { Reader in(body); in.End(); break; }
             if (skip_until_sync && type != 'S') continue;
@@ -1425,7 +1445,10 @@ void PgWireServer::Impl::Session::Run() {
             }
         }
     } catch (const WireError &error) {
-        try { ErrorMessage(socket, error); } catch (...) {}
+        try {
+            if (server.peer_guard && error.code == "28P01") server.peer_guard->AuthenticationFailed(peer);
+            ErrorMessage(socket, error);
+        } catch (...) {}
     } catch (...) {}
     portals.clear(); statements.clear();
     try { if (!connection.IsAutoCommit()) connection.Rollback(); } catch (...) {}
@@ -2384,9 +2407,19 @@ void PgWireServer::Impl::Accept() {
         if (!ready) continue;
         if (stopping.load() || (pending.revents & (POLLERR | POLLHUP | POLLNVAL))) break;
         if (!(pending.revents & POLLIN)) continue;
-        auto client = accept(listener, nullptr, nullptr);
+        sockaddr_in address {};
+        socklen_t address_size = sizeof(address);
+        auto client = accept(listener, reinterpret_cast<sockaddr *>(&address), &address_size);
         if (client < 0) { if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) continue; break; }
         if (stopping.load()) { close(client); break; }
+        char numeric_peer[INET_ADDRSTRLEN] {};
+        if (address_size != sizeof(address) || address.sin_family != AF_INET ||
+            !inet_ntop(AF_INET, &address.sin_addr, numeric_peer, sizeof(numeric_peer))) { close(client); continue; }
+        const std::string peer(numeric_peer);
+        if (peer_guard) {
+            try { if (!peer_guard->AdmitConnection(peer)) { close(client); continue; } }
+            catch (...) { close(client); continue; }
+        }
         // macOS inherits O_NONBLOCK from the listener; protocol sessions read
         // complete frames on their worker thread with blocking sockets.
         const auto client_flags = fcntl(client, F_GETFL, 0);
@@ -2409,7 +2442,7 @@ void PgWireServer::Impl::Accept() {
                 if (job->done->load()) { job->thread.join(); job = jobs.erase(job); } else ++job;
             }
             auto id = next_id.fetch_add(1);
-            auto session = std::make_shared<Session>(*this, client, id);
+            auto session = std::make_shared<Session>(*this, client, id, peer);
             socket_transferred = true;
             {
                 std::lock_guard<std::mutex> guard(sessions_lock);

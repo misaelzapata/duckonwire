@@ -5,9 +5,12 @@
     "native-attach": 12,
     "pgwire-protocol": 56,
     "access-rules": 20,
-    "scram-authentication": 12,
+    "scram-authentication": 15,
     "bootstrap-regressions": 17,
-    "database-routing": 6
+    "database-routing": 6,
+    "peer-protection": 15,
+    "native-access": 57,
+    "pg-peer-protection": 7
   },
   "ctest_uncounted_suites": [
     "concurrent-smoke"

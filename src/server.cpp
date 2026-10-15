@@ -2,6 +2,8 @@
 #include "duckonwire/json.hpp"
 #include "duckonwire/pgwire.hpp"
 #include "duckonwire/access.hpp"
+#include "duckonwire/native_access.hpp"
+#include "duckonwire/peer_guard.hpp"
 #include "initialize.hpp"
 
 #include <algorithm>
@@ -113,6 +115,7 @@ struct Options {
 	int max_queries = 8;
 	int query_timeout_ms = 30000;
 	int threads = 0;
+	duckonwire::PeerGuardOptions peer_guard;
 	bool init_demo = false;
 	std::int64_t demo_prices = 0;
 };
@@ -161,6 +164,8 @@ Options Parse(int argc, char **argv) {
 			          << "Engine: --threads 1..64 per database; default uses DuckDB's detected CPU capacity, capped at 2 workers per database.\n"
 			          << "Demo: --init-demo imports the catalog; --demo-prices 1000000 adds reproducible 30-day synthetic history instead of CSV prices (46462..10000000 rows).\n"
 			          << "Access rules assign users read/write permission within named database sections; TLS and SCRAM required.\n";
+			std::cout << "Protected peer limits: --auth-max-failures 5 --auth-window-seconds 60 --ban-seconds 300\n"
+			          << "--max-connections-per-minute 120 --max-requests-per-minute 6000 (per socket IP, shared by all databases and protocols).\n";
 			std::exit(0);
 		}
 		if (i + 1 == argc) throw std::runtime_error("Every option requires a value");
@@ -187,6 +192,19 @@ Options Parse(int argc, char **argv) {
 		else if (name == "--tls-cert") options.tls_cert = value;
 		else if (name == "--tls-key") options.tls_key = value;
 		else if (name == "--pg-host") options.pg_host = value;
+		else if (name == "--auth-max-failures" || name == "--auth-window-seconds" || name == "--ban-seconds" ||
+		         name == "--max-connections-per-minute" || name == "--max-requests-per-minute") {
+			size_t consumed = 0;
+			const auto number = std::stoull(value, &consumed);
+			if (consumed != value.size() || value.empty() || value.front() == '-' || number < 1 || number > 1000000)
+				throw std::runtime_error("Peer protection limits must be between 1 and 1000000");
+			const auto limit = static_cast<std::uint32_t>(number);
+			if (name == "--auth-max-failures") options.peer_guard.auth_failures = limit;
+			else if (name == "--auth-window-seconds") options.peer_guard.auth_window_seconds = limit;
+			else if (name == "--ban-seconds") options.peer_guard.ban_seconds = limit;
+			else if (name == "--max-connections-per-minute") options.peer_guard.connections_per_minute = limit;
+			else options.peer_guard.requests_per_minute = limit;
+		}
 		else if (name == "--threads") {
 			size_t consumed = 0;
 			options.threads = std::stoi(value, &consumed);
@@ -323,9 +341,11 @@ void InstallSignals() {
 void Serve(const Options &options, const std::string &token) {
 	const bool protected_mode = !options.access_file.empty();
 	duckonwire::AccessConfig rules;
+	std::shared_ptr<duckonwire::PeerGuard> peer_guard;
 	if (protected_mode) {
 		if (options.init_demo) throw std::runtime_error("Initialize the demo locally before enabling access rules");
 		rules = duckonwire::ReadAccessConfig(options.access_file.string());
+		peer_guard = std::make_shared<duckonwire::PeerGuard>(options.peer_guard);
 	}
 	auto configured = options.databases;
 	if (configured.front().name.empty()) configured.front().name = protected_mode ? rules.database : "duckonwire";
@@ -381,6 +401,7 @@ void Serve(const Options &options, const std::string &token) {
 		auto &database = *runtime.database;
 		auto &owner = *runtime.owner;
 		if (protected_mode) {
+			duckonwire::ConfigureNativeAccess(database, settings.name, rules, peer_guard);
 			// Retain quota detection and reserve process headroom. Independent
 			// engines share this one buffer budget rather than multiplying it.
 			constexpr duckdb::idx_t memory_cap = 1024ULL * 1024ULL * 1024ULL;
@@ -420,6 +441,7 @@ void Serve(const Options &options, const std::string &token) {
 		settings.databases = routes;
 		settings.max_active_queries = static_cast<std::size_t>(options.max_queries);
 		settings.query_timeout_ms = static_cast<std::uint32_t>(options.query_timeout_ms);
+		settings.peer_guard = peer_guard;
 		settings.tls_cert = options.tls_cert.string();
 		settings.tls_key = options.tls_key.string();
 		for (const auto &rule : rules.users) {

@@ -178,6 +178,24 @@ int main() {
         for (unsigned iterations : {4095u, 1000001u}) Rejected([&] { duckonwire::MakeScramVerifier(std::string(32, 'a'), iterations); });
         duckonwire::ValidateScramVerifier(duckonwire::MakeScramVerifier(std::string(1024, 'a'), 4096));
     });
+    test("native_password_matches_existing_scram_verifier", [] {
+        const std::string password = "native-fixture-32-or-more-printable-password";
+        const auto verifier = duckonwire::MakeScramVerifier(password, 4096);
+        Require(duckonwire::VerifyScramPassword(verifier, password), "Valid native password rejected");
+        Require(!duckonwire::VerifyScramPassword(verifier, password + "wrong"), "Invalid native password accepted");
+    });
+    test("native_password_length_ascii_and_verifier_bounds", [] {
+        const auto verifier = duckonwire::MakeScramVerifier(std::string(32, 'a'), 4096);
+        for (const auto &password : {std::string(31, 'a'), std::string(1025, 'a'), std::string(32, '\n'), std::string(32, static_cast<char>(0xff))})
+            Require(!duckonwire::VerifyScramPassword(verifier, password), "Invalid native password format accepted");
+        Rejected([&] { duckonwire::VerifyScramPassword("invalid-verifier", std::string(32, 'a')); });
+    });
+    test("native_password_preserves_colons_spaces_and_maximum_length", [] {
+        for (const auto &password : {std::string("native fixture with spaces:and:colons"), std::string(1024, 'x')}) {
+            const auto verifier = duckonwire::MakeScramVerifier(password, 4096);
+            Require(duckonwire::VerifyScramPassword(verifier, password), "Printable native password changed");
+        }
+    });
     bool passed = !checks.empty(); std::cout << "{\"checks\":[";
     for (std::size_t i = 0; i < checks.size(); ++i) {
         if (i) std::cout << ','; const auto &check = checks[i]; passed = passed && check.second.empty();
