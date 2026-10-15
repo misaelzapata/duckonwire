@@ -3,11 +3,13 @@
 #include "duckonwire/pgwire.hpp"
 #include "duckonwire/access.hpp"
 #include "duckonwire/native_access.hpp"
+#include "duckonwire/read_copy.hpp"
 #include "duckonwire/peer_guard.hpp"
 #include "initialize.hpp"
 
 #include <algorithm>
 #include <cerrno>
+#include <chrono>
 #include <csignal>
 #include <cstdlib>
 #include <cstring>
@@ -85,6 +87,7 @@ fs::path ConfigurationPath(const fs::path &input, const fs::path &root) {
 struct DatabaseOption {
 	std::string name;
 	fs::path path, spill, secrets;
+	fs::path pointer, versions;
 };
 
 std::string DatabaseKey(std::string_view value) {
@@ -124,11 +127,19 @@ void ValidateStoragePaths(const Options &options) {
 	// A database also owns its WAL and spill namespace. Never let one engine's
 	// storage or cleanup touch another database, the descriptor, or a TLS/rules file.
 	const bool protected_mode = !options.access_file.empty();
-	std::vector<fs::path> resources {OwnedPath(options.state, options.root)};
+	std::vector<fs::path> resources {OwnedPath(options.state, options.root),
+	                                OwnedPath(options.state.string() + ".update", options.root)};
 	for (const auto &database : options.databases) {
-		resources.push_back(OwnedPath(database.path, options.root));
-		for (const auto &suffix : {".wal", ".wal.checkpoint", ".wal.recovery", ".tmp"})
-			resources.push_back(OwnedPath(fs::path(database.path.string() + suffix), options.root));
+		if (database.pointer.empty()) {
+			resources.push_back(OwnedPath(database.path, options.root));
+			for (const auto &suffix : {".wal", ".wal.checkpoint", ".wal.recovery", ".tmp"})
+				resources.push_back(OwnedPath(fs::path(database.path.string() + suffix), options.root));
+		} else {
+			resources.push_back(OwnedPath(database.pointer, options.root));
+			resources.push_back(OwnedPath(database.pointer.string() + ".active", options.root));
+			resources.push_back(OwnedPath(database.pointer.string() + ".active.update", options.root));
+			resources.push_back(OwnedPath(database.versions, options.root));
+		}
 		resources.push_back(OwnedPath(database.spill, options.root));
 		if (protected_mode) resources.push_back(OwnedPath(database.secrets, options.root));
 	}
@@ -157,6 +168,7 @@ Options Parse(int argc, char **argv) {
 			std::cout << "duckonwire-server [--root DIRECTORY] [--database PATH | NAME=PATH] [--port 9495] [--pg-port 9496] [--state PATH] [--init-demo] [--demo-prices ROWS] [--threads 1..64]\n"
 			          << "Quack uses --port; PostgreSQL drivers use --pg-port (0 selects a free port).\n"
 			          << "Repeat --database NAME=PATH for up to 32 isolated databases. Only the first may omit NAME.\n"
+			          << "--read-copy NAME=POINTER publishes immutable read-only copies; atomically replace private POINTER with a version basename in POINTER.versions (private directory).\n"
 			          << "Quack uses consecutive loopback ports, one per database; choose a PostgreSQL port outside that range.\n"
 			          << "DUCKONWIRE_TOKEN sets local endpoint passwords; otherwise one is generated.\n"
 			          << "Public: --pg-host ADDRESS --access-file PATH --tls-cert PATH --tls-key PATH\n"
@@ -171,11 +183,12 @@ Options Parse(int argc, char **argv) {
 		if (i + 1 == argc) throw std::runtime_error("Every option requires a value");
 		std::string value(argv[++i]);
 		if (name == "--root") options.root = value;
-		else if (name == "--database") {
+		else if (name == "--database" || name == "--read-copy") {
 			if (options.databases.size() >= 32) throw std::runtime_error("At most 32 databases may be served");
 			const auto separator = value.find('=');
 			DatabaseOption database;
 			if (separator == std::string::npos) {
+				if (name == "--read-copy") throw std::runtime_error("Read copies require NAME=POINTER");
 				if (!options.databases.empty()) throw std::runtime_error("Additional databases require NAME=PATH");
 				database.path = value;
 			} else {
@@ -185,6 +198,7 @@ Options Parse(int argc, char **argv) {
 			}
 			if (database.path.empty() || value.find('\0') != std::string::npos)
 				throw std::runtime_error("A database requires a nonempty file path");
+			if (name == "--read-copy") database.pointer = database.path;
 			options.databases.push_back(std::move(database));
 		}
 		else if (name == "--state") options.state = value;
@@ -255,6 +269,15 @@ Options Parse(int argc, char **argv) {
 	for (auto &database : options.databases) {
 		if (!database.name.empty() && !names.insert(DatabaseKey(database.name)).second)
 			throw std::runtime_error("Database names must be unique, ignoring case");
+		if (!database.pointer.empty()) {
+			if (options.init_demo) throw std::runtime_error("Read copies cannot be combined with --init-demo");
+			database.pointer = (database.pointer.is_absolute() ? database.pointer : options.root / database.pointer).lexically_normal();
+			database.path = duckonwire::ReadCopyController::InitialPath(options.root, database.pointer);
+			database.versions = duckonwire::ReadCopyController::VersionDirectory(options.root, database.pointer);
+			database.spill = OwnedPath(options.root / ".runtime" / ("read-copy-" + database.name + ".spill"), options.root);
+			database.secrets = OwnedPath(options.root / ".runtime" / ("read-copy-" + database.name + ".secrets"), options.root);
+			continue;
+		}
 		database.path = OwnedPath(database.path, options.root);
 		database.spill = OwnedPath(options.databases.size() == 1 ? database.path.parent_path() / "native-spill" :
 		                          fs::path(database.path.string() + ".spill"), options.root);
@@ -304,6 +327,20 @@ public:
 		}
 	}
 	void Write(const std::string &payload) {
+		const bool updating = fd < 0;
+		fs::path temporary;
+		if (updating) {
+			struct stat current {};
+			if (lstat(path.c_str(), &current) != 0 || current.st_dev != identity.st_dev || current.st_ino != identity.st_ino)
+				throw std::runtime_error("Private descriptor owner changed");
+			std::string temporary_name = path.string() + ".update.XXXXXX";
+			fd = mkstemp(temporary_name.data());
+			if (fd < 0) throw std::runtime_error("Cannot create private descriptor update");
+			temporary = temporary_name;
+		}
+		try {
+		if (updating && (fcntl(fd, F_SETFD, FD_CLOEXEC) != 0 || fchmod(fd, 0600) != 0))
+			throw std::runtime_error("Cannot secure private descriptor update");
 		size_t offset = 0;
 		while (offset < payload.size()) {
 			auto count = write(fd, payload.data() + offset, payload.size() - offset);
@@ -312,8 +349,24 @@ public:
 			offset += static_cast<size_t>(count);
 		}
 		if (fsync(fd) != 0) throw std::runtime_error("Cannot persist the private descriptor");
+		struct stat updated {};
+		if (fstat(fd, &updated) != 0) throw std::runtime_error("Cannot inspect private descriptor update");
 		close(fd);
 		fd = -1;
+		if (updating) {
+			struct stat current {};
+			if (lstat(path.c_str(), &current) != 0 || current.st_dev != identity.st_dev || current.st_ino != identity.st_ino)
+				throw std::runtime_error("Private descriptor owner changed");
+			if (rename(temporary.c_str(), path.c_str()) != 0)
+				throw std::runtime_error("Cannot publish private descriptor update");
+		}
+		identity = updated;
+		} catch (...) {
+			if (fd >= 0) close(fd);
+			fd = -1;
+			if (updating) unlink(temporary.c_str());
+			throw;
+		}
 	}
 private:
 	fs::path path;
@@ -370,6 +423,7 @@ void Serve(const Options &options, const std::string &token) {
 		DatabaseOption settings;
 		std::string endpoint;
 		std::unique_ptr<duckdb::DuckDB> database;
+		std::unique_ptr<duckonwire::ReadCopyController> read_copy;
 		std::unique_ptr<duckdb::Connection> owner;
 		bool active = false;
 	};
@@ -378,6 +432,7 @@ void Serve(const Options &options, const std::string &token) {
 	duckdb::idx_t shared_memory_budget = 0;
 	for (std::size_t i = 0; i < configured.size(); ++i) {
 		const auto &settings = configured[i];
+		const bool read_copy = !settings.pointer.empty();
 		fs::create_directories(settings.path.parent_path());
 		// Creation can reveal aliases that were absent during Parse on a
 		// case-insensitive filesystem. Recheck before opening the next engine.
@@ -386,7 +441,7 @@ void Serve(const Options &options, const std::string &token) {
 		config.SetOptionByName(duckdb::Identifier("temp_directory"), duckdb::Value(settings.spill.string()));
 		if (options.threads != 0)
 			config.SetOptionByName(duckdb::Identifier("threads"), duckdb::Value::BIGINT(options.threads));
-		if (protected_mode) {
+		if (protected_mode || read_copy) {
 			config.SetOptionByName(duckdb::Identifier("enable_external_access"), duckdb::Value(false));
 			config.SetOptionByName(duckdb::Identifier("allow_unsigned_extensions"), duckdb::Value(false));
 			config.SetOptionByName(duckdb::Identifier("allow_persistent_secrets"), duckdb::Value(false));
@@ -396,12 +451,22 @@ void Serve(const Options &options, const std::string &token) {
 		DatabaseRuntime runtime;
 		runtime.settings = settings;
 		runtime.endpoint = "quack:127.0.0.1:" + std::to_string(options.port + static_cast<int>(i));
-		runtime.database = std::make_unique<duckdb::DuckDB>(settings.path.string(), &config);
+		runtime.database = std::make_unique<duckdb::DuckDB>(read_copy ? nullptr : settings.path.c_str(), &config);
+		if (read_copy) {
+			// The native filesystem exists only after construction. These fixed
+			// storage exceptions are installed once, before any client can run.
+			auto &storage_config = duckdb::DBConfig::GetConfig(*runtime.database->instance);
+			storage_config.AddAllowedDirectory(settings.versions.string());
+			storage_config.AddAllowedDirectory(settings.spill.string());
+			runtime.read_copy = std::make_unique<duckonwire::ReadCopyController>(*runtime.database, options.root, settings.pointer,
+			    [&options](const fs::path &) { ValidateStoragePaths(options); });
+		}
 		runtime.owner = std::make_unique<duckdb::Connection>(*runtime.database);
 		auto &database = *runtime.database;
 		auto &owner = *runtime.owner;
 		if (protected_mode) {
-			duckonwire::ConfigureNativeAccess(database, settings.name, rules, peer_guard);
+			duckonwire::ConfigureNativeAccess(database, settings.name, rules, peer_guard, read_copy,
+			    read_copy ? runtime.read_copy->Available() : nullptr);
 			// Retain quota detection and reserve process headroom. Independent
 			// engines share this one buffer budget rather than multiplying it.
 			constexpr duckdb::idx_t memory_cap = 1024ULL * 1024ULL * 1024ULL;
@@ -414,6 +479,8 @@ void Serve(const Options &options, const std::string &token) {
 			if (!memory_option) throw std::runtime_error("Native memory setting is unavailable");
 			actual.SetOption(database.instance.get(), *memory_option, duckdb::Value(std::to_string(budget) + "B"));
 		}
+		if (!protected_mode && read_copy)
+			duckonwire::ConfigureReadCopyNativeAccess(database, token, runtime.read_copy->Available());
 		if (options.threads == 0) {
 			// Let DuckDB detect CPU quotas before applying our two-worker default cap.
 			auto detected = owner.Query("SELECT current_setting('threads')");
@@ -423,7 +490,9 @@ void Serve(const Options &options, const std::string &token) {
 		if (options.init_demo && i == 0) {
 			duckonwire::demo::Initialize(owner, options.root, options.demo_prices);
 		}
-		if (!protected_mode) {
+		if (!protected_mode && !read_copy) {
+			// duckdb_extensions() enumerates the user's extension directory. As
+			// in protected mode, copies never access that external directory.
 			auto builtins = owner.Query("SELECT count(*) FROM duckdb_extensions() WHERE extension_name IN ('httpfs','quack') AND loaded AND installed AND install_mode='STATICALLY_LINKED'");
 			if (builtins->HasError()) builtins->ThrowError();
 			if (builtins->GetValue<int64_t>(0, 0) != 2) throw std::runtime_error("This server requires the integrated native DuckDB build");
@@ -431,7 +500,9 @@ void Serve(const Options &options, const std::string &token) {
 		databases.push_back(std::move(runtime));
 	}
 	std::vector<duckonwire::PgDatabase> routes;
-	for (const auto &runtime : databases) routes.push_back({runtime.settings.name, runtime.database.get()});
+	for (const auto &runtime : databases) routes.push_back({runtime.settings.name, runtime.database.get(),
+	    static_cast<bool>(runtime.read_copy), runtime.read_copy ? runtime.read_copy->Available() : nullptr,
+	    runtime.read_copy ? runtime.read_copy->StorageDirectory().string() : std::string()});
 	std::unique_ptr<duckonwire::PgWireServer> pg_owner;
 	if (protected_mode) {
 		duckonwire::PgWireOptions settings;
@@ -474,34 +545,69 @@ void Serve(const Options &options, const std::string &token) {
 		for (auto &runtime : databases) {
 			Query(*runtime.owner, "CALL quack_serve(?, token=?)", duckdb::Value(runtime.endpoint), duckdb::Value(token));
 			runtime.active = true;
-			if (protected_mode) {
+			if (protected_mode || runtime.read_copy) {
 				Query(*runtime.owner, "SET TimeZone = 'UTC'");
 				Query(*runtime.owner, "SET lock_configuration = true");
 			}
 		}
 		postgres.Start();
-		std::string database_list = "[";
-		for (const auto &runtime : databases) {
-			if (database_list.size() > 1) database_list += ',';
-			database_list += "{\"name\":" + JsonString(runtime.settings.name) +
-			    ",\"path\":" + JsonString(runtime.settings.path.string()) +
-			    ",\"endpoint\":" + JsonString(runtime.endpoint) + "}";
-		}
-		database_list += ']';
 		const auto &primary = databases.front();
-		const std::string shared = "\"pid\":" + std::to_string(getpid()) +
+		auto shared_state = [&]() {
+			std::string database_list = "[";
+			for (const auto &runtime : databases) {
+				if (database_list.size() > 1) database_list += ',';
+				database_list += "{\"name\":" + JsonString(runtime.settings.name) +
+				    ",\"path\":" + JsonString(runtime.read_copy ? runtime.read_copy->Path().string() : runtime.settings.path.string()) +
+				    ",\"endpoint\":" + JsonString(runtime.endpoint);
+				if (runtime.read_copy) database_list += ",\"read_copy_pointer\":" + JsonString(runtime.settings.pointer.string()) +
+				    ",\"read_copy_directory\":" + JsonString(runtime.read_copy->StorageDirectory().string()) +
+				    ",\"generation\":" + std::to_string(runtime.read_copy->Generation()) +
+				    ",\"available\":" + (runtime.read_copy->Available()->load() ? "true" : "false");
+				database_list += '}';
+			}
+			database_list += ']';
+			return "\"pid\":" + std::to_string(getpid()) +
 		    ",\"pg_endpoint\":" + JsonString(postgres.Endpoint()) +
 		    ",\"pg_port\":" + std::to_string(postgres.Port()) +
-		    ",\"database\":" + JsonString(primary.settings.path.string()) +
+		    ",\"database\":" + JsonString(primary.read_copy ? primary.read_copy->Path().string() : primary.settings.path.string()) +
 		    ",\"databases\":" + database_list + ",\"builtin_extensions\":[\"httpfs\",\"quack\"]";
-		descriptor.Write("{\"endpoint\":" + JsonString(primary.endpoint) + ",\"token\":" + JsonString(token) + "," + shared +
-		                 ",\"duckdb\":" + JsonString(duckdb::DuckDB::LibraryVersion()) + "}\n");
+		};
+		auto write_descriptor = [&]() {
+			descriptor.Write("{\"endpoint\":" + JsonString(primary.endpoint) + ",\"token\":" + JsonString(token) + "," + shared_state() +
+			                 ",\"duckdb\":" + JsonString(duckdb::DuckDB::LibraryVersion()) + "}\n");
+		};
+		write_descriptor();
+		const auto shared = shared_state();
 		std::cout << "{\"ready\":true,\"uri\":" << JsonString(primary.endpoint) << "," << shared
 		          << ",\"duckdb_version\":" << JsonString(duckdb::DuckDB::LibraryVersion())
 		          << ",\"source_id\":" << JsonString(duckdb::DuckDB::SourceID()) << "}" << std::endl;
+		bool metadata_dirty = false, metadata_error_logged = false;
+		auto next_metadata_attempt = std::chrono::steady_clock::now();
 		while (!stop_requested) {
 			struct timespec interval {0, 100000000};
 			nanosleep(&interval, nullptr);
+			for (auto &runtime : databases) {
+				if (!runtime.read_copy) continue;
+				const auto result = runtime.read_copy->Poll();
+				using Result = duckonwire::ReadCopyController::Result;
+				if (result == Result::Unchanged) continue;
+				const char *status = result == Result::Published ? "published" : result == Result::Restored ? "restored" :
+				                     result == Result::Unavailable ? "unavailable" : "rejected";
+				std::cerr << "{\"event\":\"read-copy-refresh\",\"database\":" << JsonString(runtime.settings.name)
+				          << ",\"status\":" << JsonString(status) << ",\"generation\":" << runtime.read_copy->Generation()
+				          << (result == Result::VersionLimit ? ",\"reason\":\"version-limit\"" : "") << "}" << std::endl;
+				if (result != Result::Rejected && result != Result::VersionLimit) metadata_dirty = true;
+			}
+			if (metadata_dirty && std::chrono::steady_clock::now() >= next_metadata_attempt) {
+				try {
+					write_descriptor(); metadata_dirty = false; metadata_error_logged = false;
+				} catch (...) {
+					if (!metadata_error_logged)
+						std::cerr << "{\"event\":\"read-copy-metadata\",\"status\":\"failed\"}" << std::endl;
+					metadata_error_logged = true;
+					next_metadata_attempt = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+				}
+			}
 		}
 		if (auto error = stop_services()) std::rethrow_exception(error);
 	} catch (...) {

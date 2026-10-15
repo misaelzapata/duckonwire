@@ -142,7 +142,8 @@ void GuardTokens(const std::string &sql) {
         const bool call = next < tokens.size() && tokens[next].start < sql.size() && sql[tokens[next].start] == '(';
         if (token == "QUERY" || token == "QUERY_TABLE" || token.compare(0, 6, "QUACK_") == 0 || token == "RPC_AUTHORIZATION" ||
             (call && (token == "SET_CONFIG" || token == "SET_VARIABLE" || token.compare(0, 5, "READ_") == 0 ||
-                      token == "PARQUET_SCAN" || token == "CSV_SCAN" || token == "JSON_SCAN" || token == "GLOB" || token == "LIST_FILES"))) denied();
+                      token.compare(0, 8, "PARQUET_") == 0 || token == "SNIFF_CSV" || token == "CSV_SCAN" ||
+                      token == "JSON_SCAN" || token == "GLOB" || token == "LIST_FILES"))) denied();
     }
 }
 
@@ -243,8 +244,9 @@ void ValidateStoredDefinitions(duckdb::DuckDB &database) {
 
 class NativeAccess final : public duckdb::QuackSecurityPolicy {
 public:
-    NativeAccess(const std::string &name, const AccessConfig &access, std::shared_ptr<PeerGuard> guard)
-        : guard(std::move(guard)) {
+    NativeAccess(const std::string &name, const AccessConfig &access, std::shared_ptr<PeerGuard> guard,
+                 bool force_read_only, std::shared_ptr<std::atomic<bool>> available)
+        : guard(std::move(guard)), force_read_only(force_read_only), available(std::move(available)) {
         if (!this->guard) throw std::invalid_argument("Native access requires a peer guard");
         for (const auto &rule : access.users) if (Upper(rule.database) == Upper(name)) {
             ValidateScramVerifier(rule.verifier);
@@ -259,10 +261,10 @@ public:
         OPENSSL_cleanse(random_password.data(), random_password.size());
         OPENSSL_cleanse(bytes.data(), bytes.size());
     }
-    bool AdmitConnection(const std::string &peer) override { return guard->AdmitConnection(peer); }
-    bool AdmitRequest(const std::string &peer) override { return guard->AdmitRequest(peer); }
+    bool AdmitConnection(const std::string &peer) override { return IsAvailable() && guard->AdmitConnection(peer); }
+    bool AdmitRequest(const std::string &peer) override { return IsAvailable() && guard->AdmitRequest(peer); }
     bool Authenticate(const std::string &peer, const std::string &auth, duckdb::QuackIdentity &identity) override {
-        if (guard->IsBanned(peer)) return false;
+        if (!IsAvailable() || guard->IsBanned(peer)) return false;
         const auto colon = auth.find(':');
         const bool format = colon != std::string::npos && colon > 0 && colon <= 63 && auth.size() <= 1088;
         const auto name = format ? auth.substr(0, colon) : std::string();
@@ -278,32 +280,76 @@ public:
             return false;
         }
         identity.account = selected->name;
-        identity.read_only = selected->read_only;
+        identity.read_only = force_read_only || selected->read_only;
         return true;
     }
     void Authorize(duckdb::Connection &, const duckdb::QuackIdentity &identity, const std::string &sql) override {
+        RequireAvailable();
         if (sql.empty()) return; // Transaction-state control probe, without executable SQL.
         duckdb::Parser parser;
         parser.ParseQuery(sql);
         for (auto &statement : parser.statements) AuthorizeStatement(*statement, identity.read_only);
     }
     void AuthorizeBound(const duckdb::QuackIdentity &identity, const duckdb::StatementProperties &properties) override {
+        RequireAvailable();
         if (identity.read_only && !properties.modified_databases.empty())
             throw duckdb::PermissionException("This native account has read-only access");
     }
 private:
+    bool IsAvailable() const { return !available || available->load(); }
+    void RequireAvailable() const {
+        if (!IsAvailable()) throw duckdb::PermissionException("This published database is unavailable");
+    }
     std::shared_ptr<PeerGuard> guard;
     std::vector<AccessRule> users;
     std::string fake_verifier;
+    bool force_read_only;
+    std::shared_ptr<std::atomic<bool>> available;
+};
+
+class LocalReadCopyAccess final : public duckdb::QuackSecurityPolicy {
+public:
+    LocalReadCopyAccess(std::string token, std::shared_ptr<std::atomic<bool>> available)
+        : token(std::move(token)), available(std::move(available)) {}
+    bool AdmitConnection(const std::string &) override { return available->load(); }
+    bool AdmitRequest(const std::string &) override { return available->load(); }
+    bool Authenticate(const std::string &, const std::string &auth, duckdb::QuackIdentity &identity) override {
+        if (!available->load() || auth.size() != token.size() || CRYPTO_memcmp(auth.data(), token.data(), token.size()))
+            return false;
+        identity.account = "local"; identity.read_only = true; return true;
+    }
+    void Authorize(duckdb::Connection &, const duckdb::QuackIdentity &, const std::string &sql) override {
+        RequireAvailable();
+        if (sql.empty()) return;
+        duckdb::Parser parser; parser.ParseQuery(sql);
+        for (auto &statement : parser.statements) AuthorizeStatement(*statement, true);
+    }
+    void AuthorizeBound(const duckdb::QuackIdentity &, const duckdb::StatementProperties &properties) override {
+        RequireAvailable();
+        if (!properties.modified_databases.empty()) throw duckdb::PermissionException("This published database has read-only access");
+    }
+private:
+    void RequireAvailable() const {
+        if (!available->load()) throw duckdb::PermissionException("This published database is unavailable");
+    }
+    std::string token;
+    std::shared_ptr<std::atomic<bool>> available;
 };
 } // namespace
 
 void ConfigureNativeAccess(duckdb::DuckDB &database, const std::string &name,
-                           const AccessConfig &access, std::shared_ptr<PeerGuard> guard) {
+                           const AccessConfig &access, std::shared_ptr<PeerGuard> guard,
+                           bool force_read_only, std::shared_ptr<std::atomic<bool>> available) {
     // Audit every custom definition once before listener publication. All referenced definition chains
     // are covered, across schemas, and protected clients cannot install unaudited macros afterwards.
     ValidateStoredDefinitions(database);
     duckdb::SetQuackSecurityPolicy(*database.instance,
-        duckdb::make_shared_ptr<NativeAccess>(name, access, std::move(guard)));
+        duckdb::make_shared_ptr<NativeAccess>(name, access, std::move(guard), force_read_only, std::move(available)));
+}
+void AuditNativeStoredDefinitions(duckdb::DuckDB &database) { ValidateStoredDefinitions(database); }
+void ConfigureReadCopyNativeAccess(duckdb::DuckDB &database, const std::string &token,
+                                   std::shared_ptr<std::atomic<bool>> available) {
+    duckdb::SetQuackSecurityPolicy(*database.instance,
+        duckdb::make_shared_ptr<LocalReadCopyAccess>(token, std::move(available)));
 }
 } // namespace duckonwire

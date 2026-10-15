@@ -95,16 +95,22 @@ add_executable(duckonwire-password src/password.cpp)
 target_link_libraries(duckonwire-password PRIVATE duckonwire-auth)
 set_target_properties(duckonwire-password PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 duckonwire_executable(duckonwire-server src/server.cpp)
-target_sources(duckonwire-server PRIVATE src/native_access.cpp)
-target_include_directories(duckonwire-server PRIVATE "${DUCKONWIRE_QUACK_SOURCE}/src/include")
+add_library(duckonwire-native-access STATIC src/native_access.cpp)
+target_include_directories(duckonwire-native-access PUBLIC "${CMAKE_SOURCE_DIR}/include"
+  PRIVATE "${DUCKONWIRE_QUACK_SOURCE}/src/include")
+target_link_libraries(duckonwire-native-access PUBLIC DuckDB::DuckDB duckonwire-auth)
+add_library(duckonwire-read-copy STATIC src/read_copy.cpp)
+target_include_directories(duckonwire-read-copy PUBLIC "${CMAKE_SOURCE_DIR}/include")
+target_link_libraries(duckonwire-read-copy PUBLIC duckonwire-native-access)
 target_sources(duckonwire-server PRIVATE examples/demo/initialize.cpp)
 target_include_directories(duckonwire-server PRIVATE "${CMAKE_SOURCE_DIR}/examples/demo")
-target_link_libraries(duckonwire-server PRIVATE duckonwire-pgwire)
+target_link_libraries(duckonwire-server PRIVATE duckonwire-pgwire duckonwire-read-copy)
 duckonwire_executable(cpp-crud-client examples/crud_cpp.cpp)
 duckonwire_executable(c-crud-client examples/crud_c.c)
 duckonwire_executable(transaction-flow examples/transaction_flow.cpp)
 duckonwire_executable(attach-client examples/attach.cpp)
-install(TARGETS duckonwire-server duckonwire-password cpp-crud-client c-crud-client transaction-flow attach-client
+duckonwire_executable(read-copy-example examples/read_copy.cpp)
+install(TARGETS duckonwire-server duckonwire-password cpp-crud-client c-crud-client transaction-flow attach-client read-copy-example
         RUNTIME DESTINATION bin)
 install(DIRECTORY examples/ DESTINATION examples
   PATTERN node_modules EXCLUDE PATTERN target EXCLUDE PATTERN obj EXCLUDE
@@ -137,12 +143,17 @@ if(BUILD_TESTING)
   target_link_libraries(pg-peer-guard-tests PRIVATE duckonwire-auth OpenSSL::SSL)
   target_include_directories(pg-peer-guard-tests PRIVATE "${CMAKE_SOURCE_DIR}/tests/support")
   add_dependencies(pg-peer-guard-tests duckonwire-server)
+  duckonwire_executable(read-copy-tests tests/read_copy_tests.cpp)
+  target_link_libraries(read-copy-tests PRIVATE duckonwire-read-copy duckonwire-pgwire OpenSSL::SSL)
+  target_include_directories(read-copy-tests PRIVATE "${CMAKE_SOURCE_DIR}/tests/support"
+    "${DUCKONWIRE_DUCKDB_SOURCE}/third_party/fmt/include")
+  add_dependencies(read-copy-tests duckonwire-server)
   duckonwire_executable(duckonwire-benchmark tests/concurrent_benchmark.cpp)
   target_include_directories(native-tests PRIVATE "${CMAKE_SOURCE_DIR}/tests/support")
   target_include_directories(attach-tests PRIVATE "${CMAKE_SOURCE_DIR}/tests/support")
   target_include_directories(pgwire-protocol-tests PRIVATE "${CMAKE_SOURCE_DIR}/tests/support")
   target_include_directories(duckonwire-benchmark PRIVATE "${CMAKE_SOURCE_DIR}/tests/support")
-  install(TARGETS native-tests attach-tests pgwire-protocol-tests database-routing-tests access-tests scram-tests peer-guard-tests quack-access-tests pg-peer-guard-tests duckonwire-benchmark RUNTIME DESTINATION bin
+  install(TARGETS native-tests attach-tests pgwire-protocol-tests database-routing-tests access-tests scram-tests peer-guard-tests quack-access-tests pg-peer-guard-tests read-copy-tests duckonwire-benchmark RUNTIME DESTINATION bin
           COMPONENT Tests EXCLUDE_FROM_ALL)
   add_dependencies(native-tests duckonwire-server transaction-flow)
   add_dependencies(attach-tests duckonwire-server attach-client)
@@ -165,14 +176,16 @@ if(BUILD_TESTING)
     --server "$<TARGET_FILE:duckonwire-server>" --fixture-parent "${CMAKE_BINARY_DIR}/test-results")
   add_test(NAME pg-peer-protection COMMAND pg-peer-guard-tests
     --server "$<TARGET_FILE:duckonwire-server>" --fixture-parent "${CMAKE_BINARY_DIR}/test-results")
-  set_tests_properties(native-access pg-peer-protection PROPERTIES TIMEOUT 180)
+  add_test(NAME read-copy-refresh COMMAND read-copy-tests
+    --server "$<TARGET_FILE:duckonwire-server>" --fixture-parent "${CMAKE_BINARY_DIR}/test-results")
+  set_tests_properties(native-access pg-peer-protection read-copy-refresh PROPERTIES TIMEOUT 180)
   add_test(NAME concurrent-smoke COMMAND duckonwire-benchmark
     --rows 10000 --batch 250 --mode both --server "$<TARGET_FILE:duckonwire-server>"
     --output "${CMAKE_BINARY_DIR}/test-results/concurrent-smoke.json")
   set_tests_properties(native-tests native-attach pgwire-protocol concurrent-smoke PROPERTIES TIMEOUT 120)
   # Server fixtures reserve then publish TCP endpoints. Serialize these suites
   # so one fixture cannot reuse another suite's released probe port.
-  set_tests_properties(native-tests native-attach pgwire-protocol native-access pg-peer-protection concurrent-smoke
+  set_tests_properties(native-tests native-attach pgwire-protocol native-access pg-peer-protection read-copy-refresh concurrent-smoke
     PROPERTIES RUN_SERIAL TRUE)
   file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/test-results")
   set_tests_properties(native-tests native-attach pgwire-protocol concurrent-smoke access-rules PROPERTIES

@@ -10,7 +10,8 @@
     "database-routing": 6,
     "peer-protection": 15,
     "native-access": 57,
-    "pg-peer-protection": 7
+    "pg-peer-protection": 7,
+    "read-copy-refresh": 37
   },
   "ctest_uncounted_suites": [
     "concurrent-smoke"

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <cstddef>
 #include <memory>
@@ -22,6 +23,12 @@ struct PgUser {
 struct PgDatabase {
     std::string name;
     duckdb::DuckDB *database = nullptr;
+    // A published copy stays read-only even when an account normally writes.
+    bool force_read_only = false;
+    // Only the affected database becomes unavailable after failed recovery.
+    std::shared_ptr<std::atomic<bool>> available;
+    // Fixed storage namespace for immutable versions; never a general file grant.
+    std::string read_copy_directory;
 };
 // Protected mode requires an engine with external access disabled, configuration
 // locked, unsigned extensions disabled, and no filesystem/configuration exceptions
