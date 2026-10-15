@@ -68,7 +68,7 @@
     },
     {
       "path": "native-security.json",
-      "sha256": "2e7fd44fd899e95b67c1d3c534a5d7415daf68eb8f0d32baf0594628cc1b3acc"
+      "sha256": "b11fad08d719537af25632b31851792c35dc26af6db5e4fc5918cc3a5bfd80a0"
     }
   ],
   "benchmark_runs": [

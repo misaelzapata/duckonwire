@@ -142,7 +142,10 @@
       "runtime_passed": true,
       "focused_security_checks": 79,
       "focused_security_passed": true,
-      "remote_ssh_https_instructions_runtime_tested": false
+      "remote_ssh_https_instructions_runtime_tested": false,
+      "runtime_receipt_sha256": "4bc962eb7a84859c1de70f1699e293c61d64ece2dfb871762b6bd4df1d55a266",
+      "documentation_receipt_sha256": "2a1aca75712838a914a1b00937372d7c6a9bcec54f9729f7be5b679598959b72",
+      "focused_ctest_log_sha256": "d105ffedef73a22dbaa705b4250b94a20f9c130a4ca0a722ba15a7c5d309cd55"
     }
   },
   "source_sha256": {

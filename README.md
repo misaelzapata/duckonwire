@@ -349,7 +349,7 @@ The first read shows your pending change. The last read shows the stock before t
 
 ## Examples and tests
 
-CI verifies **115 checks** across seven native test suites, plus **20 PostgreSQL integration checks**, ordinary-driver examples and concurrent reads during million-row inserts. The [release workflow](.github/workflows/release.yml) builds a fresh package and publishes it only after tests, the tutorial and Docker pass. [See the results](tests/results/index.json).
+CI verifies **226 automated checks**, plus PostgreSQL integration checks, ordinary-driver examples and concurrent reads during million-row inserts. The [release workflow](.github/workflows/release.yml) builds a fresh package and publishes it only after tests, the tutorial and Docker pass. [See the results](tests/results/index.json).
 
 Ordinary PostgreSQL drivers, using standard `PG*` settings:
 
