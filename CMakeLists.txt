@@ -149,7 +149,8 @@ if(BUILD_TESTING)
   add_dependencies(pgwire-protocol-tests duckonwire-server)
   add_dependencies(duckonwire-benchmark duckonwire-server)
   add_test(NAME native-tests COMMAND native-tests
-    --server "$<TARGET_FILE:duckonwire-server>" --flow "$<TARGET_FILE:transaction-flow>")
+    --server "$<TARGET_FILE:duckonwire-server>" --flow "$<TARGET_FILE:transaction-flow>"
+    --catalog "${CMAKE_SOURCE_DIR}/examples/demo")
   add_test(NAME native-attach COMMAND attach-tests
     --server "$<TARGET_FILE:duckonwire-server>" --client "$<TARGET_FILE:attach-client>"
     --fixture-parent "${CMAKE_BINARY_DIR}/test-results")

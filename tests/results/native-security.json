@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "local_native_acceptance_passed_fresh_ci_pending",
+  "status": "fresh_exact_pin_native_acceptance_passed_ci_pending",
   "passed": true,
   "required_checks": 226,
   "suites": {
@@ -55,7 +55,7 @@
       "receipt_sha256": "7e13dc109d60ac8c76406082667380925b01d396152de5a77fe691a1d2e52cf5"
     }
   },
-  "scope": "Native C++ server and rebuilt Quack extension; all32 Quack translation units rebuilt with immutable cached DuckDB848126236a/HTTPFS objects. This is not fresh exact-pin engine or installed release qualification.",
+  "scope": "The suites and binary hashes below retain their original incremental local qualification. fresh_native_acceptance separately qualifies the complete exact-pin engine/server with all11 CTest suites; installed package and current-head CI remain separate gates.",
   "native_security": {
     "account_source": "access.tsv",
     "native_credential_format": "username:password through existing TOKEN field",
@@ -124,9 +124,11 @@
       "fences": 35
     },
     "fresh_pinned_cmake_configure_passed": true,
-    "fresh_build_or_ci_passed": false,
     "production_changed": false,
-    "release_published": false
+    "release_published": false,
+    "fresh_pinned_build_passed": true,
+    "fresh_pinned_ctest_passed": true,
+    "current_head_ci_passed": false
   },
   "source_sha256": {
     "src/native_access.cpp": "c60324e4cdd80e143859b9c2b6ac3f1d4fa1c4c25a99c72de1b255361678621d",
@@ -151,6 +153,39 @@
     "transactions": 177,
     "errors": 0,
     "mixed_generations": 0,
-    "rollback_hazard_verified": true
+    "rollback_hazard_verified": true,
+    "fresh_exact_pin_proof": {
+      "passed": true,
+      "accepted_checks": 18,
+      "source_id": "0cfb63a5f7",
+      "receipt_sha256": "d5fc8d2b56768d59fcc9bfc90585ea4947057cad073f722fcc8143ffc76a6519",
+      "readers": 4,
+      "swaps": 20,
+      "transactions": 174,
+      "errors": 0,
+      "mixed_generations": 0,
+      "old_handles_drained": true,
+      "rollback_hazard_verified": true,
+      "service_integration": false,
+      "production_changed": false
+    }
+  },
+  "fresh_native_acceptance": {
+    "passed": true,
+    "unique_checks": 226,
+    "ctest_suites_passed": 11,
+    "runtime_source_id": "0cfb63a5f7",
+    "duckdb_commit": "0cfb63a5f712fadf06a0de33217b7b03666ae66b",
+    "quack_commit": "8ebc6c89c06db534aa8d2c7e38d6939d99f859f3",
+    "httpfs_commit": "96a2f2e88e5dd075facbc5a65dc3afd67aa2bb44",
+    "platform": "macOS ARM64",
+    "build": "complete native CMake build in an isolated external directory",
+    "ctest_log_sha256": "aa6ee5f969938370d3acf34217ff170ed97cb005ac4488fdf2b96991f60dd6dd",
+    "engine_sha256": "f8b6a532dbb02e824036ec3dee356ed2f15c3cd6866c734df770c70e4c60df59",
+    "server_sha256": "30988bf8a9f06255a7344fc0ab11aacb07a8c11cb87676795a9e00469798e3da",
+    "catalog_fixture_path": "explicit source-directory path; independent of build-directory location",
+    "benchmark_checks_counted": false,
+    "installed_package_qualification": "pending",
+    "current_head_ci_qualification": "pending"
   }
 }
