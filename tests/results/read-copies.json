@@ -1,0 +1,245 @@
+{
+  "schema_version": 1,
+  "status": "native_local_acceptance_passed_current_ci_pending",
+  "passed": true,
+  "synthetic_only": true,
+  "required_checks": 263,
+  "ctest_suites_passed": 12,
+  "new_read_copy_checks": 37,
+  "checks": [
+    {
+      "name": "protected_pg_default_catalog_reads_initial_generation",
+      "passed": true
+    },
+    {
+      "name": "protected_native_default_catalog_reads_initial_generation",
+      "passed": true
+    },
+    {
+      "name": "protected_both_prepared_selects_read_initial_generation",
+      "passed": true
+    },
+    {
+      "name": "host_pointer_publication_keeps_pid_and_listeners",
+      "passed": true
+    },
+    {
+      "name": "accessed_pg_transaction_retains_old_generation",
+      "passed": true
+    },
+    {
+      "name": "accessed_native_transaction_retains_old_generation",
+      "passed": true
+    },
+    {
+      "name": "old_generation_handle_retained_while_transaction_active",
+      "passed": true
+    },
+    {
+      "name": "existing_autocommit_pg_and_native_read_new_generation",
+      "passed": true
+    },
+    {
+      "name": "new_pg_and_native_sessions_read_new_generation",
+      "passed": true
+    },
+    {
+      "name": "existing_pg_and_native_prepared_selects_rebind",
+      "passed": true
+    },
+    {
+      "name": "old_transactions_finish_and_same_sessions_read_new_generation",
+      "passed": true
+    },
+    {
+      "name": "pg_pending_portal_finishes_old_generation_after_publication",
+      "passed": true
+    },
+    {
+      "name": "native_pending_result_finishes_old_generation_after_publication",
+      "passed": true
+    },
+    {
+      "name": "read_copy_writer_grants_deny_pg_and_native_mutations",
+      "passed": true
+    },
+    {
+      "name": "read_copy_prepared_mutations_denied_for_writer_grants",
+      "passed": true
+    },
+    {
+      "name": "read_copy_catalog_configuration_and_host_control_bypass_denied",
+      "passed": true
+    },
+    {
+      "name": "read_copy_storage_exception_does_not_permit_remote_file_reads",
+      "passed": true
+    },
+    {
+      "name": "ordinary_database_remains_read_write_and_isolated",
+      "passed": true
+    },
+    {
+      "name": "missing_candidate_preserves_last_good_without_creating_file",
+      "passed": true
+    },
+    {
+      "name": "corrupt_candidate_preserves_last_good",
+      "passed": true
+    },
+    {
+      "name": "malformed_pointer_preserves_last_good",
+      "passed": true
+    },
+    {
+      "name": "traversal_and_absolute_candidate_paths_preserve_last_good",
+      "passed": true
+    },
+    {
+      "name": "symlink_candidate_and_parent_preserve_last_good",
+      "passed": true
+    },
+    {
+      "name": "writable_candidate_and_wal_candidate_preserve_last_good",
+      "passed": true
+    },
+    {
+      "name": "nonprivate_and_symlink_pointer_preserve_last_good",
+      "passed": true
+    },
+    {
+      "name": "unsafe_stored_view_macro_and_default_candidates_audited_before_publish",
+      "passed": true
+    },
+    {
+      "name": "retired_generation_handles_drain_after_sessions_and_results_finish",
+      "passed": true
+    },
+    {
+      "name": "four_readers_twenty_swaps_have_zero_mixed_generations_or_errors",
+      "passed": true
+    },
+    {
+      "name": "immutable_candidate_file_hashes_remain_unchanged",
+      "passed": true
+    },
+    {
+      "name": "restart_reads_last_acknowledged_generation_and_ordinary_data",
+      "passed": true
+    },
+    {
+      "name": "owned_protected_fixture_shuts_down_gracefully",
+      "passed": true
+    },
+    {
+      "name": "local_shared_token_read_copy_denies_pg_and_native_writes_and_catalog_bypasses",
+      "passed": true
+    },
+    {
+      "name": "owned_local_fixture_shuts_down_gracefully",
+      "passed": true
+    },
+    {
+      "name": "postpublication_rollback_hazard_explicitly_restores_last_good",
+      "passed": true
+    },
+    {
+      "name": "restart_after_failed_publish_uses_durable_ack_not_pending_candidate",
+      "passed": true
+    },
+    {
+      "name": "restart_with_malformed_pending_pointer_retains_durable_ack",
+      "passed": true
+    },
+    {
+      "name": "failed_last_good_restoration_blocks_affected_pg_and_native_routes_only",
+      "passed": true
+    }
+  ],
+  "metrics": {
+    "concurrent_reader_errors": 0,
+    "concurrent_swaps": 20,
+    "concurrent_transaction_reads": 4561,
+    "fault_generation": 1,
+    "fault_last_good_path_retained": 1,
+    "fault_recovery_result": 3,
+    "fault_rollback_hazard_seen": 1,
+    "fault_route_available": 1
+  },
+  "engine": {
+    "source_id": "0cfb63a5f7",
+    "duckdb_commit": "0cfb63a5f712fadf06a0de33217b7b03666ae66b",
+    "quack_commit": "8ebc6c89c06db534aa8d2c7e38d6939d99f859f3",
+    "httpfs_commit": "96a2f2e88e5dd075facbc5a65dc3afd67aa2bb44",
+    "native_library_sha256": "f8b6a532dbb02e824036ec3dee356ed2f15c3cd6866c734df770c70e4c60df59"
+  },
+  "scope": "Current C++ server, controller and acceptance executables rebuilt against the unchanged full-build exact-pin native library on macOS ARM64. All12 suites completed; public CMake configure passed. Fresh current-source Linux, installed-package and Docker qualification are separate CI gates.",
+  "build": {
+    "kind": "isolated feature CMake build; exact pinned engine reused",
+    "ctest_log_sha256": "b80a083a949327a30bd11625456987bb389a6f891402050324cd6febda7910ba",
+    "expected_checks_sha256": "c803ba7f6dc1647b24e90e373dc7b1e80bf8dfa8466af36baaa779a7cc2abd54",
+    "server_sha256": "d5c73846ea353425571dd75084426ef338334b1a8e0ecfed675f642e5aad7e9b",
+    "read_copy_tests_sha256": "b2a910608da12f2b23713718f35d67dece45fea159df04b1f3248bbc32c70156"
+  },
+  "conditions": {
+    "readers": 4,
+    "swaps": 20,
+    "account_mode": "local shared token and protected verified TLS/SCRAM accounts; native Quack account credentials",
+    "stress_connections_per_minute": 10000,
+    "stress_requests_per_minute": 100000,
+    "stress_auth_failure_limit": 100,
+    "default_ban_behavior": "verified separately by peer-protection, native-access and pg-peer-protection suites"
+  },
+  "documentation": {
+    "guide": "docs/read-copies.md",
+    "structure_and_help_passed": true,
+    "documents": 5,
+    "server_options": 21,
+    "working_guide_checks": 20,
+    "working_example_checks": 11,
+    "guide_runtime_receipt_sha256": "98d1b48a66c9714e6fb062a4327c38e436d224aea408cfbb4aeb3e92cdb22aa7",
+    "guide_runtime_scope": "Exact documented shell/SQL blocks used the immediately preceding binary; its sole later code delta reports unavailable status accurately at the 4096-version limit. The final binary passed all 263 checks.",
+    "remote_guide_instructions_tested": false
+  },
+  "source_sha256": {
+    "src/read_copy.cpp": "ee0532848e3bb8bffea7f59dd95e52df666fcb29551ad772be5aa9f739837a1a",
+    "include/duckonwire/read_copy.hpp": "7b7f5e721e680a6d79a020f07602f51aadbdcdd32081ba3ede7e4301828f90b2",
+    "src/native_access.cpp": "5a5a1e8c8069be550d3348a733519aef0118bdea974b97c4fa221a8b0fe82fd0",
+    "include/duckonwire/native_access.hpp": "d9c035a51f92f82875fec890f9cbceab7aed1dc8e0eaebac4dbaf351f6dae99a",
+    "src/pgwire.cpp": "69cf42859136dab0c0dc1f9df2cb49eacb6e846431d439c797e654ed04fc05ac",
+    "include/duckonwire/pgwire.hpp": "cc77c680e6bacd9145918c72f8cb8dff6a2a4eb60caaac59df7343972c954aa3",
+    "src/server.cpp": "a4808ad21973dee7665643b684809440f1558d3eabb076065d90f4686b12ef45",
+    "examples/read_copy.cpp": "f0be0fe8bb1e20373d7dcc97473f968d868a491d74f1bccdc8e851fdc4db8447",
+    "tests/read_copy_tests.cpp": "4b55aafaf6afa5c555a943bfdf9dbc8e6bcbbaf4d89cf5f9dbdceb60a3c9b3db",
+    "tests/support/read_copy_pg_test.hpp": "8641d3cac87d0ab031edb3233b18023ba4d8226b32148a731d57ee190dee699e",
+    "CMakeLists.txt": "cd347028781afcb7fb77e3fe9029134a43fa9e753e71c9d68a9880b643b5b2da",
+    "cmake/ExpectedChecks.cmake": "b919f0b390b4dfed7d13480fd7474c024b254801a505eecc511209c30130083c",
+    "cmake/Package.cmake": "ed9b93b5dcaf992b05324286675a7e80d77329b1124819756a9de4569cd90d32",
+    ".github/workflows/docker.yml": "23ed3ecd0987e6a9148762e6d51691be084eaeaa40603780d302d6e922c44afb",
+    ".github/workflows/release.yml": "1ba1c44071e24cbd5cf0ef8e567de3762741e40acea201e7e100b00a2d5f6a89"
+  },
+  "verified_behavior": [
+    "stable listeners and process during publication",
+    "old accessed transactions and pending results retain their version",
+    "existing and new clients see the replacement in new transactions",
+    "prepared queries rebind",
+    "both connection options enforce read-only copies even for writer grants",
+    "ordinary database remains writable and isolated",
+    "candidate and stored-definition rejection",
+    "external file access remains denied within version storage",
+    "explicit recovery after ATTACH replacement rollback hazard",
+    "restart bootstraps the durable acknowledgement then validates pending requests",
+    "failed restoration makes only the affected database unavailable"
+  ],
+  "limits": [
+    "Read-only copies only; normal --database mode retains reading and writing.",
+    "Validation inspects file/catalog definitions; it does not scan every table data block.",
+    "Version files are retained on disk; no automatic file deletion.",
+    "Up to 4096 distinct validated version paths per process.",
+    "The update counter resets on restart and is not a transaction/cache version.",
+    "A validated candidate can be visible before acknowledgement; restoration does not undo what completed readers already observed.",
+    "Monitoring events are provided; external alert delivery is not configured."
+  ],
+  "production_changed": false,
+  "release_published": false
+}

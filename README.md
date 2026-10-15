@@ -35,7 +35,7 @@ SQL
 
 On the first run, the last query returns Coffee with stock 4. This is one ordinary connection reading and writing DuckDB. The local server listens on your machine and shares one password; [remote accounts use verified TLS](#public-access). On Mac or ARM, start with [Docker](#try-with-docker) or [build from source](#build-from-source). Ctrl+C stops the server; its database stays in `duckonwire/data`.
 
-[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-226-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
+[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-263-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
 
 DoW turns your DuckDB databases into a shared data service. Connect apps in your favorite language, read and write through the same connection, and let readers keep working while new data arrives. Your data stays in DuckDB.
 
@@ -275,6 +275,12 @@ Quack uses one consecutive loopback port per database, beginning at `--port`; ch
 
 Up to 32 databases and 64 account grants are supported. Protected engines share one buffer budget; threads and spill limits apply per engine. Start with the databases you need, and restart the server to change the list. `--init-demo` initializes only the first database. Earlier release packages may not contain this feature. [Development checks](tests/results/multiple-databases.json).
 
+## Update a read-only copy without disconnecting readers
+
+When another job prepares your data, publish it as a read copy. DoW checks each new file, keeps the server running and lets existing transactions finish with their previous view. New transactions see the update. A rejected copy keeps the last working one; other databases stay available.
+
+The [read-copy guide](docs/read-copies.md) includes a small working example, publishing commands, recovery behavior and how to keep related queries and cached results on the same version. This feature is available in current source builds; ordinary databases still support both reading and writing.
+
 ## Native connections, clear transactions
 
 Use Quack with DuckOnWire's compatible native engine. HTTPFS and Quack are built in; no extension paths or `LOAD` commands are needed. An unrelated stock DuckDB engine is not automatically compatible. Exact bindings and protocol versions are recorded in [AGENTS.md](AGENTS.md) and the [result index](tests/results/index.json).
@@ -349,7 +355,7 @@ The first read shows your pending change. The last read shows the stock before t
 
 ## Examples and tests
 
-CI verifies **226 automated checks**, plus PostgreSQL integration checks, ordinary-driver examples and concurrent reads during million-row inserts. The [release workflow](.github/workflows/release.yml) builds a fresh package and publishes it only after tests, the tutorial and Docker pass. [See the results](tests/results/index.json).
+CI verifies **263 automated checks**, plus PostgreSQL integration checks, ordinary-driver examples and concurrent reads during million-row inserts. The [release workflow](.github/workflows/release.yml) builds a fresh package and publishes it only after tests, the tutorial and Docker pass. [See the results](tests/results/index.json).
 
 Ordinary PostgreSQL drivers, using standard `PG*` settings:
 
@@ -484,6 +490,7 @@ Protected accounts cannot read external objects or create cloud secrets; import 
 | --- | --- | --- |
 | `--root DIRECTORY` | Keep database, runtime state and configuration in one workspace. Directory must exist. | Current directory; `workspace` |
 | `--database PATH` or `--database NAME=PATH` | Open or create a database; repeat named entries for isolated databases. | `data/demo.duckdb`; `shop=data/shop.duckdb` |
+| `--read-copy NAME=POINTER` | Publish completed read-only copies and refresh them without restarting. | `shop=copies/catalog.current`; [guide](docs/read-copies.md) |
 | `--state PATH` | Store the private descriptor, including the local token. Must differ from the database path. | `.runtime/native.json` |
 | `--init-demo` | Import the public sample into an empty database. Omit on restart. | Off |
 | `--demo-prices NUMBER` | Generate this many synthetic price observations; requires `--init-demo`. | CSV sample; 46462–10000000 |
@@ -545,6 +552,8 @@ Con `--access-file`, las cuentas y permisos también se aplican a Quack. Cinco f
 
 Puedes servir [varias bases](#multiple-databases) desde un mismo puerto PostgreSQL: cada conexión elige su base y cada cuenta tiene permisos allí. Las bases permanecen aisladas; para cruzar datos desde un cliente nativo, adjunta sus endpoints con `ATTACH`.
 
+Las [copias de lectura](docs/read-copies.md) pueden actualizarse sin reiniciar el servidor: las transacciones abiertas conservan su versión y las nuevas ven la actualización. La guía incluye un ejemplo y explica cómo mantener coherente la caché.
+
 `COMMIT` confirma cambios, `ROLLBACK` los descarta y cerrar revierte lo pendiente. Cada trabajador usa su conexión. Hay [diez ejemplos](#examples-and-tests), una [página Flask](#flask-playground) y una [guía para agentes](AGENTS.md); los detalles de configuración y compilación están en apartados desplegables.
 
 Para comparar tiempos, usa la misma consulta, cantidad de filas y equipo. El tiempo de la página mide trabajo en el servidor; tu conexión a Internet añade demora. El ejemplo de Node mide el viaje completo de la consulta.
@@ -556,5 +565,7 @@ DuckOnWire（DoW）让应用连接 DuckDB，在新数据写入时继续读取。
 原生 Quack 需要匹配的引擎：`ATTACH` 用于读取和连接远程表，参数查询、写入及事务使用 `CONNECT remote`。项目提供十种语言示例，MIT 许可。
 
 一个 PostgreSQL 地址可提供多个隔离数据库；每个连接选择数据库，账号权限按数据库配置。原生客户端可用 `ATTACH` 连接多个端点。
+
+只读副本可在服务器运行时更新；正在执行的事务继续读取原来的版本。
 
 教程展示启动、登录、同一连接读写、事务快照、分页与测量。读者在事务结束后才看到新提交的数据；网页的服务器耗时不等于完整网络等待时间。

@@ -5,7 +5,7 @@ if(NOT SOURCE_DIR)
 endif()
 file(REAL_PATH "${SOURCE_DIR}" SOURCE_DIR)
 if(NOT GUIDES)
-  set(GUIDES README.md AGENTS.md docs/access.md docs/neon.md)
+  set(GUIDES README.md AGENTS.md docs/access.md docs/neon.md docs/read-copies.md)
 endif()
 
 function(count_check name)

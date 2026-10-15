@@ -982,6 +982,8 @@ struct PgWireServer::Impl::Session {
     std::string authenticated_user;
     const std::string peer;
     bool read_only = true;
+    bool force_read_only = false;
+    std::shared_ptr<std::atomic<bool>> available;
     std::uint32_t id, cancel_secret;
     bool failed_transaction = false, skip_until_sync = false, implicit_extended_transaction = false;
     bool implicit_simple_transaction = false;
@@ -1093,7 +1095,10 @@ struct PgWireServer::Impl::Session {
     void CheckPeer() const {
         if (server.peer_guard && server.peer_guard->IsBanned(peer))
             throw WireError("53300", "Socket peer is temporarily blocked", true);
+        if (available && !available->load())
+            throw WireError("57P03", "This database copy is temporarily unavailable", true);
     }
+    bool Restricted() const { return server.protected_mode || force_read_only; }
     bool Startup();
     void UpgradeTLS();
     void Authenticate(const std::map<std::string, std::string> &options);
@@ -1102,6 +1107,13 @@ struct PgWireServer::Impl::Session {
     void AuthorizeBound(duckdb::StatementProperties properties);
     void InitializeTypeCatalog();
     void SelectDatabase(duckdb::DuckDB &database) {
+        for (const auto &route : server.databases) {
+            if (route.database == &database) {
+                force_read_only = route.force_read_only;
+                available = route.available;
+                break;
+            }
+        }
         if (selected_database == &database) return;
         duckdb::Connection replacement(database);
         std::lock_guard<std::mutex> guard(connection_lock);
@@ -1173,7 +1185,7 @@ struct PgWireServer::Impl::Session {
 };
 
 void PgWireServer::Impl::Session::AuthorizeBound(duckdb::StatementProperties properties) {
-    if (server.protected_mode && read_only && !properties.IsReadOnly())
+    if (Restricted() && read_only && !properties.IsReadOnly())
         throw WireError("42501", "This database user has read-only access");
 }
 void PgWireServer::Impl::Session::Authorize(duckdb::SQLStatement &statement, const std::string &source_sql) {
@@ -1205,7 +1217,7 @@ void PgWireServer::Impl::Session::Authorize(duckdb::SQLStatement &statement, con
         }
         if (stream) throw WireError("0A000", "PostgreSQL COPY streaming is not supported; use bound INSERT batches or SELECT rows");
     }
-    if (!server.protected_mode) return;
+    if (!Restricted()) return;
     const auto denied = [] { throw WireError("42501", "This SQL operation is not allowed on the published database"); };
     if (statement.type == S::EXPLAIN_STATEMENT) {
         // The contained operation was authorized above.
@@ -1245,7 +1257,8 @@ void PgWireServer::Impl::Session::Authorize(duckdb::SQLStatement &statement, con
         const bool call = next < tokens.size() && tokens[next].start < sql.size() && sql[tokens[next].start] == '(';
         if (token == "QUERY" || token == "QUERY_TABLE" || token.compare(0, 6, "QUACK_") == 0 || token == "RPC_AUTHORIZATION" ||
             (call && (token == "SET_CONFIG" || token == "SET_VARIABLE" || token.compare(0, 5, "READ_") == 0 ||
-                      token == "PARQUET_SCAN" || token == "CSV_SCAN" || token == "JSON_SCAN" || token == "GLOB" || token == "LIST_FILES"))) denied();
+                      token.compare(0, 8, "PARQUET_") == 0 || token == "SNIFF_CSV" || token == "CSV_SCAN" ||
+                      token == "JSON_SCAN" || token == "GLOB" || token == "LIST_FILES"))) denied();
     }
 }
 void PgWireServer::Impl::Session::UpgradeTLS() {
@@ -1297,7 +1310,7 @@ void PgWireServer::Impl::Session::Authenticate(const std::map<std::string, std::
         if (!selected) throw std::invalid_argument("Unknown credentials");
         CheckPeer();
         SelectDatabase(*server.FindDatabase(database->second));
-        authenticated_user = selected->name; read_only = selected->read_only;
+        authenticated_user = selected->name; read_only = selected->read_only || force_read_only;
         body.clear(); Put32(body, 12); body.insert(body.end(), response.begin(), response.end()); Message(socket, 'R', body);
     } catch (const std::invalid_argument &) { throw WireError("28P01", "Authentication failed", true); }
 }
@@ -1348,8 +1361,9 @@ bool PgWireServer::Impl::Session::Startup() {
             const auto requested_database = options.find("database");
             auto *route = requested_database == options.end() ? nullptr : server.FindDatabase(requested_database->second);
             if (server.databases.size() > 1 && !route) throw WireError("28P01", "Authentication failed", true);
-            if (route) SelectDatabase(*route);
+            SelectDatabase(route ? *route : *selected_database);
         }
+        CheckPeer();
         InitializeTypeCatalog();
         auth.clear(); Put32(auth, 0); Message(socket, 'R', auth);
         const std::array<std::pair<const char *, const char *>, 9> settings {{
@@ -1363,7 +1377,7 @@ bool PgWireServer::Impl::Session::Startup() {
         }
         Buffer identity; PutString(identity, "duckonwire_engine"); PutString(identity, duckdb::DuckDB::LibraryVersion()); Message(socket, 'S', identity);
         Buffer key; Put32(key, id); Put32(key, cancel_secret); Message(socket, 'K', key);
-        if (!server.protected_mode) {
+        if (!Restricted()) {
             auto result = connection.Query("SET TimeZone='UTC'");
             if (result->HasError()) NativeError(result->GetErrorObject());
         }
@@ -1464,14 +1478,14 @@ void PgWireServer::Impl::Session::ResetConnection(bool preserve_statements) {
     { std::lock_guard<std::mutex> guard(connection_lock); connection = std::move(replacement); }
     failed_transaction = false; implicit_extended_transaction = false;
     InitializeTypeCatalog();
-    if (!server.protected_mode) {
+    if (!Restricted()) {
         auto result = connection.Query("SET TimeZone='UTC'");
         if (result->HasError()) NativeError(result->GetErrorObject());
     }
 }
 void PgWireServer::Impl::Session::EnsurePrepared(Statement &statement) {
     if (!statement.prepared && !statement.empty && !statement.setting && !statement.deallocate && statement.control.kind == FdwKind::NONE) {
-        if (server.protected_mode) {
+        if (Restricted()) {
             ParseAdmission admission(*this);
             auto parsed = Extract(statement.sql, &admission);
             if (parsed.size() != 1) throw WireError("42601", "A prepared statement must contain a single command");
@@ -1675,7 +1689,7 @@ bool PositionalValuesTemplate(const duckdb::SQLStatement &statement, const std::
 
 duckdb::vector<duckdb::unique_ptr<duckdb::SQLStatement>>
 PgWireServer::Impl::Session::Extract(const std::string &sql, ParseAdmission *admission) {
-    if (!server.protected_mode) return connection.ExtractStatements(sql);
+    if (!Restricted()) return connection.ExtractStatements(sql);
     std::unique_ptr<ParseAdmission> own_admission;
     if (!admission) { own_admission = std::make_unique<ParseAdmission>(*this); admission = own_admission.get(); }
     admission->Check();
@@ -1731,11 +1745,11 @@ void PgWireServer::Impl::Session::RecordFailure(const std::string &state, bool f
     failed_transaction = true;
 }
 void PgWireServer::Impl::Session::ReadOnlyTransaction() {
-    if (!server.protected_mode || !read_only || connection.IsAutoCommit()) return;
+    if (!Restricted() || !read_only || connection.IsAutoCommit()) return;
     connection.context->RunFunctionInTransaction([&] { connection.context->transaction.SetReadOnly(); }, false);
 }
 void PgWireServer::Impl::Session::SavepointControl(const FdwCommand &command) {
-    if (!server.protected_mode || !read_only)
+    if (!Restricted() || !read_only)
         throw WireError("0A000", "SAVEPOINT is supported only for protected read-only database users");
     if (connection.IsAutoCommit() || implicit_extended_transaction || implicit_simple_transaction)
         throw WireError("25P01", "SAVEPOINT requires an explicit read-only transaction");
@@ -1920,7 +1934,7 @@ bool PgWireServer::Impl::Session::FdwSimple(const std::string &sql) {
     }
     ReadOnlyTransaction();
     std::unique_ptr<ParseAdmission> admission;
-    if (server.protected_mode) admission = std::make_unique<ParseAdmission>(*this);
+    if (Restricted()) admission = std::make_unique<ParseAdmission>(*this);
     auto parsed = Extract(declaration.query, admission.get());
     if (parsed.size() != 1 || parsed[0]->type != duckdb::StatementType::SELECT_STATEMENT)
         throw WireError("42501", "SQL cursors support one SELECT only");
@@ -2021,13 +2035,13 @@ void PgWireServer::Impl::Session::Simple(const std::string &input_sql) {
             if (SessionSetting(text)) { Buffer body; PutString(body, "SET"); Message(socket, 'C', body); continue; }
             Portal portal; portal.statement = std::make_shared<Statement>(); portal.statement->sql = text;
             portal.statement->type = statement->type;
-            const bool read_transaction = server.protected_mode && read_only && connection.IsAutoCommit() &&
+            const bool read_transaction = Restricted() && read_only && connection.IsAutoCommit() &&
                                           statement->type != duckdb::StatementType::TRANSACTION_STATEMENT;
             try {
                 ExecutionGuard execution(*this);
                 if (read_transaction) connection.BeginTransaction();
                 ReadOnlyTransaction();
-                if (server.protected_mode && read_only && statement->type != duckdb::StatementType::TRANSACTION_STATEMENT) {
+                if (Restricted() && read_only && statement->type != duckdb::StatementType::TRANSACTION_STATEMENT) {
                     auto signature = connection.context->BindStatement(statement->Copy()); AuthorizeBound(signature.properties);
                 }
                 execution.StartTimer(); portal.result = connection.Query(std::move(statement));
@@ -2067,7 +2081,7 @@ void PgWireServer::Impl::Session::Parse(Reader &in) {
     if (statements.size() >= MAX_OBJECTS && !statements.count(name)) throw WireError("54000", "Too many prepared statements");
     auto deallocate = DeallocateAll(sql);
     std::unique_ptr<ParseAdmission> admission;
-    if (server.protected_mode && !deallocate && control.kind == FdwKind::NONE)
+    if (Restricted() && !deallocate && control.kind == FdwKind::NONE)
         admission = std::make_unique<ParseAdmission>(*this);
     auto extracted = deallocate || control.kind != FdwKind::NONE
         ? duckdb::vector<duckdb::unique_ptr<duckdb::SQLStatement>>() : Extract(sql, admission.get());
@@ -2248,7 +2262,7 @@ void PgWireServer::Impl::Session::Execute(Reader &in) {
             connection.BeginTransaction(); implicit_extended_transaction = true;
         }
         ReadOnlyTransaction();
-        if (server.protected_mode && read_only) { auto signature = BoundSignature(statement, portal.parameters); AuthorizeBound(signature.properties); }
+        if (Restricted() && read_only) { auto signature = BoundSignature(statement, portal.parameters); AuthorizeBound(signature.properties); }
         execution.StartTimer(); portal.result = statement.prepared->Execute(portal.parameters, false);
         if (portal.result->HasError()) NativeError(portal.result->GetErrorObject());
         if (portal.described) {
@@ -2346,11 +2360,27 @@ void PgWireServer::Impl::Start() {
         }
         if (!config.temporary_directory.empty())
             storage_directories.insert(native_config.SanitizeAllowedPath(config.temporary_directory) + "/");
+        if (!route.read_copy_directory.empty()) {
+            if (!route.force_read_only)
+                throw std::invalid_argument("Read-copy storage requires a read-only database route");
+            const auto directory = native_config.SanitizeAllowedPath(route.read_copy_directory) + "/";
+            auto attached = check.Query("SELECT path FROM system.main.duckdb_databases() "
+                                        "WHERE database_name='base' AND readonly AND type='duckdb'");
+            if (!attached || attached->HasError() || attached->RowCount() != 1 || attached->GetValue(0, 0).IsNull())
+                throw std::invalid_argument("Read-copy storage requires one read-only native base catalog");
+            const auto path = native_config.SanitizeAllowedPath(attached->GetValue(0, 0).GetValue<std::string>());
+            if (path.compare(0, directory.size(), directory) != 0 ||
+                path.find('/', directory.size()) != std::string::npos)
+                throw std::invalid_argument("Read-copy catalog must be a file in its fixed storage directory");
+            storage_directories.insert(directory);
+            for (const auto suffix : {"", ".wal", ".wal.checkpoint", ".wal.recovery"})
+                storage_paths.insert(path + suffix);
+        }
         if (!config.allowed_configs.empty()) throw std::invalid_argument("Protected PGwire requires no configurable-setting exceptions");
         for (const auto &path : config.allowed_paths) if (!storage_paths.count(path))
             throw std::invalid_argument("Protected PGwire permits only the published database and its native WAL files");
         for (const auto &path : config.allowed_directories) if (!storage_directories.count(path))
-            throw std::invalid_argument("Protected PGwire permits only the published database's native spill directory");
+            throw std::invalid_argument("Protected PGwire permits only native storage and spill directories");
         }
         if (options.tls_cert.empty() || options.tls_key.empty() || options.users.empty() || options.users.size() > 64)
             throw std::invalid_argument("Protected PGwire requires TLS certificate, key and configured users");

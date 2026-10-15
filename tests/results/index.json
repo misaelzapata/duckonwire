@@ -1,7 +1,7 @@
 {
   "project": "DuckOnWire",
   "version": "0.3.0",
-  "status": "Version0.3.0 evidence is retained. Native account and peer protection passed226 checks in a fresh exact-pin build and a separate protected two-million-row Node workload; current-head CI, installed packaging and deployment remain separate gates.",
+  "status": "Historical release evidence is retained. Current account protection and read-copy refresh passed 263 local checks in 12 suites; fresh current-source CI and deployment remain separate gates.",
   "native_engine_version": "v2.1.0-dev0",
   "quack_protocol": 7,
   "patches_sha256": {
@@ -69,6 +69,10 @@
     {
       "path": "native-security.json",
       "sha256": "b11fad08d719537af25632b31851792c35dc26af6db5e4fc5918cc3a5bfd80a0"
+    },
+    {
+      "path": "read-copies.json",
+      "sha256": "829c11fcd99cb7c396fe9c83403d504472b47015605be9bf22b2243c23d95fff"
     }
   ],
   "benchmark_runs": [
