@@ -35,7 +35,7 @@ SQL
 
 On the first run, the last query returns Coffee with stock 4. This is one ordinary connection reading and writing DuckDB. The local server listens on your machine and shares one password; [remote accounts use verified TLS](#public-access). On Mac or ARM, start with [Docker](#try-with-docker) or [build from source](#build-from-source). Ctrl+C stops the server; its database stays in `duckonwire/data`.
 
-[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-144-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
+[![Tests](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/verify.yml) [![Native checks](https://img.shields.io/badge/native_checks-226-blue)](.github/workflows/verify.yml) [![Docker](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml/badge.svg)](https://github.com/misaelzapata/duckonwire/actions/workflows/docker.yml)
 
 DoW turns your DuckDB databases into a shared data service. Connect apps in your favorite language, read and write through the same connection, and let readers keep working while new data arrives. Your data stays in DuckDB.
 
@@ -143,6 +143,8 @@ Use DoW 0.3 or newer for Neon support. [Integration results](tests/results/neon-
 ## Public access
 
 Users log in with their usual PostgreSQL **username and password**. TLS encrypts the connection and verifies the server; SCRAM checks the password without sending it. Give each account database-wide `read` or `write` access. This is separate from local shared-password mode.
+
+The [account setup guide](docs/access.md) walks through two databases, separate reader/writer logins, native connections through an SSH tunnel, changing limits and removing access.
 
 <details>
 <summary>Set up accounts and verified TLS</summary>
@@ -277,7 +279,7 @@ Up to 32 databases and 64 account grants are supported. Protected engines share 
 
 Use Quack with DuckOnWire's compatible native engine. HTTPFS and Quack are built in; no extension paths or `LOAD` commands are needed. An unrelated stock DuckDB engine is not automatically compatible. Exact bindings and protocol versions are recorded in [AGENTS.md](AGENTS.md) and the [result index](tests/results/index.json).
 
-For protected native examples, in the client terminal set `DUCKONWIRE_TOKEN="${PGUSER}:${PGPASSWORD}"` using that database's account. The examples keep the ordinary DuckDB connection API; readers can query and writers can also modify data. With `CREATE SECRET (TYPE quack, TOKEN ...)`, the same credential can be kept in a native session secret for `ATTACH` and `CONNECT`.
+For protected native examples, run `export DUCKONWIRE_TOKEN="${PGUSER}:${PGPASSWORD}"` in the client terminal, with that database's account. The examples keep the ordinary DuckDB connection API; readers can query and writers can also modify data. The [account guide](docs/access.md#4-connect-through-duckdb) includes a command that reads the password without showing it. With `CREATE SECRET (TYPE quack, TOKEN ...)`, the same credential can be kept in a native session secret for `ATTACH` and `CONNECT`.
 
 ### ATTACH a remote catalog
 
@@ -304,7 +306,7 @@ The [ATTACH example](examples/attach.cpp) reads and joins remote data, then uses
 
 ```sh
 export DUCKONWIRE_ENDPOINT=quack:127.0.0.1:9495
-export DUCKONWIRE_TOKEN='your-server-token'
+# Local mode: set the shared server token. Protected mode: use the account above.
 ./build/bin/attach-client
 ```
 
@@ -539,7 +541,7 @@ Desde [Neon](#query-from-neon), `postgres_fdw` presenta las tablas remotas para 
 
 En local se comparte una contraseña. Por red puedes configurar usuarios reales con permisos de lectura o escritura. Quack requiere el motor nativo compatible: `ATTACH` permite leer y unir tablas, y `CONNECT remote` es la ruta para consultas parametrizadas, CRUD y transacciones.
 
-Con `--access-file`, las cuentas y permisos también se aplican a Quack. Cinco fallos de login en un minuto bloquean la IP durante cinco minutos; también se limita el exceso de conexiones y solicitudes. El bloqueo se comparte entre bases y protocolos. Para Quack remoto usa un túnel cifrado o HTTPS verificado.
+Con `--access-file`, las cuentas y permisos también se aplican a Quack. Cinco fallos de login en un minuto bloquean la IP durante cinco minutos; también se limita el exceso de conexiones y solicitudes. El bloqueo se comparte entre bases y protocolos. La [guía de cuentas](docs/access.md) explica la configuración paso a paso y el túnel cifrado para Quack remoto.
 
 Puedes servir [varias bases](#multiple-databases) desde un mismo puerto PostgreSQL: cada conexión elige su base y cada cuenta tiene permisos allí. Las bases permanecen aisladas; para cruzar datos desde un cliente nativo, adjunta sus endpoints con `ATTACH`.
 

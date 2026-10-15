@@ -128,7 +128,22 @@
     "release_published": false,
     "fresh_pinned_build_passed": true,
     "fresh_pinned_ctest_passed": true,
-    "current_head_ci_passed": false
+    "current_head_ci_passed": false,
+    "qualified_ci": {
+      "source_head": "ae294cfd4adf68d0d5cbe0543aa14ffb60632c32",
+      "all_five_checks_passed": true,
+      "native": "https://github.com/misaelzapata/duckonwire/actions/runs/38657686525",
+      "guide_and_clients": "https://github.com/misaelzapata/duckonwire/actions/runs/38657686573",
+      "docker_amd64_and_arm64": "https://github.com/misaelzapata/duckonwire/actions/runs/38657686502",
+      "includes_installed_package_and_public_installer": true
+    },
+    "account_guide": {
+      "runtime_checks": 17,
+      "runtime_passed": true,
+      "focused_security_checks": 79,
+      "focused_security_passed": true,
+      "remote_ssh_https_instructions_runtime_tested": false
+    }
   },
   "source_sha256": {
     "src/native_access.cpp": "c60324e4cdd80e143859b9c2b6ac3f1d4fa1c4c25a99c72de1b255361678621d",
@@ -185,7 +200,8 @@
     "server_sha256": "30988bf8a9f06255a7344fc0ab11aacb07a8c11cb87676795a9e00469798e3da",
     "catalog_fixture_path": "explicit source-directory path; independent of build-directory location",
     "benchmark_checks_counted": false,
-    "installed_package_qualification": "pending",
-    "current_head_ci_qualification": "pending"
+    "installed_package_qualification": "passed on macOS ARM64; installed checks and paired-library relocation verified",
+    "current_head_ci_qualification": "pending after documentation updates",
+    "qualified_ci_source_head": "ae294cfd4adf68d0d5cbe0543aa14ffb60632c32"
   }
 }
